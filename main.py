@@ -16,10 +16,11 @@ mclient = pymongo.MongoClient(
 bot = commands.Bot('.', max_messages=30000, fetch_offline_members=True)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
-logging.basicConfig(format=LOG_FORMAT, level=logging.DEBUG)
+logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 serverLogs = None
-modLogs = None
+
+READY = False
 
 async def safe_send_message(channel, content=None, embeds=None):
     await channel.send(content, embed=embeds)
@@ -27,10 +28,14 @@ async def safe_send_message(channel, content=None, embeds=None):
 @bot.event
 async def on_ready():
     global serverLogs
-    global modLogs
+    global READY
     serverLogs = bot.get_channel(config.logChannel)
-    modLogs = bot.get_channel(config.modChannel)
-    logging.warning('Bot has passed on_ready')
+
+    if not READY:
+        READY = True
+        bot.load_extension('cogs.moderation')
+
+    logging.info('Bot has passed on_ready')
 
 @bot.event
 async def on_resume():
@@ -74,12 +79,13 @@ async def on_message_edit(before, after):
 @commands.is_owner()
 async def reload(ctx, module):
     try:
+        logging.info(f'Attempting to reload extension {module}')
         bot.reload_extension(f'cogs.{module}')
     except discord.ext.commands.errors.ExtensionNotLoaded:
+        logging.error(f'Error while reloading extension {module}')
         return await ctx.send(':x: The provided module is not loaded')
     
     await ctx.send(':heavy_check_mark: Module reloaded successfully')
 
 print('\033[94mFils-A-Mech python by MattBSG#8888 2019\033[0m')
-bot.load_extension('cogs.moderation')
 bot.run(config.token)
