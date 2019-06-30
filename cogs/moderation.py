@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import datetime
+import time
 
 import pymongo
 import discord
@@ -25,13 +26,23 @@ async def warn(ctx, member: discord.Member, *args):
     reason = ''
     for x in args:
         reason += f'{x} '        
-    db = mclient.fil
-    puns = db.puns
-    users = db.users
+    db = mclient.fil.users
+    user = db.find_one({'_id': member.id}) # TODO: Mark tier unactive after escalating
+
+    if not user:
+        # Serious issue, all users should be in the database. Abort
+        logging.critical(f'Member {member.id} does not exist in the database!')
+        return await ctx.send(':warning: Unable to find user. This has been logged.')
 
     tier1 = ctx.guild.get_role(config.warnTier1)
     tier2 = ctx.guild.get_role(config.warnTier2)
     tier3 = ctx.guild.get_role(config.warnTier3)
+
+    tierStr = {
+        0: 'tier1',
+        1: 'tier2',
+        2: 'tier3'
+    }
 
     Roles = member.roles
     warnLevel = 0
@@ -49,6 +60,19 @@ async def warn(ctx, member: discord.Member, *args):
             embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
             embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
             embed.add_field(name='Reason', value=reason)
+
+            puns = user['punishments']
+            updatedPuns = []
+            for obj in puns:
+                if not obj['active']:
+                    updatedPuns.append(obj)
+                    continue
+                
+                if obj['type'] != 'tier2':
+                    continue
+
+                obj['active'] = False
+                updatedPuns.append(obj)
         
         elif role == tier1:
             warnLevel = 1
@@ -60,6 +84,19 @@ async def warn(ctx, member: discord.Member, *args):
             embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
             embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
             embed.add_field(name='Reason', value=reason)
+
+            puns = user['punishments']
+            updatedPuns = []
+            for obj in puns:
+                if not obj['active']:
+                    updatedPuns.append(obj)
+                    continue
+                
+                if obj['type'] != 'tier1':
+                    continue
+
+                obj['active'] = False
+                updatedPuns.append(obj)
     
     if warnLevel == 0:
         Roles.append(tier1)
@@ -69,20 +106,42 @@ async def warn(ctx, member: discord.Member, *args):
         embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
         embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
         embed.add_field(name='Reason', value=reason[:-1])
+
+        db.update_one({'_id': member.id}, {'$push': {
+            'punishments': {
+                'moderator': ctx.author.id,
+                'type': 'tier1',
+                'timestamp': int(time.time()),
+                'expiry': None,
+                'reason': reason[:-1],
+                'active': True
+            }
+        }})
+
+    else:
+        db.update_one({'_id': member.id}, {'$push': {
+            'punishments': {
+                'moderator': ctx.author.id,
+                'type': tierStr[warnLevel],
+                'timestamp': int(time.time()),
+                'expiry': None,
+                'reason': reason[:-1],
+                'active': True
+            }
+        }})
     
-    await member.edit(roles=Roles, reason='Warning action by Moderator')
+    await member.edit(roles=Roles, reason=f'Warning action by {ctx.author.name}#{ctx.author.discriminator}')
     await modLogs.send(embed=embed)
 
     return await ctx.send(f':heavy_check_mark: Issued a Tier {warnLevel + 1} warning to {member.name}#{member.discriminator}')
 
-@warn.error
-async def warn_error(ctx, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        return await ctx.send(':warning: Missing argument')
-    
-    else:
-        await ctx.send(':warning: An unknown exception has occured. This has been logged.')
-        raise error
+#@warn.error
+#async def warn_error(ctx, error):
+#    if isinstance(error, commands.MissingRequiredArgument):
+#        return await ctx.send(':warning: Missing argument')
+#    else:
+#        await ctx.send(':warning: An unknown exception has occured. This has been logged.')
+#        raise error
 
 def setup(bot):
     global serverLogs
