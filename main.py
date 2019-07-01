@@ -32,7 +32,7 @@ userCache = []
 async def safe_send_message(channel, content=None, embeds=None):
     await channel.send(content, embed=embeds)
 
-@tasks.loop(seconds=30.0)
+@tasks.loop(seconds=15.0)
 async def stats_update():
     global userCache
     global preCache
@@ -49,7 +49,8 @@ async def stats_update():
             db = mclient.fil.users
             doc = db.find_one({'_id': item['_id']})
             if not doc:
-                logging.error(f"[Cache Tool] Unexpected user {item['_id']}in cache, aborting")
+                logging.error(f"[Cache Tool] Unexpected user {item['_id']}in cache, creating")
+                db.insert_one(item)
                 continue
 
             db.update_one({'_id': item['_id']}, {'$set': item})
@@ -66,7 +67,7 @@ async def db_cache_merge(member, guild, data): # TODO Merge newEntry with dbEntr
     warnTier2 = config.warnTier2
     warnTier3 = config.warnTier3
     muteRole = config.mute
-    logging.info(f'Evaluating starting cache for {member.id}')
+    logging.debug(f'Evaluating starting cache for {member.id}')
 
     if not dbUser:
         # We don't have a record yet, make and toss it back
@@ -142,7 +143,7 @@ async def on_ready():
         bot.load_extension('cogs.moderation')
         stats_update.start() # TODO: Workaround list(dict()) not being hashable
 
-        NS = bot.get_guild(314857672585248768)
+        NS = bot.get_guild(238080556708003851)
         dbQueue = []
 
         logging.info('Starting cache population')
@@ -190,9 +191,55 @@ async def on_resume():
 
 @bot.event
 async def on_member_join(member):
-    embed = discord.Embed(color=discord.Color(0x4f941e), description=f'User <@{member.id}> joined.', timestamp=datetime.datetime.utcnow())
-    embed.set_author(name=f'User joined | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
-    await safe_send_message(serverLogs, embeds=embed)
+    global userCache
+    await bot.wait_until_ready()
+    db = mclient.fil.users
+    doc = db.find_one({'_id': member.id})
+    roleList = []
+
+    if not doc:
+        restored = False
+        for x in member.roles:
+            if x.id == member.guild.id: # We don't want @everyone in the role list. Grab any roles immediately assigned before payload
+                continue
+
+            roleList.append(x.id)
+
+        userData = {
+            '_id': member.id,
+            'messages': 0,
+            'last_message': None,
+            'roles': roleList,
+            'punishments': []
+        }
+        userCache.append(userData)
+
+    else:
+        if doc['roles']:
+            restored = True
+            for x in doc['roles']:
+                role = member.guild.get_role(x)
+                if role:
+                    roleList.append(role)
+    
+            await member.edit(roles=roleList, reason='Automatic role restore action')
+
+        else:
+            restored = False
+        
+    joinEmbed = discord.Embed(color=discord.Color(0x4f941e), description=f'User <@{member.id}> joined.', timestamp=datetime.datetime.utcnow())
+    joinEmbed.set_author(name=f'User joined | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
+    await safe_send_message(serverLogs, embeds=joinEmbed)
+
+    if restored:
+        roleText = ''
+        for z in roleList:
+            roleText += f'{z}, '
+
+        restoreEmbed = discord.Embed(color=discord.Color(0x25a5ef), description=f'<@{member.id}>\'s previous roles have been restored', timestamp=datetime.datetime.utcnow())
+        restoreEmbed.set_author(name=f'User restored | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
+        restoreEmbed.add_field(name='Restored roles', value=roleText[:-2])
+        await safe_send_message(serverLogs, embeds=restoreEmbed)
 
 @bot.event
 async def on_member_remove(member):
