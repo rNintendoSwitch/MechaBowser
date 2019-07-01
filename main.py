@@ -14,7 +14,8 @@ mclient = pymongo.MongoClient(
 	username=config.mongoUser,
 	password=config.mongoPass
 )
-bot = commands.Bot('.', max_messages=30000, fetch_offline_members=True)
+activityStatus = discord.Activity(type=discord.ActivityType.playing, name='with Fils-A-Mech')
+bot = commands.Bot('()', max_messages=30000, fetch_offline_members=True, activity=activityStatus)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -44,14 +45,14 @@ async def db_cache_merge(member, guild, data):
 
     if not dbUser:
         # We don't have a record yet, make and toss it back
-        db.insert_one({
+        dbEntry = {
             '_id': member.id,
             'messages': data['messages'],
             'last_message': data['last_message'],
             'roles': data['roles'],
             'punishments': data['punishments']
-        })
-        return data
+        }
+        return data, dbEntry
     
     newEntry = {}
     newEntry['messages'] = dbUser['messages']
@@ -96,7 +97,7 @@ async def db_cache_merge(member, guild, data):
 
             await member.edit(roles=newRoles)
         
-        return newEntry
+        return newEntry, None
 
 @bot.event
 async def on_ready():
@@ -108,29 +109,48 @@ async def on_ready():
     logging.info('Bot has passed on_ready')
 
     if not READY:
+        bot.load_extension('jishaku')
         bot.load_extension('cogs.moderation')
-        stats_update.start()
+        #stats_update.start() # TODO: Workaround list(dict()) not being hashable
 
-        NS = bot.get_guild(314857672585248768)
+        NS = bot.get_guild(238080556708003851)
+        dbQueue = []
 
-        for member in NS.members:
-            serverData = {
-                'messages': 0,
-                'last_message': None,
-                'roles': [x.id for x in member.roles],
-                'punishments': []
-                }
-            
-            preCache.append(await db_cache_merge(member, NS, serverData))
+        logging.info('Starting cache population')
+        async def cache_fetch_loop():
+            guildSize = len(NS.members)
+            memberNumber = 0
+            for member in NS.members:
+                memberNumber += 1
+                logging.info(f'Inputting member {memberNumber}/{guildSize} into cache')
+                serverData = {
+                    'messages': 0,
+                    'last_message': None,
+                    'roles': [x.id for x in member.roles],
+                    'punishments': []
+                    }
+                cacheData, dbData = await db_cache_merge(member, NS, serverData)
+                preCache.append(cacheData)
+                dbQueue.append(dbData)
+                await asyncio.sleep(0.01)
 
+        await asyncio.gather(cache_fetch_loop())
         userCache = preCache # Initialize starting member cache
         READY = True
+    db = mclient.fil.users
+    db.insert_many(dbQueue)
 
     logging.info('Bot is fully initialized')
 
 @bot.event
 async def on_resume():
     logging.warning('The bot has been resumed on Discord')
+
+#@bot.event
+#async def on_command_error(event, *args, **kwargs):
+#    print(event)
+#    print(args)
+#    print(kwargs)
 
 @bot.event
 async def on_member_join(member):
@@ -162,9 +182,12 @@ async def on_message(message):
 
 @bot.event
 async def on_message_delete(message):
+    # Discord allows 1024 chars per embed field value, but a message can have 2000 chars
+    content = message.content if len(message.content) < 1000 else message.content[:1000] + '...'
+
     embed = discord.Embed(color=discord.Color(0xff6661), description=f'Message by <@{message.author.id}> in <#{message.channel.id}> was deleted.', timestamp=datetime.datetime.utcnow())
     embed.set_author(name=f'Message deleted | {message.author.name}#{message.author.discriminator}')
-    embed.add_field(name='Message', value=message.content)
+    embed.add_field(name='Message', value=content)
     await safe_send_message(serverLogs, embeds=embed)
 
 @bot.event
@@ -197,6 +220,14 @@ async def reload(ctx, module):
         return await ctx.send(':x: The provided module is not loaded')
     
     await ctx.send(':heavy_check_mark: Module reloaded successfully')
+
+@reload.error
+async def reload_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        logging.error('We handled bois')
+        return
+    
+    logging.error('Oopsie, cannot handle all this erroring')
 
 @bot.command()
 @commands.is_owner()
