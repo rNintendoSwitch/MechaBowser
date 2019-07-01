@@ -124,7 +124,7 @@ async def warn(ctx, member: discord.Member, *args):
             embed.set_author(name=f'Third Warning | {member.name}#{member.discriminator}')
             embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
             embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
-            embed.add_field(name='Reason', value=reason)
+            embed.add_field(name='Reason', value=reason[:-1])
 
             puns = user['punishments']
             updatedPuns = []
@@ -148,7 +148,7 @@ async def warn(ctx, member: discord.Member, *args):
             embed.set_author(name=f'Second Warning | {member.name}#{member.discriminator}')
             embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
             embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
-            embed.add_field(name='Reason', value=reason)
+            embed.add_field(name='Reason', value=reason[:-1])
 
             puns = user['punishments']
             updatedPuns = []

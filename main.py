@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import datetime
+import time
+import copy
 from collections import Counter
 
 import pymongo
@@ -21,20 +23,42 @@ LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 serverLogs = None
+debugChannel = None
 
 READY = False
 preCache = []
-userCache = {}
+userCache = []
 
 async def safe_send_message(channel, content=None, embeds=None):
     await channel.send(content, embed=embeds)
 
-@tasks.loop(seconds=15.0)
+@tasks.loop(seconds=30.0)
 async def stats_update():
-    updateCache = list(set(userCache) - set(preCache))
-    print(updateCache)
+    global userCache
+    global preCache
+    logging.info('[Cache Tool] Running cache update')
+    updateCache = []
+    if not READY:
+        logging.info('[Cache Tool] Bot not READY. Skipping cache check')
+        return
 
-async def db_cache_merge(member, guild, data):
+    for item in userCache:
+        if item not in preCache: # Something that is not the same
+            logging.info(f"[Cache Tool] Updating user db for {item['_id']}")
+            updateCache.append(item)
+            db = mclient.fil.users
+            doc = db.find_one({'_id': item['_id']})
+            if not doc:
+                logging.error(f"[Cache Tool] Unexpected user {item['_id']}in cache, aborting")
+                continue
+
+            db.update_one({'_id': item['_id']}, {'$set': item})
+            preCache = copy.deepcopy(userCache)
+            break
+
+    logging.info('[Cache Tool] Done')
+
+async def db_cache_merge(member, guild, data): # TODO Merge newEntry with dbEntry. They are now the same
     db = mclient.fil.users
     dbUser = db.find_one({'_id': member.id})
 
@@ -42,6 +66,7 @@ async def db_cache_merge(member, guild, data):
     warnTier2 = config.warnTier2
     warnTier3 = config.warnTier3
     muteRole = config.mute
+    logging.info(f'Evaluating starting cache for {member.id}')
 
     if not dbUser:
         # We don't have a record yet, make and toss it back
@@ -55,6 +80,7 @@ async def db_cache_merge(member, guild, data):
         return data, dbEntry
     
     newEntry = {}
+    newEntry['_id'] = member.id
     newEntry['messages'] = dbUser['messages']
     newEntry['last_message'] = dbUser['last_message']
     if Counter(dbUser['roles']) != Counter(data['roles']):
@@ -102,18 +128,21 @@ async def db_cache_merge(member, guild, data):
 @bot.event
 async def on_ready():
     global serverLogs
+    global debugChannel
     global READY
     global userCache
     global preCache
     serverLogs = bot.get_channel(config.logChannel)
+    debugChannel = bot.get_channel(config.debugChannel)
+    db = mclient.fil.users
     logging.info('Bot has passed on_ready')
 
     if not READY:
         bot.load_extension('jishaku')
         bot.load_extension('cogs.moderation')
-        #stats_update.start() # TODO: Workaround list(dict()) not being hashable
+        stats_update.start() # TODO: Workaround list(dict()) not being hashable
 
-        NS = bot.get_guild(238080556708003851)
+        NS = bot.get_guild(314857672585248768)
         dbQueue = []
 
         logging.info('Starting cache population')
@@ -122,7 +151,7 @@ async def on_ready():
             memberNumber = 0
             for member in NS.members:
                 memberNumber += 1
-                logging.info(f'Inputting member {memberNumber}/{guildSize} into cache')
+                logging.info(f'Populating member {memberNumber}/{guildSize} into cache')
                 serverData = {
                     'messages': 0,
                     'last_message': None,
@@ -130,15 +159,22 @@ async def on_ready():
                     'punishments': []
                     }
                 cacheData, dbData = await db_cache_merge(member, NS, serverData)
-                preCache.append(cacheData)
+                userCache.append(cacheData)
+                if not dbData:
+                    # This is an update
+                    db.update_one({'_id': member.id}, {'$set': cacheData})
                 dbQueue.append(dbData)
                 await asyncio.sleep(0.01)
 
         await asyncio.gather(cache_fetch_loop())
-        userCache = preCache # Initialize starting member cache
+        preCache = copy.deepcopy(userCache) # Initialize starting member cache
+        #logging.info(f'start usercache {userCache}')
+        #logging.info(f'start precache {preCache}')
         READY = True
-    db = mclient.fil.users
-    db.insert_many(dbQueue)
+
+    dbQueue = list(filter(None, dbQueue))
+    if dbQueue: # New records to insert
+        db.insert_many(dbQueue)
 
     logging.info('Bot is fully initialized')
 
@@ -160,12 +196,14 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
+    await bot.wait_until_ready()
     embed = discord.Embed(color=discord.Color(0x772F30), description=f'User <@{member.id}> left.', timestamp=datetime.datetime.utcnow())
     embed.set_author(name=f'User left | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
     await safe_send_message(serverLogs, embeds=embed)
 
 @bot.event
 async def on_message(message):
+    global userCache
     await bot.wait_until_ready()
     if message.author == bot.user:
         return
@@ -177,11 +215,23 @@ async def on_message(message):
     while not READY: # We need on_ready tasks to complete prior to handling
         logging.debug(f'Not READY. Delaying message {message.id}')
         await asyncio.sleep(1)
-    
+    for obj in userCache:
+        if obj['_id'] == message.author.id:
+            obj['messages'] += 1
+            obj['last_message'] = int(time.time())
+            break
+
     await bot.process_commands(message) # Continue commands
 
 @bot.event
 async def on_message_delete(message):
+    await bot.wait_until_ready()
+    if message.type != discord.MessageType.default:
+        return # No system messages
+
+    if not message.content:
+        return # Blank or null content (could be embed)
+
     # Discord allows 1024 chars per embed field value, but a message can have 2000 chars
     content = message.content if len(message.content) < 1000 else message.content[:1000] + '...'
 
@@ -192,8 +242,15 @@ async def on_message_delete(message):
 
 @bot.event
 async def on_message_edit(before, after):
+    await bot.wait_until_ready()
     if before.content == after.content:
         return
+
+    if before.type != discord.MessageType.default:
+        return # No system messages
+
+    if not after.content or not before.content:
+        return # Blank or null content (could be embed)
     
     # Discord allows 1024 chars per embed field value, but a message can have 2000 chars
     before_content = before.content if len(before.content) < 1000 else before.content[:1000] + '...'
@@ -212,6 +269,7 @@ async def ping(ctx):
 @bot.command()
 @commands.is_owner()
 async def reload(ctx, module):
+    await bot.wait_until_ready()
     try:
         logging.info(f'Attempting to reload extension {module}')
         bot.reload_extension(f'cogs.{module}')
@@ -232,6 +290,7 @@ async def reload_error(ctx, error):
 @bot.command()
 @commands.is_owner()
 async def update(ctx, sub, *args):
+    await bot.wait_until_ready()
     if sub == 'pfp':
         if not ctx.message.attachments:
             return await ctx.send(':warning: An attachment to change the picture to was not provided')
