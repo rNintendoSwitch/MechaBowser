@@ -55,7 +55,6 @@ async def stats_update():
 
             db.update_one({'_id': item['_id']}, {'$set': item})
             preCache = copy.deepcopy(userCache)
-            break
 
     logging.info('[Cache Tool] Done')
 
@@ -160,7 +159,7 @@ async def on_ready():
                     'punishments': []
                     }
                 cacheData, dbData = await db_cache_merge(member, NS, serverData)
-                userCache.append(cacheData)
+                userCache.append(dbData)
                 if not dbData:
                     # This is an update
                     db.update_one({'_id': member.id}, {'$set': cacheData})
@@ -252,7 +251,7 @@ async def on_member_remove(member):
 async def on_message(message):
     global userCache
     await bot.wait_until_ready()
-    if message.author == bot.user:
+    if message.author.bot:
         return
     
     if message.channel.type != discord.ChannelType.text:
@@ -262,6 +261,7 @@ async def on_message(message):
     while not READY: # We need on_ready tasks to complete prior to handling
         logging.debug(f'Not READY. Delaying message {message.id}')
         await asyncio.sleep(1)
+
     for obj in userCache:
         if obj['_id'] == message.author.id:
             obj['messages'] += 1
