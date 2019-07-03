@@ -82,9 +82,9 @@ async def _banning(ctx, user: typing.Union[discord.User, int], *args):
     await modLogs.send(embed=embed)
     return await ctx.send(':heavy_check_mark: User banned')
 
-@commands.command()
+@commands.command(name='warn')
 @commands.has_any_role(config.moderator, config.eh)
-async def warn(ctx, member: discord.Member, *args):
+async def _warning(ctx, member: discord.Member, *args):
     if len(args) < 1:
         return await ctx.send(':warning: A reason is required')
 
@@ -200,7 +200,7 @@ async def warn(ctx, member: discord.Member, *args):
 
     return await ctx.send(f':heavy_check_mark: Issued a Tier {warnLevel + 1} warning to {member.name}#{member.discriminator}')
 
-@warn.error
+@_warning.error
 async def warn_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument):
         return await ctx.send(':warning: Missing argument')
@@ -218,6 +218,6 @@ def setup(bot):
     modLogs = bot.get_channel(config.modChannel)
     Client = bot
 
-    bot.add_command(warn)
+    bot.add_command(_warning)
     bot.add_command(_banning)
     logging.info('Moderation module loaded')
