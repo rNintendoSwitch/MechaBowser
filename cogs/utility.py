@@ -19,7 +19,7 @@ mclient = pymongo.MongoClient(
 serverLogs = None
 modLogs = None
 SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
-SMM2LevelPost = re.compile(r'Name: ?(.+)\n\n?(?:Level )?ID: ?([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})\n\n?Style: ?(.+)\n\n?(?:Theme: ?(.+)\n\n?)?(?:Tags: ?(.+)\n\n?)?Difficulty: ?(.+)\n\n?Description: ?(.+)', re.I)
+SMM2LevelPost = re.compile(r'Name: ?(.+)\n\n?(?:Level )?ID: ?([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(.+)\n\n?(?:Theme: ?(.+)\n\n?)?(?:Tags: ?(.+)\n\n?)?Difficulty: ?(.+)\n\n?Description: ?(.+)', re.I)
 
 class ChatFilter(commands.Cog, name='Chat Filter'):
     def __init__(self, bot):
