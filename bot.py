@@ -24,6 +24,9 @@ logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 READY = False
 
+async def is_ready():
+    return READY
+
 @bot.event
 async def on_ready():
     global READY
@@ -57,10 +60,10 @@ async def on_ready():
                     }})
 
         logging.info('[Cache] Inital database syncronization complete')
-        bot.load_extension('cogs.main')
 
 async def setup_discord():
     bot.load_extension('jishaku')
+    bot.load_extension('cogs.core')
     await bot.start(config.token)
 
 async def safe_send_message(channel, content=None, embeds=None):
@@ -84,14 +87,15 @@ class MainHandler(tornado.web.RequestHandler):
         else:
             self.write(doc['body'])
 
-print('\033[94mFils-A-Mech python by MattBSG#8888 2019\033[0m')
+if __name__ == '__main__':
+    print('\033[94mFils-A-Mech python by MattBSG#8888 2019\033[0m')
 
-logging.info('Initializing web framework')
-app = tornado.web.Application([
-    (r'/api/archive/([0-9]+-[0-9]+)', MainHandler)
-], xheader=True)
+    logging.info('Initializing web framework')
+    app = tornado.web.Application([
+        (r'/api/archive/([0-9]+-[0-9]+)', MainHandler)
+    ], xheader=True)
 
-app.listen(8880)
-logging.info('Initializing discord')
-tornado.ioloop.IOLoop.current().run_sync(setup_discord)
-tornado.ioloop.IOLoop.current().start()
+    app.listen(8880)
+    logging.info('Initializing discord')
+    tornado.ioloop.IOLoop.current().run_sync(setup_discord)
+    tornado.ioloop.IOLoop.current().start()
