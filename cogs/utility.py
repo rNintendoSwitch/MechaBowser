@@ -6,9 +6,11 @@ import datetime
 
 import pymongo
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+import pymarkovchain
 
 import config
+import utils
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -19,7 +21,6 @@ mclient = pymongo.MongoClient(
 serverLogs = None
 modLogs = None
 SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
-SMM2LevelPost = re.compile(r'Name: ?(.+)\n\n?(?:Level )?ID: ?([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(.+)\n\n?(?:Theme: ?(.+)\n\n?)?(?:Tags: ?(.+)\n\n?)?Difficulty: ?(.+)\n\n?Description: ?(.+)', re.I)
 SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
 
 class MarkovChat(commands.Cog):
@@ -128,6 +129,52 @@ class ChatControl(commands.Cog):
                 # Fall back to leaving user text
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
+
+    @commands.command(name='ping')
+    async def _ping(self, ctx):
+        initiated = ctx.message.created_at
+        msg = await ctx.send('Evaluating...')
+        return await msg.edit(content=f'Pong! Roundtrip latency {(msg.created_at - initiated).total_seconds()} seconds')
+
+    @commands.command(name='clean')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _clean(self, ctx, messages: int, members: commands.Greedy[discord.Member]):
+        if messages >= 100:
+            def confirm_check(reaction, member):
+                return member == ctx.author and str(reaction.emoji) in [config.redTick, config.greenTick]
+
+            confirmMsg = await ctx.send(f'This action will delete up to {messages}, are you sure you want to proceed?')
+            await confirmMsg.add_reaction(config.greenTick)
+            await confirmMsg.add_reaction(config.redTick)
+            try:
+                reaction = await Client.wait_for('reaction_add', timeout=15, check=confirm_check)
+                if str(reaction[0]) != config.greenTick:
+                    await confirmMsg.edit(content='Clean action canceled.')
+                    return await confirmMsg.clear_reactions()
+
+            except asyncio.TimeoutError:
+                await confirmMsg.edit(content='Confirmation timed out, clean action canceled.')
+                return await confirmMsg.clear_reactions()
+
+            else:
+                await confirmMsg.delete()
+            
+        memberList = None if not members else [x.id for x in members]
+
+        def message_filter(message):
+            return True if not memberList or message.author.id in memberList else False
+
+        deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
+    
+        m = await ctx.send('Clean action complete')
+        await m.delete(delay=10)
+        archiveID = await utils.message_archive(deleted)
+
+        embed = discord.Embed(color=discord.Color(0xff6661), description=f'A bulk delete has occured, view message logs at {config.baseUrl}/archive/{archiveID}', timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Messages deleted | Bulk Delete')
+        await Client.get_channel(config.logChannel).send(embed=embed)
+
+        return await m.delete(delay=10)
 
     @commands.command(name='info')
     @commands.has_any_role(config.moderator, config.eh)
