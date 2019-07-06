@@ -22,6 +22,7 @@ SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
 SMM2LevelPost = re.compile(r'Name: ?(.+)\n\n?(?:Level )?ID: ?([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(.+)\n\n?(?:Theme: ?(.+)\n\n?)?(?:Tags: ?(.+)\n\n?)?Difficulty: ?(.+)\n\n?Description: ?(.+)', re.I)
 
 class ChatFilter(commands.Cog, name='Chat Filter'):
+class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -33,7 +34,7 @@ class ChatFilter(commands.Cog, name='Chat Filter'):
             return
 
         #Filter for #mario
-        if message.channel.id == 595665653260615696: # #mario
+        if message.channel.id == 325430144993067049: # #mario
             if re.search(SMM2LevelID, message.content):
                 await message.delete()
                 response = await message.channel.send(f'<:redTick:402505117733224448> <@{message.author.id}> Please do not post Super Mario Maker 2 level codes '\
