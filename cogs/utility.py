@@ -20,8 +20,50 @@ serverLogs = None
 modLogs = None
 SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
 SMM2LevelPost = re.compile(r'Name: ?(.+)\n\n?(?:Level )?ID: ?([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(.+)\n\n?(?:Theme: ?(.+)\n\n?)?(?:Tags: ?(.+)\n\n?)?Difficulty: ?(.+)\n\n?Description: ?(.+)', re.I)
+SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
 
-class ChatFilter(commands.Cog, name='Chat Filter'):
+class MarkovChat(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.markovChain = pymarkovchain.MarkovChain('markov')
+        #self.dump_markov.start() # pylint: disable=no-member
+
+    def cog_unload(self):
+        pass
+        #self.dump_markov.cancel() # pylint: disable=no-member
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        await self.bot.wait_until_ready()
+        if message.author.bot or message.type != discord.MessageType.default:
+            # This a trash message, we don't want to track this
+            return
+
+        if not message.content or message.content.startswith('()'):
+            # Might be an embed or a command, not useful
+            return
+
+        self.markovChain.generateDatabase(message.content)
+        self.markovChain.dumpdb()
+
+    @tasks.loop(seconds=30)
+    async def dump_markov(self):
+        logging.info('Taking a dump')
+        self.markovChain.dumpdb()
+        logging.info('I\'m done')
+
+    @commands.command(name='markov')
+    @commands.is_owner()
+    async def _markov(self, ctx, seed: typing.Optional[str]):
+        try:
+            if seed:
+                return await ctx.send(self.markovChain.generateStringWithSeed(seed))
+
+            else:
+                return await ctx.send(self.markovChain.generateString())
+        except pymarkovchain.StringContinuationImpossibleError:
+            return await ctx.send(':warning: Unable to generate chain with provided seed')
+
 class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -78,7 +120,6 @@ class ChatControl(commands.Cog):
             if levelTags:
                 embed.add_field(name='Tags', value=levelTags, inline=False)
 
-            #await message.delete() Flap broke embedssssssss
             try:
                 await message.channel.send(embed=embed)
                 await message.delete()
