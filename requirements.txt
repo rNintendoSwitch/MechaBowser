@@ -2,3 +2,5 @@ discord
 pymongo
 jishaku
 pylint
+tornado
+markovify
