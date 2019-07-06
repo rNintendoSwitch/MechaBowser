@@ -129,69 +129,72 @@ class ChatControl(commands.Cog):
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
 
-@commands.command(name='info')
-@commands.has_any_role(config.moderator, config.eh)
-async def _info(ctx, user: typing.Union[discord.Member, int]):
-    if type(user) == int:
-        # User shares no servers, fetch it instead
-        user = await Client.fetch_user(user)
-        if not user:
-            return await ctx.send('<:redTick:402505117733224448> User does not exist')
+    @commands.command(name='info')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _info(self, ctx, user: typing.Union[discord.Member, int]):
+        if type(user) == int:
+            # User shares no servers, fetch it instead
+            user = await Client.fetch_user(user)
+            if not user:
+                return await ctx.send('<:redTick:402505117733224448> User does not exist')
         
-        embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about this user (<@{user.id}>) from the ' \
-        'API as I share no servers. There is little information to display as such')
-        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-        embed.set_thumbnail(url=user.avatar_url)
-        embed.add_field(name='Created', value=f'{user.created_at}T UTC')
-        return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
-
-    else:
-        # Member object, loads of info to work with
-        db = mclient.fil.users
-        doc = db.find_one({'_id': user.id})
-        embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched member <@{user.id}>')
-        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-        embed.set_thumbnail(url=user.avatar_url)
-        embed.add_field(name='Messages', value=str(doc['messages']), inline=True)
-        embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
-        roles = ''
-        for role in user.roles:
-            if role.id == user.guild.id:
-                continue
-
-            roles += f'{role.name}, '
-            
-        if not roles:
-            # Empty, or no roles
-            roles = '*User has no roles*'
-
-        embed.add_field(name='Roles', value=roles[:-2], inline=False)
-        if doc['last_message'] == None:
-            lastMsg = 'N/a'
-
-        lastMsg = 'N/a' if not doc['last_message'] else datetime.datetime.utcfromtimestamp(doc['last_message']).strftime('%B %d, %Y %H:%M:%S UTC')
-        embed.add_field(name='Last message', value=lastMsg, inline=True)
-        embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
-        punishments = ''
-        if not doc['punishments']:
-            punishments = '__*No punishments on record*__'
+            embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about this user (<@{user.id}>) from the ' \
+            'API as I share no servers. There is little information to display as such')
+            embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
+            embed.set_thumbnail(url=user.avatar_url)
+            embed.add_field(name='Created', value=f'{user.created_at}T UTC')
+            return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
 
         else:
-            punStrs = {
-                'tier1': 'Tier 1 Warning',
-                'tier2': 'Tier 2 Warning',
-                'tier3': 'Tier 3 Warning',
-                'mute': 'Mute',
-                'unmute': 'Unmute',
-                'clear': 'Warnings reset',
-                'kick': 'Kick',
-                'ban': 'Ban',
-                'unban': 'Unban'
-            }
-            puns = 0
-            for pun in doc['punishments']:
-                if puns > 5:
-                    break
+            # Member object, loads of info to work with
+            db = mclient.fil.users
+            doc = db.find_one({'_id': user.id})
+            embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched member <@{user.id}>')
+            embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
+            embed.set_thumbnail(url=user.avatar_url)
+            embed.add_field(name='Messages', value=str(doc['messages']), inline=True)
+            embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+            roleList = []
+            for role in user.roles:
+                if role.id == user.guild.id:
+                    continue
+
+                roleList.append(role.name)
+            
+            if not roleList:
+                # Empty; no roles
+                roles = '*User has no roles*'
+
+            else:
+                roles = ', '.join(roleList)
+
+            embed.add_field(name='Roles', value=roles, inline=False)
+            if doc['last_message'] == None:
+                lastMsg = 'N/a'
+
+            lastMsg = 'N/a' if not doc['last_message'] else datetime.datetime.utcfromtimestamp(doc['last_message']).strftime('%B %d, %Y %H:%M:%S UTC')
+            embed.add_field(name='Last message', value=lastMsg, inline=True)
+            embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+            punishments = ''
+            if not doc['punishments']:
+                punishments = '__*No punishments on record*__'
+
+            else:
+                punStrs = {
+                    'tier1': 'Tier 1 Warning',
+                    'tier2': 'Tier 2 Warning',
+                    'tier3': 'Tier 3 Warning',
+                    'mute': 'Mute',
+                    'unmute': 'Unmute',
+                    'clear': 'Warnings reset',
+                    'kick': 'Kick',
+                    'ban': 'Ban',
+                    'unban': 'Unban'
+                }
+                puns = 0
+                for pun in doc['punishments']:
+                    if puns > 5:
+                        break
 
                 puns += 1
                 stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%M/%d/%y %H:%M:%S UTC')
@@ -217,11 +220,11 @@ def setup(bot):
     modLogs = bot.get_channel(config.modChannel)
     Client = bot
 
-    bot.add_cog(ChatFilter(bot))
-    bot.add_command(_info)
-
-    logging.info('Utility module loaded')
+    bot.add_cog(ChatControl(bot))
+    #bot.add_cog(MarkovChat(bot))
+    logging.info('[Extension] Utility module loaded')
 
 def teardown(bot):
-    bot.remove_cog('Chat Filter')
-    logging.info('Utility module unloaded')
+    bot.remove_cog('ChatControl')
+    #bot.remove_cog('MarkovChat')
+    logging.info('[Extension] Utility module unloaded')
