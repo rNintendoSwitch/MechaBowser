@@ -208,3 +208,6 @@ def setup(bot):
     bot.add_cog(Moderation(bot))
     logging.info('[Extension] Moderation module loaded')
 
+def teardown(bot):
+    bot.remove_cog('Moderation')
+    logging.info('[Extension] Utility module unloaded')
