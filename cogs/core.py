@@ -26,12 +26,6 @@ class MainEvents(commands.Cog):
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
 
-    #@commands.Cog.listener()
-    #async def on_ready(self):
-    #    self.serverLogs = self.bot.get_channel(config.logChannel)
-    #    self.modLogs = self.bot.get_channel(config.modChannel)
-    #    self.debugChannel = self.bot.get_channel(config.debugChannel)
-
     @commands.Cog.listener()
     async def on_resume(self):
         logging.warning('[MAIN] The bot has been resumed on Discord')
