@@ -202,15 +202,16 @@ class ChatControl(commands.Cog):
 
         else:
             # Member object, loads of info to work with
-            db = mclient.fil.users
-            doc = db.find_one({'_id': user.id})
+            messages = mclient.bowser.messages.find({'author': user.id})
+            msgCount = 0 if not messages else messages.count()
+
             embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched member <@{user.id}>')
             embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
             embed.set_thumbnail(url=user.avatar_url)
-            embed.add_field(name='Messages', value=str(doc['messages']), inline=True)
+            embed.add_field(name='Messages', value=str(msgCount), inline=True)
             embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
             roleList = []
-            for role in user.roles:
+            for role in reversed(user.roles):
                 if role.id == user.guild.id:
                     continue
 
@@ -224,14 +225,13 @@ class ChatControl(commands.Cog):
                 roles = ', '.join(roleList)
 
             embed.add_field(name='Roles', value=roles, inline=False)
-            if doc['last_message'] == None:
-                lastMsg = 'N/a'
 
-            lastMsg = 'N/a' if not doc['last_message'] else datetime.datetime.utcfromtimestamp(doc['last_message']).strftime('%B %d, %Y %H:%M:%S UTC')
+            lastMsg = 'N/a' if msgCount == 0 else datetime.datetime.utcfromtimestamp(messages.sort('timestamp', 1)[0]['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
             embed.add_field(name='Last message', value=lastMsg, inline=True)
             embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
             punishments = ''
-            if not doc['punishments']:
+            punsCol = mclient.bowser.puns.find({'user': user.id})
+            if not punsCol:
                 punishments = '__*No punishments on record*__'
 
             else:
@@ -247,22 +247,22 @@ class ChatControl(commands.Cog):
                     'unban': 'Unban'
                 }
                 puns = 0
-                for pun in doc['punishments']:
+                for pun in punsCol:
                     if puns > 5:
                         break
 
-                puns += 1
-                stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%M/%d/%y %H:%M:%S UTC')
-                punType = punStrs[pun['type']]
-                if pun['type'] in ['clear', 'unmute', 'unban']:
-                    punishments += f'- [{stamp}] {punType}\n'
+                    puns += 1
+                    stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
+                    punType = punStrs[pun['type']]
+                    if pun['type'] in ['clear', 'unmute', 'unban']:
+                        punishments += f'- [{stamp}] {punType}\n'
 
-                else:
-                    punishments += f'+ [{stamp}] {punType}\n'
+                    else:
+                        punishments += f'+ [{stamp}] {punType}\n'
 
-            punishments = f'Showing {puns}/{len(doc["punishments"])} punishment entries. ' \
-                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
-                f'\n```diff\n{punishments}```'
+                punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
+                    f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
+                    f'\n```diff\n{punishments}```'
         embed.add_field(name='Punishments', value=punishments)
         return await ctx.send(embed=embed)
 

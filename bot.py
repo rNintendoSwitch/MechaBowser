@@ -36,7 +36,7 @@ class BotCache(commands.Cog):
             #self.READY = True
             #return
             logging.info('[Cache] Performing initial database synchronization')
-            db = mclient.fil.users
+            db = mclient.bowser.users
             NS = bot.get_guild(238080556708003851)
 
             guildCount = len(NS.members)
@@ -81,7 +81,7 @@ class MainHandler(tornado.web.RequestHandler):
         self.set_header('Content-Type', 'text/plain; charset=UTF-8')
 
     async def get(self, archiveID):
-        db = mclient.fil.archive
+        db = mclient.bowser.archive
         doc = db.find_one({'_id': archiveID})
 
         if not doc:

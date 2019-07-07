@@ -2,6 +2,7 @@ import asyncio
 import typing
 import datetime
 import time
+import uuid
 
 import discord
 import pymongo
@@ -17,7 +18,7 @@ mclient = pymongo.MongoClient(
 archiveHeader = '# Message archive for "#{0.name}" ({0.id}) in guild "{1.name}" ({1.id})\n# Format:\n[date + time] Member ID/Message ID/Username - Message content\n----------------\n'
 
 async def message_archive(archive: typing.Union[discord.Message, list]):
-    db = mclient.fil.archive
+    db = mclient.bowser.archive
     if type(archive) != list:
         # Single message to archive
         archive = [archive]
@@ -41,7 +42,7 @@ async def message_archive(archive: typing.Union[discord.Message, list]):
     return archiveID
 
 async def store_user(member, messages=0):
-    db = mclient.fil.users
+    db = mclient.bowser.users
     # Double check exists
     if db.find_one({'_id': member.id}):
         return
@@ -55,9 +56,23 @@ async def store_user(member, messages=0):
 
     userData = {
         '_id': member.id,
-        'messages': messages,
-        'last_message': None,
-        'roles': roleList,
-        'punishments': []
+        'roles': roleList
     }
     db.insert_one(userData)
+
+async def issue_pun(user, moderator, _type, reason=None, timestamp=int(time.time()), expiry=None, active=True, old_doc=None):
+    db = mclient.bowser.puns
+    docID = str(uuid.uuid4())
+    while db.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
+        docID = str(uuid.uuid4())
+
+    db.insert_one({
+        '_id': docID,
+        'user': user,
+        'moderator': moderator,
+        'type': _type,
+        'timestamp': timestamp,
+        'reason': reason,
+        'expiry': expiry,
+        'active': active
+    })

@@ -20,8 +20,12 @@ mclient = pymongo.MongoClient(
 class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.load_extension('cogs.moderation')
-        self.bot.load_extension('cogs.utility')
+        try:
+            self.bot.load_extension('cogs.moderation')
+            self.bot.load_extension('cogs.utility')
+        except discord.ext.commands.errors.ExtensionAlreadyLoaded:
+            pass
+
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
@@ -32,7 +36,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        db = mclient.fil.users
+        db = mclient.bowser.users
         doc = db.find_one({'_id': member.id})
         roleList = []
 
@@ -75,25 +79,29 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot:
+        if message.author.bot or message.webhook_id:
             return
     
         if message.channel.type != discord.ChannelType.text:
             logging.error(f'Discarding bad message {message.channel.type}')
             return
 
-        db = mclient.fil.users
-        doc = db.find_one_and_update({'_id': message.author.id}, {'$inc': {'messages': 1}, '$set': {'last_message': int(time.time())}})
-        if not doc:
-            await utils.store_user(message.author, 1)
+        db = mclient.bowser.messages
+        db.insert_one({
+            '_id': message.id,
+            'author': message.author.id,
+            'guild': message.guild.id,
+            'channel': message.channel.id,
+            'timestamp': int(time.time())
+        })
 
         return await self.bot.process_commands(message) # Allow commands to fire
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):
-        db = mclient.fil.archive
-        oneDayPast = int(time.time() - 30)
-        archives = db.find({'timestamp': {'$gt': oneDayPast}})
+        db = mclient.bowser.archive
+        thirtySec = int(time.time() - 30)
+        archives = db.find({'timestamp': {'$gt': thirtySec}})
         if archives: # If the bulk delete is the result of us, exit
             for x in archives:
                 if messages[0].id in x[messages]:
