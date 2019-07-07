@@ -102,7 +102,7 @@ class MainEvents(commands.Cog):
         archives = db.find({'timestamp': {'$gt': oneDayPast}})
         if archives: # If the bulk delete is the result of us, exit
             for x in archives:
-                if messages[0].id in x.messages:
+                if messages[0].id in x[messages]:
                     return
 
         archiveID = await utils.message_archive(messages)
