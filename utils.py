@@ -29,7 +29,7 @@ async def message_archive(archive: typing.Union[discord.Message, list]):
     for msg in reversed(archive):
         messageIDs.append(msg.id)
         content = '*No message content could be saved, could be embed or attachment*' if not msg.content else msg.content
-        body += f'[{msg.created_at.strftime("%Y/%M/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
+        body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
 
     db.insert_one({
         '_id': archiveID,
