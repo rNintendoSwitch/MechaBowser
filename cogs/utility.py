@@ -3,9 +3,11 @@ import logging
 import re
 import typing
 import datetime
+import aiohttp
 
 import pymongo
 import discord
+from discord import Webhook, AsyncWebhookAdapter
 from discord.ext import commands, tasks
 import pymarkovchain
 
@@ -20,8 +22,6 @@ mclient = pymongo.MongoClient(
 
 serverLogs = None
 modLogs = None
-SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
-SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
 
 class MarkovChat(commands.Cog):
     def __init__(self, bot):
@@ -35,11 +35,6 @@ class MarkovChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        await self.bot.wait_until_ready()
-        if message.author.bot or message.type != discord.MessageType.default:
-            # This a trash message, we don't want to track this
-            return
-
         if not message.content or message.content.startswith('()'):
             # Might be an embed or a command, not useful
             return
@@ -68,17 +63,30 @@ class MarkovChat(commands.Cog):
 class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
+        self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
+        self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:ebay)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I)
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        await self.bot.wait_until_ready()
-
         if message.author.bot or message.type != discord.MessageType.default:
             return
 
+        #Filter test for afiliate links
+        if message.channel.id in [314857672585248768, 276036563866091521]:
+            if re.search(self.affiliateLinks, message.content):
+                hooks = await message.channel.webhooks()
+                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+
+                await message.delete()
+                async with aiohttp.ClientSession() as session:
+                    name = message.author.name if not message.author.nick else message.author.nick
+                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
+                    await webhook.send(content=re.sub(self.affiliateLinks, r'\1', message.content), username=name, avatar_url=message.author.avatar_url)
+
         #Filter for #mario
         if message.channel.id == 325430144993067049: # #mario
-            if re.search(SMM2LevelID, message.content):
+            if re.search(self.SMM2LevelID, message.content):
                 await message.delete()
                 response = await message.channel.send(f'<:redTick:402505117733224448> <@{message.author.id}> Please do not post Super Mario Maker 2 level codes '\
                     'here. Post in <#595203237108252672> with the pinned template instead.')
@@ -88,11 +96,11 @@ class ChatControl(commands.Cog):
 
         #Filter for #smm2-levels
         if message.channel.id == 595203237108252672:
-            if not re.search(SMM2LevelID, message.content):
+            if not re.search(self.SMM2LevelID, message.content):
                 # We only want to filter posts with a level id
                 return
 
-            block = re.search(SMM2LevelPost, message.content)
+            block = re.search(self.SMM2LevelPost, message.content)
             if not block:
                 # No match for a properly formatted level post
                 response = await message.channel.send(f'<:redTick:402505117733224448> <@{message.author.id}> Your level is formatted incorrectly, please see the pinned messages for the format. A copy '\
