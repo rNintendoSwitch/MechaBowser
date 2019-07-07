@@ -1,12 +1,13 @@
 import asyncio
 import logging
+import sys
 
 import pymongo
 import tornado.ioloop
 import tornado.web
 import tornado
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 import config
 import utils
@@ -22,48 +23,50 @@ bot = commands.Bot('()', max_messages=30000, fetch_offline_members=True, activit
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
-READY = False
+class BotCache(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.READY = False
 
-async def is_ready():
-    return READY
+    @commands.Cog.listener()
+    async def on_ready(self):
+        logging.info('[BOT] on_ready')
+        if not self.READY:
+            self.bot.load_extension('cogs.core')
+            #self.READY = True
+            #return
+            logging.info('[Cache] Performing initial database synchronization')
+            db = mclient.fil.users
+            NS = bot.get_guild(238080556708003851)
 
-@bot.event
-async def on_ready():
-    global READY
+            guildCount = len(NS.members)
+            userCount = 0
+            for member in NS.members:
+                userCount += 1
+                await asyncio.sleep(0.01)
+                logging.info(f'[Cache] Syncronizing user {userCount}/{guildCount}')
+                doc = db.find_one({'_id': member.id})
+                if not doc:
+                    await utils.store_user(member)
+                    continue
 
-    logging.info('[BOT] on_ready')
-    if not READY:
-        db = mclient.fil.users
-        NS = bot.get_guild(238080556708003851)
+                roleList = []
+                for role in member.roles:
+                    roleList.append(role.id)
 
-        logging.info('[Cache] Performing initial database synchronization')
-        guildCount = len(NS.members)
-        userCount = 0
-        for member in NS.members:
-            userCount += 1
-            await asyncio.sleep(0.01)
-            logging.info(f'[Cache] Syncronizing user {userCount}/{guildCount}')
-            doc = db.find_one({'_id': member.id})
-            if not doc:
-                await utils.store_user(member)
-                continue
+                if roleList == doc['roles']:
+                    continue
 
-            roleList = []
-            for role in member.roles:
-                roleList.append(role.id)
+                db.update_one({'_id': member.id}, {'$set': {
+                    'roles': roleList
+                        }})
 
-            if roleList == doc['roles']:
-                continue
-
-            db.update_one({'_id': member.id}, {'$set': {
-                'roles': roleList
-                    }})
-
-        logging.info('[Cache] Inital database syncronization complete')
+            logging.info('[Cache] Inital database syncronization complete')
+            self.READY = True
 
 async def setup_discord():
+    bot.add_cog(BotCache(bot))
     bot.load_extension('jishaku')
-    bot.load_extension('cogs.core')
     await bot.start(config.token)
 
 async def safe_send_message(channel, content=None, embeds=None):

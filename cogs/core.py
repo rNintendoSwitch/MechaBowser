@@ -9,7 +9,6 @@ from discord.ext import commands
 
 import config
 import utils
-from bot import is_ready
 
 startTime = int(time.time())
 mclient = pymongo.MongoClient(
@@ -21,10 +20,17 @@ mclient = pymongo.MongoClient(
 class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
+        self.bot.load_extension('cogs.moderation')
+        self.bot.load_extension('cogs.utility')
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
+
+    #@commands.Cog.listener()
+    #async def on_ready(self):
+    #    self.serverLogs = self.bot.get_channel(config.logChannel)
+    #    self.modLogs = self.bot.get_channel(config.modChannel)
+    #    self.debugChannel = self.bot.get_channel(config.debugChannel)
 
     @commands.Cog.listener()
     async def on_resume(self):
@@ -32,10 +38,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        while not is_ready(): # We need on_ready tasks to complete prior to handling
-            logging.debug('Not READY. Delaying event on_member_join')
-            await asyncio.sleep(1)
-
         db = mclient.fil.users
         doc = db.find_one({'_id': member.id})
         roleList = []
@@ -73,20 +75,12 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        while not is_ready(): # We need on_ready tasks to complete prior to handling
-            logging.debug('Not READY. Delaying event on_member_remove')
-            await asyncio.sleep(1)
-
         embed = discord.Embed(color=discord.Color(0x772F30), description=f'User <@{member.id}> left.', timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'User left | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
         await self.serverLogs.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        while not is_ready(): # We need on_ready tasks to complete prior to handling
-            logging.debug('Not READY. Delaying event on_message')
-            await asyncio.sleep(1)
-
         if message.author.bot:
             return
     
@@ -103,10 +97,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):
-        while not is_ready(): # We need on_ready tasks to complete prior to handling
-            logging.debug('Not READY. Delaying event on_bulk_message_delete')
-            await asyncio.sleep(1)
-
         db = mclient.fil.archive
         oneDayPast = int(time.time() - 30)
         archives = db.find({'timestamp': {'$gt': oneDayPast}})
@@ -124,10 +114,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
-        while not is_ready(): # We need on_ready tasks to complete prior to handling
-            logging.debug('Not READY. Delaying event on_message_delete')
-            await asyncio.sleep(1)
-
         if message.type != discord.MessageType.default or message.author.bot:
             return # No system messages
 
@@ -144,10 +130,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
-        while not is_ready(): # We need on_ready tasks to complete prior to handling
-            logging.debug('Not READY. Delaying event on_message_edit')
-            await asyncio.sleep(1)
-
         if before.content == after.content:
             return
 

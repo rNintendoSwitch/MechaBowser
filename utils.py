@@ -26,7 +26,7 @@ async def message_archive(archive: typing.Union[discord.Message, list]):
     archiveID = f'{archive[0].id}-{int(time.time() * 1000)}'
     messageIDs = []
 
-    for msg in archive:
+    for msg in reversed(archive):
         messageIDs.append(msg.id)
         content = '*No message content could be saved, could be embed or attachment*' if not msg.content else msg.content
         body += f'[{msg.created_at.strftime("%Y/%M/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
@@ -42,6 +42,10 @@ async def message_archive(archive: typing.Union[discord.Message, list]):
 
 async def store_user(member, messages=0):
     db = mclient.fil.users
+    # Double check exists
+    if db.find_one({'_id': member.id}):
+        return
+
     roleList = []
     for role in member.roles:
         if role.id == member.guild.id:
