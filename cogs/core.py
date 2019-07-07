@@ -101,8 +101,8 @@ class MainEvents(commands.Cog):
 
         archiveID = await utils.message_archive(messages)
 
-        embed = discord.Embed(color=discord.Color(0xff6661), description=f'A bulk delete has occured, view message logs at {config.baseUrl}/archive/{archiveID}', timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Messages deleted | Bulk Delete')
+        embed = discord.Embed(color=discord.Color(0xff6661), description=f'A bulk delete has occured, you can view these messags at {config.baseUrl}/archive/{archiveID}', timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Messages deleted | Bulk delete')
         await self.bot.get_channel(config.logChannel).send(embed=embed)
         return await self.serverLogs.send()
 
