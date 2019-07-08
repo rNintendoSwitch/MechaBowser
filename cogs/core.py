@@ -56,26 +56,24 @@ class MainEvents(commands.Cog):
 
             else:
                 restored = False
-        
-        joinEmbed = discord.Embed(color=discord.Color(0x4f941e), description=f'User <@{member.id}> joined.', timestamp=datetime.datetime.utcnow())
-        joinEmbed.set_author(name=f'User joined | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
-        await self.serverLogs.send(embed=joinEmbed)
+
+        new = ':new:' if (datetime.datetime.utcnow() - member.created_at).total_seconds() <= 60 * 60 * 24 * 14 else '' # Two weeks
+
+        log = f':inbox_tray: {new} User **{str(member)}** ({member.id}) joined'
+        await self.serverLogs.send(log)
 
         if restored:
             roleText = ''
             for z in roleList:
                 roleText += f'{z}, '
 
-            restoreEmbed = discord.Embed(color=discord.Color(0x25a5ef), description=f'Returning member <@{member.id}> has been restored', timestamp=datetime.datetime.utcnow())
-            restoreEmbed.set_author(name=f'User restored | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
-            restoreEmbed.add_field(name='Restored roles', value=roleText[:-2])
-            await self.serverLogs.send(embed=restoreEmbed)
+            logRestore = f':shield: Roles restored for returning member **{str(member)}** ({member.id})'
+            await self.serverLogs.send(logRestore)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        embed = discord.Embed(color=discord.Color(0x772F30), description=f'User <@{member.id}> left.', timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'User left | {member.name}#{member.discriminator}', icon_url=member.avatar_url)
-        await self.serverLogs.send(embed=embed)
+        log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
+        await self.serverLogs.send(log)
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -98,7 +96,7 @@ class MainEvents(commands.Cog):
         return await self.bot.process_commands(message) # Allow commands to fire
 
     @commands.Cog.listener()
-    async def on_bulk_message_delete(self, messages):
+    async def on_bulk_message_delete(self, messages): # TODO: Work with archives channel attribute to list channels
         db = mclient.bowser.archive
         thirtySec = int(time.time() - 30)
         archives = db.find({'timestamp': {'$gt': thirtySec}})
@@ -109,10 +107,8 @@ class MainEvents(commands.Cog):
 
         archiveID = await utils.message_archive(messages)
 
-        embed = discord.Embed(color=discord.Color(0xff6661), description=f'A bulk delete has occured, you can view these messags at {config.baseUrl}/archive/{archiveID}', timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Messages deleted | Bulk delete')
-        await self.bot.get_channel(config.logChannel).send(embed=embed)
-        return await self.serverLogs.send()
+        log = f':printer: New message archive has been generated, view it at {config.baseUrl}/archive/{archiveID}'
+        return await self.serverLogs.send(log)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
@@ -122,13 +118,12 @@ class MainEvents(commands.Cog):
         if not message.content:
             return # Blank or null content (could be embed)
 
-        # Discord allows 1024 chars per embed field value, but a message can have 2000 chars
-        content = message.content if len(message.content) <= 1024 else f'Message exceeds character limit, view at {config.baseUrl}/archive/{await utils.message_archive(message)}'
-
-        embed = discord.Embed(color=discord.Color(0xff6661), description=f'Message by <@{message.author.id}> in <#{message.channel.id}> was deleted.', timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Message deleted | {message.author.name}#{message.author.discriminator}')
-        embed.add_field(name='Message', value=content)
-        await self.serverLogs.send(embed=embed)
+        log = f':wastebasket: Message by **{str(message.author)}** ({message.author.id}) in <#{message.channel.id}> deleted:\n'
+        content = message.content if (len(log) + len(message.clean_content)) < 2000 else 'Message exceeds character limit, ' \
+            f'view at {config.baseUrl}/archive/{await utils.message_archive(message)}'
+        log += content
+        
+        await self.serverLogs.send(log)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
@@ -141,15 +136,13 @@ class MainEvents(commands.Cog):
         if not after.content or not before.content:
             return # Blank or null content (could be embed)
 
-        # Discord allows 1024 chars per embed field value, but a message can have 2000 chars
-        before_content = before.content if len(before.content) < 1000 else before.content[:1000] + '...'
-        after_content = after.content if len(after.content) < 1000 else after.content[:1000] + '...'
-    
-        embed = discord.Embed(color=discord.Color(0x25a5ef), description=f'Message by <@{before.author.id}> in <#{before.channel.id}> was edited.', timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Message edited | {before.author.name}#{before.author.discriminator}')
-        embed.add_field(name='Before', value=before_content, inline=True)
-        embed.add_field(name='After', value=after_content, inline=True)
-        await self.serverLogs.send(embed=embed)
+        log = f':pencil: Message by **{str(before.author)}** ({before.author.id}) in <#{before.channel.id}> edited:\n'
+        editedMsg = f'__Before:__ {before.clean_content}\n\n__After:__ {before.clean_content}'
+        fullLog = log + editedMsg if (len(log) + len(editedMsg)) < 2000 else log + 'Message exceeds character limit, ' \
+            f'view at {config.baseUrl}/archive/{await utils.message_archive([before, after], True)}'
+        
+
+        await self.serverLogs.send(fullLog)
 
     @commands.command()
     @commands.is_owner()
