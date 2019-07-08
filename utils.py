@@ -17,7 +17,7 @@ mclient = pymongo.MongoClient(
 
 archiveHeader = '# Message archive for "#{0.name}" ({0.id}) in guild "{1.name}" ({1.id})\n# Format:\n[date + time] Member ID/Message ID/Username - Message content\n----------------\n'
 
-async def message_archive(archive: typing.Union[discord.Message, list]):
+async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
     db = mclient.bowser.archive
     if type(archive) != list:
         # Single message to archive
@@ -27,10 +27,18 @@ async def message_archive(archive: typing.Union[discord.Message, list]):
     archiveID = f'{archive[0].id}-{int(time.time() * 1000)}'
     messageIDs = []
 
-    for msg in reversed(archive):
-        messageIDs.append(msg.id)
-        content = '*No message content could be saved, could be embed or attachment*' if not msg.content else msg.content
-        body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
+    if edit:
+        msgBefore = archive[0]
+        msgAfter = archive[1]
+
+        body += f'[{msgBefore.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msgBefore.author.id}/{msgBefore.id}/{str(msgBefore.author)}): message edit:\n'
+        body += f'--- Before ---\n{msgBefore.content}\n\n--- After ---\n{msgAfter.content}'
+
+    else:
+        for msg in reversed(archive): # TODO: attachment CDN urls should be posted as message
+            messageIDs.append(msg.id)
+            content = '*No message content could be saved, could be embed or attachment*' if not msg.content else msg.content
+            body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
 
     db.insert_one({
         '_id': archiveID,
