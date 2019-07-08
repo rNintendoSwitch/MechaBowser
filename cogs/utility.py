@@ -188,16 +188,18 @@ class ChatControl(commands.Cog):
     @commands.has_any_role(config.moderator, config.eh)
     async def _info(self, ctx, user: typing.Union[discord.Member, int]):
         if type(user) == int:
-            # User shares no servers, fetch it instead
-            user = await Client.fetch_user(user)
-            if not user:
+            # User doesn't share the ctx server, fetch it instead
+            try:
+                user = await Client.fetch_user(user)
+
+            except discord.NotFound:
                 return await ctx.send('<:redTick:402505117733224448> User does not exist')
         
             embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about this user (<@{user.id}>) from the ' \
-            'API as I share no servers. There is little information to display as such')
+            'API as I do not share this server with them. There may little information to display as such')
             embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
             embed.set_thumbnail(url=user.avatar_url)
-            embed.add_field(name='Created', value=f'{user.created_at}T UTC')
+            embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
             return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
 
         else:
