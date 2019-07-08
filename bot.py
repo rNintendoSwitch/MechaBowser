@@ -52,7 +52,8 @@ class BotCache(commands.Cog):
 
                 roleList = []
                 for role in member.roles:
-                    roleList.append(role.id)
+                    if role.id != NS.id:
+                        roleList.append(role.id)
 
                 if roleList == doc['roles']:
                     continue
