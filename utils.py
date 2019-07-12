@@ -84,3 +84,9 @@ async def issue_pun(user, moderator, _type, reason=None, timestamp=int(time.time
         'expiry': expiry,
         'active': active
     })
+
+def setup(bot):
+    logging.info('[Extension] Utils module loaded')
+
+def teardown(bot):
+    logging.info('[Extension] Utils module unloaded')
