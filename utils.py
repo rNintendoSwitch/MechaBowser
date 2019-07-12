@@ -3,6 +3,7 @@ import typing
 import datetime
 import time
 import uuid
+import logging
 
 import discord
 import pymongo
@@ -35,7 +36,9 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
         body += f'--- Before ---\n{msgBefore.content}\n\n--- After ---\n{msgAfter.content}'
 
     else:
-        for msg in reversed(archive): # TODO: attachment CDN urls should be posted as message
+        channels = []
+        for msg in archive: # TODO: attachment CDN urls should be posted as message
+            if not msg.channel not in channels: channels.append(msg.channel)
             messageIDs.append(msg.id)
             content = '*No message content could be saved, could be embed or attachment*' if not msg.content else msg.content
             body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
@@ -53,6 +56,7 @@ async def store_user(member, messages=0):
     db = mclient.bowser.users
     # Double check exists
     if db.find_one({'_id': member.id}):
+        logging.error('Attempted to store user that already exists!')
         return
 
     roleList = []
