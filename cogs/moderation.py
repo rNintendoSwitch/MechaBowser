@@ -23,14 +23,21 @@ class Moderation(commands.Cog):
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
 
+        self.punDM = 'You have received a moderation action on the /r/NintendoSwitch Discord server.\n' \
+            'Action: **{}**\n' \
+            'Reason:\n```{}```\n' \
+            'Responsible moderator: {} ({})\n' \
+            'If you have questions concerning this matter, please feel free to contact the respective moderator that took this action or another member of the moderation team.\n\n' \
+            'Please do not respond to this message, I cannot reply.'
+
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
-    async def _banning(self, ctx, user: typing.Union[discord.User, int], *, reason='-No reason specified-'):
+    async def _banning(self, ctx, user: typing.Union[discord.Member, int], *, reason='-No reason specified-'):
         userid = user if (type(user) is int) else user.id
         await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
 
-        user = discord.Object(id=userid) if (type(user) is int) else user # If not a user, manually contruct a user object
         username = userid if (type(user) is int) else f'{str(user)}'
+        user = discord.Object(id=userid) if (type(user) is int) else user # If not a user, manually contruct a user object
 
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Ban | {username}')
@@ -38,9 +45,32 @@ class Moderation(commands.Cog):
         embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
         embed.add_field(name='Reason', value=reason)
 
+        try:
+            await user.send(self.punDM.format('Ban', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+            pass
+
         await ctx.guild.ban(user, reason=f'Ban action by {str(user)}')
         await self.modLogs.send(embed=embed)
-        return await ctx.send(':heavy_check_mark: User banned')
+        return await ctx.send(f'{config.greenTick} {username} has been successfully banned')
+
+    @commands.command(name='unban')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _unbanning(self, ctx, user: int, *, reason='-No reason specified-'):
+        db = mclient.bowser.puns
+        userObj = discord.Object(id=user)
+        try:
+            await ctx.guild.fetch_ban(userObj)
+
+        except discord.NotFound:
+            return await ctx.send(f'{config.redTick} {user} is not currently banned')
+
+        await ctx.guild.unban(userObj)
+        db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
+            'active': False
+        }})
+        await utils.issue_pun(user,ctx.author.id, 'unban', reason, active=False)
+        return await ctx.send(f'{config.greenTick} {user} has been unbanned')
 
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
@@ -93,6 +123,10 @@ class Moderation(commands.Cog):
 
         await member.add_roles(tierLevel[warnLevel], reason='Warn action performed by moderator')
         await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason)
+        try:
+            await member.send(self.punDM.format(warnText[warnLevel], reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except discord.Forbidden: # User has DMs off
+            pass
 
         await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
@@ -134,6 +168,10 @@ class Moderation(commands.Cog):
 
         await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
         await self.modLogs.send(embed=embed)
+        try:
+            await member.send(self.punDM.format('Warning level has been reset', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except discord.Forbidden: # User has DMs off
+            pass
         return await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
 
     @_warning.command(name='level')
@@ -185,6 +223,10 @@ class Moderation(commands.Cog):
         await member.add_roles(tierLevel[tier])
         await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, context='level_set')
         await self.modLogs.send(embed=embed)
+        try:
+            await member.send(self.punDM.format(warnText[tier], reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except discord.Forbidden: # User has DMs off
+            pass
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {tier}')
 
     @_warning.error
