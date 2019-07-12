@@ -72,8 +72,9 @@ async def store_user(member, messages=0):
     }
     db.insert_one(userData)
 
-async def issue_pun(user, moderator, _type, reason=None, timestamp=int(time.time()), expiry=None, active=True, old_doc=None):
+async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None):
     db = mclient.bowser.puns
+    timestamp = int(time.time())
     docID = str(uuid.uuid4())
     while db.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
         docID = str(uuid.uuid4())
@@ -86,6 +87,7 @@ async def issue_pun(user, moderator, _type, reason=None, timestamp=int(time.time
         'timestamp': timestamp,
         'reason': reason,
         'expiry': expiry,
+        'context': context,
         'active': active
     })
 
