@@ -72,6 +72,47 @@ class Moderation(commands.Cog):
         await utils.issue_pun(user,ctx.author.id, 'unban', reason, active=False)
         return await ctx.send(f'{config.greenTick} {user} has been unbanned')
 
+    @commands.command(name='mute')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _muting(self, ctx, member: discord.Member, duration, *, reason='-No reason specified-'):
+        db = mclient.bowser.puns
+        if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
+            return await ctx.send(f'{config.redTick} {str(member)} ({member.id}) is already muted')
+
+        muteRole = ctx.guild.get_role(config.mute)
+        try:
+            _duration = await utils.resolve_duration(duration)
+
+        except KeyError:
+            return await ctx.send(f'{config.redTick} Invalid duration passed')
+
+        await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
+        await member.add_roles(muteRole)
+        try:
+            await member.send(self.punDM.format(f'Mute ({duration})', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+            pass
+        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully muted')
+
+    @commands.command(name='unmute')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _unmuting(self, ctx, member: discord.Member, *, reason='-No reason specified-'): # TODO: Allow IDs to be unmuted (in the case of not being in the guild)
+        db = mclient.bowser.puns
+        muteRole = ctx.guild.get_role(config.mute)
+        action = db.find_one_and_update({'user': member.id, 'type': 'mute', 'active': True}, {'$set':{
+            'active': False
+        }})
+        if not action:
+            return await ctx.send(f'{config.redTick} Cannot unmute {str(member)} ({member.id}), they are not currently muted')
+
+        await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
+        await member.remove_roles(muteRole)
+        try:
+            await member.send(self.punDM.format(f'Unmute', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+            pass
+        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully unmuted')
+
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning(self, ctx, member: discord.Member, *, reason):
