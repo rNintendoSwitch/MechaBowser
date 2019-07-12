@@ -176,7 +176,7 @@ class ChatControl(commands.Cog):
     
         m = await ctx.send('Clean action complete')
         await m.delete(delay=10)
-        archiveID = await utils.message_archive(deleted)
+        archiveID = await utils.message_archive(reversed(deleted))
 
         log = f':printer: New message archive has been generated for <#{ctx.channel.id}> from a clean, view it at {config.baseUrl}/archive/{archiveID}'
         await Client.get_channel(config.logChannel).send(log)
@@ -227,12 +227,12 @@ class ChatControl(commands.Cog):
 
             embed.add_field(name='Roles', value=roles, inline=False)
 
-            lastMsg = 'N/a' if msgCount == 0 else datetime.datetime.utcfromtimestamp(messages.sort('timestamp', 1)[0]['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
+            lastMsg = 'N/a' if msgCount == 0 else datetime.datetime.utcfromtimestamp(messages.sort('timestamp', pymongo.DESCENDING)[0]['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
             embed.add_field(name='Last message', value=lastMsg, inline=True)
             embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
             punishments = ''
             punsCol = mclient.bowser.puns.find({'user': user.id})
-            if not punsCol:
+            if not punsCol.count():
                 punishments = '__*No punishments on record*__'
 
             else:
