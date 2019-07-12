@@ -98,8 +98,14 @@ class Moderation(commands.Cog):
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
 
     @_warning.command(name='clear')
+    @commands.has_any_role(config.moderator, config.eh)
     async def _warning_clear(self, ctx, member: discord.Member, *, reason):
         db = mclient.bowser.puns
+        tierLevel = {
+            1: ctx.guild.get_role(config.warnTier1),
+            2: ctx.guild.get_role(config.warnTier2),
+            3: ctx.guild.get_role(config.warnTier3)
+        }
         puns = db.find({'user': member.id, 'active': True, 'type': {
                     '$in': [
                         'tier1',
@@ -117,6 +123,8 @@ class Moderation(commands.Cog):
             db.update_one({'_id': x['_id']}, {'$set': {
                 'active': False
             }})
+            tierInt = int(x['type'][-1:])
+            await member.remove_roles(tierLevel[tierInt])
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Warnings cleared | {str(member)}')
@@ -128,13 +136,66 @@ class Moderation(commands.Cog):
         await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
 
+    @_warning.command(name='level')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _warning_setlevel(self, ctx, member: discord.Member, tier: int, *, reason):
+        if tier not in [1, 2, 3]:
+            return await ctx.send(f'{config.redTick} Invalid tier number provided')
+    
+        db = mclient.bowser.puns
+        tierLevel = {
+            1: ctx.guild.get_role(config.warnTier1),
+            2: ctx.guild.get_role(config.warnTier2),
+            3: ctx.guild.get_role(config.warnTier3)
+        }
+        embedColor = {
+            1: discord.Color(0xFFFA1C),
+            2: discord.Color(0xFF9000),
+            3: discord.Color(0xD0021B)
+        }
+        warnText = {
+            1: 'First warning',
+            2: 'Second warning',
+            3: 'Third warning'
+        }
+
+        puns = db.find({'user': member.id, 'active': True, 'type': {
+                    '$in': [
+                        'tier1',
+                        'tier2',
+                        'tier3'
+                    ]
+                }
+            }
+        )
+        if puns:
+            for x in puns:
+                db.update_one({'_id': x['_id']}, {'$set': {
+                    'active': False
+                }})
+                tierInt = int(x['type'][-1:])
+                await member.remove_roles(tierLevel[tierInt])
+
+        embed = discord.Embed(color=embedColor[tier], timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'{warnText[tier]} | {str(member)}')
+        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        await member.add_roles(tierLevel[tier])
+        await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, context='level_set')
+        await self.modLogs.send(embed=embed)
+        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {tier}')
+
     @_warning.error
     @_warning_clear.error
+    @_warning_setlevel.error
     async def mod_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(f'{config.redTick} Missing argument')
 
-        #elif isinstance(error, commands.BadArgument):
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(f'{config.redTick} Invalid arguments')
 
         else:
             await ctx.send(f'{config.redTick} An unknown exception has occured. This has been logged.')
