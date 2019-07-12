@@ -176,7 +176,7 @@ class ChatControl(commands.Cog):
     
         m = await ctx.send('Clean action complete')
         await m.delete(delay=10)
-        archiveID = await utils.message_archive(reversed(deleted))
+        archiveID = await utils.message_archive(list(reversed(deleted)))
 
         log = f':printer: New message archive has been generated for <#{ctx.channel.id}> from a clean, view it at {config.baseUrl}/archive/{archiveID}'
         await Client.get_channel(config.logChannel).send(log)
@@ -249,7 +249,7 @@ class ChatControl(commands.Cog):
                 }
                 puns = 0
                 for pun in punsCol:
-                    if puns > 5:
+                    if puns >= 5:
                         break
 
                     puns += 1
