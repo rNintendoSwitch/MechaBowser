@@ -18,7 +18,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='bot dev with MattBSG')
-bot = commands.Bot('()', max_messages=30000, fetch_offline_members=True, activity=activityStatus)
+bot = commands.Bot('()', max_messages=75000, fetch_offline_members=True, activity=activityStatus)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
