@@ -23,6 +23,7 @@ class MainEvents(commands.Cog):
         try:
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
+            self.bot.load_extension('utils')
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
 
@@ -39,23 +40,23 @@ class MainEvents(commands.Cog):
         db = mclient.bowser.users
         doc = db.find_one({'_id': member.id})
         roleList = []
+        restored = False
 
         if not doc:
-            restored = False
             await utils.store_user(member)
 
         else:
             if doc['roles']:
-                restored = True
                 for x in doc['roles']:
+                    if x == member.guild.id:
+                        continue
+
+                    restored = True
                     role = member.guild.get_role(x)
                     if role:
                         roleList.append(role)
     
                 await member.edit(roles=roleList, reason='Automatic role restore action')
-
-            else:
-                restored = False
 
         new = ':new:' if (datetime.datetime.utcnow() - member.created_at).total_seconds() <= 60 * 60 * 24 * 14 else '' # Two weeks
 
@@ -63,11 +64,9 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(log)
 
         if restored:
-            roleText = ''
-            for z in roleList:
-                roleText += f'{z}, '
+            roleText = ', '.split(x.name for x in roleList)
 
-            logRestore = f':shield: Roles restored for returning member **{str(member)}** ({member.id})'
+            logRestore = f':shield: Roles have been restored for returning member **{str(member)}** ({member.id}):\n{roleText}'
             await self.serverLogs.send(logRestore)
 
     @commands.Cog.listener()
@@ -98,11 +97,12 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages): # TODO: Work with archives channel attribute to list channels
         db = mclient.bowser.archive
-        thirtySec = int(time.time() - 30)
-        archives = db.find({'timestamp': {'$gt': thirtySec}})
+        checkStamp = int(time.time() - 600) # Rate limiting, instability, and being just slow to fire are other factors that could delay the event
+        archives = db.find({'timestamp': {'$gt': checkStamp}})
+        print(archives)
         if archives: # If the bulk delete is the result of us, exit
             for x in archives:
-                if messages[0].id in x[messages]:
+                if messages[0].id in x['messages']:
                     return
 
         archiveID = await utils.message_archive(messages)
@@ -137,7 +137,7 @@ class MainEvents(commands.Cog):
             return # Blank or null content (could be embed)
 
         log = f':pencil: Message by **{str(before.author)}** ({before.author.id}) in <#{before.channel.id}> edited:\n'
-        editedMsg = f'__Before:__ {before.clean_content}\n\n__After:__ {before.clean_content}'
+        editedMsg = f'__Before:__ {before.clean_content}\n\n__After:__ {after.clean_content}'
         fullLog = log + editedMsg if (len(log) + len(editedMsg)) < 2000 else log + 'Message exceeds character limit, ' \
             f'view at {config.baseUrl}/archive/{await utils.message_archive([before, after], True)}'
         
