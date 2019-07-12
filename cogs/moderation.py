@@ -97,15 +97,47 @@ class Moderation(commands.Cog):
         await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
 
-        return await ctx.send(f':heavy_check_mark: Issued a Tier {warnLevel + 1} warning to {str(member)}')
+    @_warning.command(name='clear')
+    async def _warning_clear(self, ctx, member: discord.Member, *, reason):
+        db = mclient.bowser.puns
+        puns = db.find({'user': member.id, 'active': True, 'type': {
+                    '$in': [
+                        'tier1',
+                        'tier2',
+                        'tier3'
+                    ]
+                }
+            }
+        )
+
+        if not puns.count():
+            return await ctx.send(f'{config.redTick} That user has no active warnings')
+
+        for x in puns:
+            db.update_one({'_id': x['_id']}, {'$set': {
+                'active': False
+            }})
+
+        embed = discord.Embed(color=discord.Color(0x18EE1C), timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Warnings cleared | {str(member)}')
+        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
+        await self.modLogs.send(embed=embed)
+        return await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
 
     @_warning.error
-    async def warn_error(self, ctx, error):
+    @_warning_clear.error
+    async def mod_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(':warning: Missing argument')
+            return await ctx.send(f'{config.redTick} Missing argument')
+
+        #elif isinstance(error, commands.BadArgument):
 
         else:
-            await ctx.send(':warning: An unknown exception has occured. This has been logged.')
+            await ctx.send(f'{config.redTick} An unknown exception has occured. This has been logged.')
             raise error
 
 def setup(bot):
@@ -114,4 +146,4 @@ def setup(bot):
 
 def teardown(bot):
     bot.remove_cog('Moderation')
-    logging.info('[Extension] Utility module unloaded')
+    logging.info('[Extension] Moderation module unloaded')
