@@ -267,6 +267,11 @@ class ChatControl(commands.Cog):
         embed.add_field(name='Punishments', value=punishments)
         return await ctx.send(embed=embed)
 
+    @commands.command(name='history')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _history(self, ctx, *, x):
+        return await ctx.send(f'{redTick} This command is not currently ready to use')
+
 def setup(bot):
     global serverLogs
     global modLogs
