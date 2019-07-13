@@ -50,7 +50,7 @@ class Moderation(commands.Cog):
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
-        await ctx.guild.ban(user, reason=f'Ban action by {str(user)}')
+        await ctx.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
         await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {username} has been successfully banned')
 
@@ -65,12 +65,23 @@ class Moderation(commands.Cog):
         except discord.NotFound:
             return await ctx.send(f'{config.redTick} {user} is not currently banned')
 
-        await ctx.guild.unban(userObj)
+        await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
         db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
         await utils.issue_pun(user,ctx.author.id, 'unban', reason, active=False)
         return await ctx.send(f'{config.greenTick} {user} has been unbanned')
+
+    @commands.command(name='kick')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
+        await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+        try:
+            await member.send(self.punDM.format(f'Kick', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+            pass
+        await member.kick(reason='Kick action performed by moderator')
+        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully kicked')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -87,7 +98,7 @@ class Moderation(commands.Cog):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
         await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
-        await member.add_roles(muteRole)
+        await member.add_roles(muteRole, reason='Mute action performed by moderator')
         try:
             await member.send(self.punDM.format(f'Mute ({duration})', reason, str(ctx.author), f'<@{ctx.author.id}>'))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
@@ -106,7 +117,7 @@ class Moderation(commands.Cog):
             return await ctx.send(f'{config.redTick} Cannot unmute {str(member)} ({member.id}), they are not currently muted')
 
         await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
-        await member.remove_roles(muteRole)
+        await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
         try:
             await member.send(self.punDM.format(f'Unmute', reason, str(ctx.author), f'<@{ctx.author.id}>'))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
