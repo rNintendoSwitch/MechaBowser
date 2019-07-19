@@ -138,6 +138,38 @@ class ChatControl(commands.Cog):
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
 
+        # Splatoon splatfest event
+        if message.channel.id == 278557283019915274:
+            pearl = re.compile(r'(<:pearl:332557519958310912>)+', re.I)
+            marina = re.compile(r'(<:marina:332557579815485451>)+', re.I)
+            orderRole = message.guild.get_role(601458524723216385)
+            chaosRole = message.guild.get_role(601458570197860449)
+            if re.search(pearl, message.content) and re.search(marina, message.content):
+                return
+
+            try:    
+                if re.search(pearl, message.content):
+                    if orderRole in message.author.roles:
+                        await message.author.remove_roles(orderRole)
+
+                    if chaosRole not in message.author.roles:
+                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Chaos')
+                        await msg.delete(delay=5.0)
+                        await message.author.add_roles(chaosRole)
+
+                elif re.search(marina, message.content):
+                    if chaosRole in message.author.roles:
+                        await message.author.remove_roles(chaosRole)
+
+                    if orderRole not in message.author.roles:
+                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Order')
+                        await msg.delete(delay=5.0)
+                        await message.author.add_roles(orderRole)
+
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+
+
     @commands.command(name='ping')
     async def _ping(self, ctx):
         initiated = ctx.message.created_at
@@ -155,7 +187,7 @@ class ChatControl(commands.Cog):
             await confirmMsg.add_reaction(config.greenTick)
             await confirmMsg.add_reaction(config.redTick)
             try:
-                reaction = await Client.wait_for('reaction_add', timeout=15, check=confirm_check)
+                reaction = await self.bot.wait_for('reaction_add', timeout=15, check=confirm_check)
                 if str(reaction[0]) != config.greenTick:
                     await confirmMsg.edit(content='Clean action canceled.')
                     return await confirmMsg.clear_reactions()
@@ -179,7 +211,7 @@ class ChatControl(commands.Cog):
         archiveID = await utils.message_archive(list(reversed(deleted)))
 
         log = f':printer: New message archive has been generated for <#{ctx.channel.id}> from a clean, view it at {config.baseUrl}/archive/{archiveID}'
-        await Client.get_channel(config.logChannel).send(log)
+        await self.bot.get_channel(config.logChannel).send(log)
 
         return await m.delete(delay=10)
 
@@ -189,7 +221,7 @@ class ChatControl(commands.Cog):
         if type(user) == int:
             # User doesn't share the ctx server, fetch it instead
             try:
-                user = await Client.fetch_user(user)
+                user = await self.bot.fetch_user(user)
 
             except discord.NotFound:
                 return await ctx.send('<:redTick:402505117733224448> User does not exist')
@@ -236,17 +268,6 @@ class ChatControl(commands.Cog):
                 punishments = '__*No punishments on record*__'
 
             else:
-                punStrs = {
-                    'tier1': 'Tier 1 Warning',
-                    'tier2': 'Tier 2 Warning',
-                    'tier3': 'Tier 3 Warning',
-                    'mute': 'Mute',
-                    'unmute': 'Unmute',
-                    'clear': 'Warnings reset',
-                    'kick': 'Kick',
-                    'ban': 'Ban',
-                    'unban': 'Unban'
-                }
                 puns = 0
                 for pun in punsCol:
                     if puns >= 5:
@@ -254,7 +275,7 @@ class ChatControl(commands.Cog):
 
                     puns += 1
                     stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
-                    punType = punStrs[pun['type']]
+                    punType = config.punStrs[pun['type']]
                     if pun['type'] in ['clear', 'unmute', 'unban']:
                         punishments += f'- [{stamp}] {punType}\n'
 
@@ -270,16 +291,14 @@ class ChatControl(commands.Cog):
     @commands.command(name='history')
     @commands.has_any_role(config.moderator, config.eh)
     async def _history(self, ctx, *, x):
-        return await ctx.send(f'{redTick} This command is not currently ready to use')
+        return await ctx.send(f'{config.redTick} This command is not currently ready to use')
 
 def setup(bot):
     global serverLogs
     global modLogs
-    global Client
 
     serverLogs = bot.get_channel(config.logChannel)
     modLogs = bot.get_channel(config.modChannel)
-    Client = bot
 
     bot.add_cog(ChatControl(bot))
     #bot.add_cog(MarkovChat(bot))
