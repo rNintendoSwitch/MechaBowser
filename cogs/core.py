@@ -144,9 +144,9 @@ class MainEvents(commands.Cog):
 
         await self.serverLogs.send(fullLog)
 
-    @commands.command()
+    @commands.command(name='update')
     @commands.is_owner()
-    async def update(self, ctx, sub, *args):
+    async def _update(self, ctx, sub, *args):
         if sub == 'pfp':
             if not ctx.message.attachments:
                 return await ctx.send(':warning: An attachment to change the picture to was not provided')
@@ -169,6 +169,12 @@ class MainEvents(commands.Cog):
 
         else:
             return await ctx.send('Invalid sub command')
+
+    @commands.command(name='shutdown')
+    @commands.is_owner()
+    async def _shutdown(self, ctx):
+        await ctx.send('Closing connection to discord and shutting down')
+        return await self.bot.close()
 
 def setup(bot):
     bot.add_cog(MainEvents(bot))
