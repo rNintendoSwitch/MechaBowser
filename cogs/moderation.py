@@ -6,7 +6,7 @@ import typing
 
 import pymongo
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
 import utils
@@ -22,13 +22,6 @@ class Moderation(commands.Cog):
         self.bot = bot
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
-
-        self.punDM = 'You have received a moderation action on the /r/NintendoSwitch Discord server.\n' \
-            'Action: **{}**\n' \
-            'Reason:\n```{}```\n' \
-            'Responsible moderator: {} ({})\n' \
-            'If you have questions concerning this matter, please feel free to contact the respective moderator that took this action or another member of the moderation team.\n\n' \
-            'Please do not respond to this message, I cannot reply.'
 
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
@@ -46,7 +39,7 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         try:
-            await user.send(self.punDM.format('Ban', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await user.send(config.punDM.format('Ban', reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
@@ -70,6 +63,14 @@ class Moderation(commands.Cog):
             'active': False
         }})
         await utils.issue_pun(user,ctx.author.id, 'unban', reason, active=False)
+
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Unban | {user}')
+        embed.add_field(name='User', value=f'<@{user}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {user} has been unbanned')
 
     @commands.command(name='kick')
@@ -77,10 +78,18 @@ class Moderation(commands.Cog):
     async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
         await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
         try:
-            await member.send(self.punDM.format(f'Kick', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await member.send(config.punDM.format(f'Kick', reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
         await member.kick(reason='Kick action performed by moderator')
+
+        embed = discord.Embed(color=0xD18407, timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Kick | {str(member)}')
+        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully kicked')
 
     @commands.command(name='mute')
@@ -92,7 +101,7 @@ class Moderation(commands.Cog):
 
         muteRole = ctx.guild.get_role(config.mute)
         try:
-            _duration = await utils.resolve_duration(duration)
+            _duration = utils.resolve_duration(duration)
 
         except KeyError:
             return await ctx.send(f'{config.redTick} Invalid duration passed')
@@ -100,9 +109,18 @@ class Moderation(commands.Cog):
         await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.add_roles(muteRole, reason='Mute action performed by moderator')
         try:
-            await member.send(self.punDM.format(f'Mute ({duration})', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await member.send(config.punDM.format(f'Mute ({duration})', reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
+
+        embed = discord.Embed(color=0xB4A6EF, timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Mute | {str(member)}')
+        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Expires', value=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully muted')
 
     @commands.command(name='unmute')
@@ -119,9 +137,17 @@ class Moderation(commands.Cog):
         await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
         try:
-            await member.send(self.punDM.format(f'Unmute', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await member.send(config.punDM.format(f'Unmute', reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
+
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Unmute | {str(member)}')
+        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        await self.modLogs.send(embed=embed)
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully unmuted')
 
     @commands.group(name='warn', invoke_without_command=True)
@@ -174,9 +200,9 @@ class Moderation(commands.Cog):
                 await member.remove_roles(role, reason='Warn action performed by moderator')
 
         await member.add_roles(tierLevel[warnLevel], reason='Warn action performed by moderator')
-        await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason)
+        await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason, int(utils.resolve_duration('30d').timestamp()))
         try:
-            await member.send(self.punDM.format(warnText[warnLevel], reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await member.send(config.punDM.format(warnText[warnLevel], reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except discord.Forbidden: # User has DMs off
             pass
 
@@ -221,7 +247,7 @@ class Moderation(commands.Cog):
         await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
         await self.modLogs.send(embed=embed)
         try:
-            await member.send(self.punDM.format('Warning level has been reset', reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await member.send(config.punDM.format('Warning level has been reset', reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except discord.Forbidden: # User has DMs off
             pass
         return await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
@@ -273,13 +299,139 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         await member.add_roles(tierLevel[tier])
-        await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, context='level_set')
+        await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, int(utils.resolve_duration('30d').timestamp()), context='level_set')
         await self.modLogs.send(embed=embed)
         try:
-            await member.send(self.punDM.format(warnText[tier], reason, str(ctx.author), f'<@{ctx.author.id}>'))
+            await member.send(config.punDM.format(warnText[tier], reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except discord.Forbidden: # User has DMs off
             pass
         return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {tier}')
+
+    @_warning.command(name='review')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _review(self, ctx, member: discord.Member):
+        db = mclient.bowser.puns
+        warnPun = db.find_one({'user': member.id, 'active': True, 'type': {
+                    '$in': [
+                        'tier1',
+                        'tier2',
+                        'tier3'
+                    ]
+                }
+            }
+        )
+
+        if not warnPun:
+            return await ctx.send(f'{config.redTick} No warnings are currently active for {str(member)} ({member.id})')
+
+        issueTime = datetime.datetime.utcfromtimestamp(warnPun['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
+
+        embed = discord.Embed(title="Warning review", colour=discord.Color(0xea4345), description="To change the status of the warning, react with the following emoji. At least three moderators must react to make a choice.\n\n:track_next: Re-review in 30 days\n:fast_forward: Re-review in 14 days\n:arrow_forward: Re-review in 7 days\n:small_red_triangle_down: Reduce warn tier (or remove if tier1)", timestamp=utils.resolve_duration('15m'))
+        embed.set_thumbnail(url=member.avatar_url)
+        embed.set_author(name=f"{str(member)} ({member.id})")
+        embed.set_footer(text="This message will expire in 15 minutes")
+        embed.add_field(name="Warning details", value=f'**Type:** {config.punStrs[warnPun["type"]]}\n**Issued by:** <@{warnPun["moderator"]}>\n**Issued at:** {issueTime}\n**Reason**: {warnPun["reason"]}')
+
+        resp = await ctx.send(embed=embed)
+        await resp.add_reaction(config.nextTrack) # track_next
+        await resp.add_reaction(config.fastForward) # fast_forward
+        await resp.add_reaction(config.playButton) # arrow_forward
+        await resp.add_reaction(config.downTriangle) # small_red_triangle_down
+
+        metaReactions = {
+            config.nextTrack: 0,
+            config.fastForward: 0,
+            config.playButton: 0,
+            config.downTriangle: 0
+        }
+        tierLevel = {
+            'tier1': ctx.guild.get_role(config.warnTier1),
+            'tier2': ctx.guild.get_role(config.warnTier2),
+            'tier3': ctx.guild.get_role(config.warnTier3)
+        }
+        renew = None
+
+        def check(reaction, user):
+            if user.bot:
+                return False
+            print(reaction.emoji)
+
+            if ctx.guild.get_role(config.moderator) in user.roles and str(reaction.emoji) in [config.nextTrack, config.fastForward, config.playButton, config.downTriangle]:
+                metaReactions[str(reaction.emoji)] += 1
+                print(metaReactions)
+                if metaReactions[str(reaction.emoji)] >= 3:
+                    return True
+
+            else:
+                return False
+
+        try:
+            reaction = await self.bot.wait_for('reaction_add', timeout=900.0, check=check)
+            print(reaction[0])
+            emoji = str(reaction[0])
+
+            if emoji == config.nextTrack:
+                renew = utils.resolve_duration('30d')
+
+            elif emoji == config.fastForward:
+                renew = utils.resolve_duration('2w')
+
+            elif emoji == config.playButton:
+                renew = utils.resolve_duration('1w')
+
+            if not renew:
+                if warnPun['type'] == 'tier1':
+                    await member.remove_roles(tierLevel[warnPun['type']])
+                    db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}})
+                    try:
+                        await member.send(config.punDM.format('Warning reduction (no current warning tier)', 'Warning was reviewed by moderators', 'N/a'))
+
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
+
+                    embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
+                    embed.set_author(name=f'Warning reduced | {str(member)}')
+                    embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+                    embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
+                    embed.add_field(name='Reason', value='Moderator vote to reduce level')
+                    await self.modLogs.send(embed=embed)
+                    await resp.delete()
+                    return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')
+
+                else:
+                    await member.remove_roles(tierLevel[warnPun['type']])
+                    newTier = 'tier1' if warnPun['type'] == 'tier2' else 'tier2' # If tier2, make it tier1 else tier3 make it tier2
+                    await member.add_roles(tierLevel[newTier])
+
+                    db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
+                    await utils.issue_pun(member.id, None, newTier, 'Moderator vote', int(utils.resolve_duration('30d').timestamp()), context='vote')
+
+                    try:
+                        await member.send(config.punDM.format(f'Warning reduction (now {newTier})', 'Warning was reviewed by moderators', 'N/a'))
+
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
+
+                    embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
+                    embed.set_author(name=f'Warning reduced | {str(member)}')
+                    embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+                    embed.add_field(name='New tier', value=config.punStrs[newTier][:-8], inline=True) # Shave off "warning" str from const
+                    embed.add_field(name='Reason', value='Moderator vote to reduce level')
+                    await self.modLogs.send(embed=embed)
+                    await resp.delete()
+                    return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')
+
+            else:
+                db.update_one({'_id': warnPun['_id']}, {'$set': {'expiry': int(renew.timestamp())}})
+                await resp.delete()
+                return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be delayed {utils.humanize_duration(renew)}')
+
+        except asyncio.TimeoutError:
+            await resp.delete()
+            return ctx.send(content=f'{config.redTick} Command timed out. Rerun to continue.')
+
+
+
 
     @_warning.error
     @_warning_clear.error
@@ -295,10 +447,122 @@ class Moderation(commands.Cog):
             await ctx.send(f'{config.redTick} An unknown exception has occured. This has been logged.')
             raise error
 
+class LoopTasks(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.NS = self.bot.get_guild(238080556708003851)
+        self.modLogs = self.bot.get_channel(config.modChannel)
+        self.adminChannel = self.bot.get_channel(config.debugChannel) # CHANGE THIS BACK BEFORE PUSH
+        self.expiryWarnNotified = {}
+        self.roles = {
+            'tier1': self.NS.get_role(config.warnTier1),
+            'tier2': self.NS.get_role(config.warnTier2),
+            'tier3': self.NS.get_role(config.warnTier3),
+            'mute': self.NS.get_role(config.mute)
+        }
+        self.expiry_check.start() #pylint: disable=no-member
+        logging.info('[Cog] Moderation tasks cog loaded')
+
+    def cog_unload(self):
+        logging.info('[Cog] Attempting to stop task expiry_check...')
+        self.expiry_check.stop() #pylint: disable=no-member
+        logging.info('[Cog] Task expiry_check exited')
+        logging.info('[Cog] Moderation tasks cog unloaded')
+
+    @tasks.loop(seconds=5)
+    async def expiry_check(self):
+        #print('expiry task start')
+        await self.bot.wait_until_ready()
+        db = mclient.bowser.puns
+        activePuns = db.find({'active': True})
+        if not activePuns.count():
+            #logging.info('No active puns to cycle through')
+            return
+
+        warns = ['tier1', 'tier2', 'tier3']
+        for pun in activePuns:
+            #print('processing pun')
+            member = self.NS.get_member(pun['user'])
+            moderator = self.NS.get_member(pun['moderator'])
+            if not member: continue # This member not apart of the server, deal with expiry if they ever rejoin
+            if not moderator:
+                moderator = self.bot.fetch_user(pun['moderator'])
+
+            if pun['type'] == 'mute' and pun['expiry'] and member: # A mute that has an expiry, for member in currently in guild
+                if int(time.time()) < pun['expiry']: continue # Has not expired yet
+
+                newPun = db.find_one_and_update({'_id': pun['_id']}, {'$set': {
+                    'active': False
+                }})
+                await utils.issue_pun(member.id, None, 'unmute', None, active=False, context='auto')
+
+                if not newPun: # There is near zero reason this would ever hit, but in case...
+                    logging.error(f'[expiry_check] Database failed to update user on pun expiration of {pun["_id"]}')
+                    continue
+
+                await member.remove_roles(self.roles[pun['type']])
+                try:
+                    await member.send(config.punDM.format('Unmute', 'Automatic action (mute expired)', 'Automatic'))
+
+                except discord.Forbidden: # User has DMs off
+                    pass
+
+                embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+                embed.set_author(name=f'Unmute | {str(member)}')
+                embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+                embed.add_field(name='Moderator', value='Automatic', inline=True)
+                embed.add_field(name='Reason', value='Mute expired')
+
+                await self.modLogs.send(embed=embed)
+
+            elif pun['type'] in warns and member:
+                if int(time.time()) < (pun['expiry']):
+                    #print('warn not review ready')
+                    continue
+
+                if pun['_id'] in self.expiryWarnNotified.keys():
+                    if time.time() <= self.expiryWarnNotified[pun['_id']] + (60 * 60 * 24): # Only send one review message every 24 hours max
+                        #print('warn already notified')
+                        continue
+
+                punsCol = db.find({'user': member.id})
+                puns = 0
+                punishments = ''
+                for n in punsCol:
+                    if puns >= 5:
+                        break
+
+                    puns += 1
+                    stamp = datetime.datetime.utcfromtimestamp(n['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
+                    punType = config.punStrs[n['type']]
+                    if n['type'] in ['clear', 'unmute', 'unban']:
+                        punishments += f'- [{stamp}] {punType}\n'
+
+                    else:
+                        punishments += f'+ [{stamp}] {punType}\n'
+
+                punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
+                    f'For a full history including responsible moderator, active status, and more use `()history @{str(member)}` or `()history {member.id}`' \
+                    f'\n```diff\n{punishments}```'
+
+                embed = discord.Embed(title="Warning due for staff review", colour=discord.Color(0xddbe2d), description=f"A warning for <@{pun['user']}> was issued over **30 days ago** and is now due for moderator review. This can either be __postponed__ to be re-reviewed at a later date or __reduced__ to the tier directly below (removed in the case of tier 1).\n\n**Infraction ID:** __{pun['_id']}__", timestamp=datetime.datetime.utcfromtimestamp(pun['timestamp']))
+                embed.set_thumbnail(url=member.avatar_url)
+                embed.set_author(name=f"{str(member)} ({member.id})", icon_url=member.avatar_url)
+                embed.add_field(name="Responsible moderator", value=f"{str(moderator)} ({moderator.id})", inline=True)
+                embed.add_field(name="Reason", value=pun['reason'], inline=True)
+                embed.add_field(name="Previous punishments", value=punishments)
+                embed.add_field(name="Making a decision", value=f"An action is required for this review. Please use the `()warn review @{str(member)}` command to proceed")
+
+                await self.adminChannel.send(content=":warning::alarm_clock:", embed=embed)
+                self.expiryWarnNotified[pun['_id']] = time.time()
+
+
 def setup(bot):
     bot.add_cog(Moderation(bot))
+    bot.add_cog(LoopTasks(bot))
     logging.info('[Extension] Moderation module loaded')
 
 def teardown(bot):
     bot.remove_cog('Moderation')
+    bot.remove_cog('LoopTasks')
     logging.info('[Extension] Moderation module unloaded')
