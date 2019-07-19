@@ -98,11 +98,13 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'active': active
     })
 
-async def resolve_duration(data):
+def resolve_duration(data):
     '''
     Takes a raw input string formatted 1w1d1h1m1s (any order)
     and converts to timedelta
     Credit https://github.com/b1naryth1ef/rowboat via MIT license
+
+    data: str
     '''
     value = 0
     digits = ''
@@ -118,7 +120,44 @@ async def resolve_duration(data):
         value += timeUnits[char](int(digits))
         digits = ''
 
-    return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
+    return datetime.datetime.utcnow() + datetime.timedelta(seconds=value)
+
+def humanize_duration(duration):
+    '''
+    Takes a datetime object and returns a prettified
+    weeks, days, hours, minutes, seconds string output
+    Credit https://github.com/ThaTiemsz/jetski via MIT license
+
+    duration: datetime.datetime
+    '''
+    now = datetime.datetime.utcnow()
+    if isinstance(duration, datetime.timedelta):
+        if duration.total_seconds() > 0:
+            duration = datetime.datetime.today() + duration
+        else:
+            duration = datetime.datetime.utcnow() - datetime.timedelta(seconds=duration.total_seconds())
+    diff_delta = duration - now
+    diff = int(diff_delta.total_seconds())
+
+    minutes, seconds = divmod(diff, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    weeks, days = divmod(days, 7)
+    units = [weeks, days, hours, minutes, seconds]
+
+    unit_strs = ['week', 'day', 'hour', 'minute', 'second']
+
+    expires = []
+    for x in range(0, 5):
+        if units[x] == 0:
+            continue
+        else:
+            if units[x] > 1:
+                expires.append('{} {}s'.format(units[x], unit_strs[x]))
+            else:
+                expires.append('{} {}'.format(units[x], unit_strs[x]))
+    
+    return ', '.join(expires)
 
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
