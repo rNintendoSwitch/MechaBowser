@@ -305,6 +305,27 @@ class MainEvents(commands.Cog):
 
             await self.bot.user.edit(username=username)
 
+        elif sub == 'servermsgcache':
+            funcStart = time.time()
+            logging.info('[Core] Starting db message sync')
+            await ctx.send('Starting syncronization of db for all messages in server. This will take a conciderable amount of time.')
+            for channel in ctx.guild.channels:
+                if channel.type != discord.ChannelType.text:
+                    print('not text')
+                    continue
+
+                await ctx.send(f'Starting syncronization for <#{channel.id}>')
+
+                try:
+                    x, y = await self.store_message_cache(channel)
+                    await ctx.send(f'Syncronized <#{channel.id}>. Processed {x} messages and recorded meta data for {y} messages')
+
+                except (discord.Forbidden, discord.HTTPException):
+                    await ctx.send(f'Failed to syncronize <#{channel.id}>')
+
+            timeToComplete = utils.humanize_duration(utils.resolve_duration(f'{int(time.time() - funcStart)}s'))
+            return await ctx.send(f'<@{ctx.author.id}> Syncronization completed. Took {timeToComplete}')
+
         else:
             return await ctx.send('Invalid sub command')
 
@@ -313,6 +334,35 @@ class MainEvents(commands.Cog):
     async def _shutdown(self, ctx):
         await ctx.send('Closing connection to discord and shutting down')
         return await self.bot.close()
+
+    async def store_message_cache(self, channel):
+        #users = mclient.bowser.users
+        db = mclient.bowser.messages
+        x = 0
+        y = 0
+        async for message in channel.history(limit=None):
+            x += 1
+            if message.author.bot:
+                continue
+
+            msg = db.find_one({'_id': message.id})
+            if not msg:
+                y += 1
+                db.insert_one({
+                    '_id': message.id,
+                    'author': message.author.id,
+                    'guild': message.guild.id,
+                    'channel': message.channel.id,
+                    'timestamp': int(message.created_at.timestamp())
+                })
+                #if not users.find_one({'_id': message.author.id}):
+                    #users.insert_one({'_id': message.author.id, 'roles': []})
+
+            #else:
+                #if not users.find_one({'_id': message.author.id}):
+                    #users.insert_one({'_id': message.author.id, 'roles': []})
+
+        return x, y
 
 def setup(bot):
     bot.add_cog(MainEvents(bot))
