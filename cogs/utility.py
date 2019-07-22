@@ -138,37 +138,36 @@ class ChatControl(commands.Cog):
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
 
-        # Splatoon splatfest event
-        if message.channel.id == 278557283019915274:
-            pearl = re.compile(r'(<:pearl:332557519958310912>)+', re.I)
-            marina = re.compile(r'(<:marina:332557579815485451>)+', re.I)
-            orderRole = message.guild.get_role(601458524723216385)
-            chaosRole = message.guild.get_role(601458570197860449)
-            if re.search(pearl, message.content) and re.search(marina, message.content):
-                return
-
-            try:    
-                if re.search(pearl, message.content):
-                    if orderRole in message.author.roles:
-                        await message.author.remove_roles(orderRole)
-
-                    if chaosRole not in message.author.roles:
-                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Chaos')
-                        await msg.delete(delay=5.0)
-                        await message.author.add_roles(chaosRole)
-
-                elif re.search(marina, message.content):
-                    if chaosRole in message.author.roles:
-                        await message.author.remove_roles(chaosRole)
-
-                    if orderRole not in message.author.roles:
-                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Order')
-                        await msg.delete(delay=5.0)
-                        await message.author.add_roles(orderRole)
-
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-
+#        # Splatoon splatfest event - ended 7/21/19
+#        if message.channel.id == 278557283019915274:
+#            pearl = re.compile(r'(<:pearl:332557519958310912>)+', re.I)
+#            marina = re.compile(r'(<:marina:332557579815485451>)+', re.I)
+#            orderRole = message.guild.get_role(601458524723216385)
+#            chaosRole = message.guild.get_role(601458570197860449)
+#            if re.search(pearl, message.content) and re.search(marina, message.content):
+#                return
+#
+#            try:    
+#                if re.search(pearl, message.content):
+#                    if orderRole in message.author.roles:
+#                        await message.author.remove_roles(orderRole)
+#
+#                    if chaosRole not in message.author.roles:
+#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Chaos')
+#                        await msg.delete(delay=5.0)
+#                        await message.author.add_roles(chaosRole)
+#
+#                elif re.search(marina, message.content):
+#                    if chaosRole in message.author.roles:
+#                        await message.author.remove_roles(chaosRole)
+#
+#                    if orderRole not in message.author.roles:
+#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Order')
+#                        await msg.delete(delay=5.0)
+#                        await message.author.add_roles(orderRole)
+#
+#            except (discord.Forbidden, discord.HTTPException):
+#                pass
 
     @commands.command(name='ping')
     async def _ping(self, ctx):
