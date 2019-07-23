@@ -45,7 +45,10 @@ class Moderation(commands.Cog):
 
         await ctx.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
         await self.modLogs.send(embed=embed)
-        return await ctx.send(f'{config.greenTick} {username} has been successfully banned')
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {username} has been successfully banned')
 
     @commands.command(name='unban')
     @commands.has_any_role(config.moderator, config.eh)
@@ -71,7 +74,10 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
-        return await ctx.send(f'{config.greenTick} {user} has been unbanned')
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {user} has been unbanned')
 
     @commands.command(name='kick')
     @commands.has_any_role(config.moderator, config.eh)
@@ -90,7 +96,10 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
-        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully kicked')
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully kicked')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -121,7 +130,10 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
-        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully muted')
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully muted')
 
     @commands.command(name='unmute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -148,7 +160,10 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
-        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully unmuted')
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully unmuted')
 
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
@@ -207,7 +222,10 @@ class Moderation(commands.Cog):
             pass
 
         await self.modLogs.send(embed=embed)
-        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
 
     @_warning.command(name='clear')
     @commands.has_any_role(config.moderator, config.eh)
@@ -250,7 +268,11 @@ class Moderation(commands.Cog):
             await member.send(config.punDM.format('Warning level has been reset', reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except discord.Forbidden: # User has DMs off
             pass
-        return await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
+
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
 
     @_warning.command(name='level')
     @commands.has_any_role(config.moderator, config.eh)
@@ -305,7 +327,11 @@ class Moderation(commands.Cog):
             await member.send(config.punDM.format(warnText[tier], reason, f'{str(ctx.author)} (<@{ctx.author.id}>)'))
         except discord.Forbidden: # User has DMs off
             pass
-        return await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {tier}')
+
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {tier}')
 
     @_warning.command(name='review')
     @commands.has_any_role(config.moderator, config.eh)
@@ -428,10 +454,7 @@ class Moderation(commands.Cog):
 
         except asyncio.TimeoutError:
             await resp.delete()
-            return ctx.send(content=f'{config.redTick} Command timed out. Rerun to continue.')
-
-
-
+            return await ctx.send(content=f'{config.redTick} Command timed out. Rerun to continue.')
 
     @_warning.error
     @_warning_clear.error

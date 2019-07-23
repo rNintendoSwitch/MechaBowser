@@ -159,6 +159,17 @@ def humanize_duration(duration):
     
     return ', '.join(expires)
 
+async def mod_cmd_invoke_delete(channel):
+    print(channel.id)
+    if channel.id in config.showModCTX:
+        print('no invoke delete')
+        return False
+
+    else:
+        print('invoke delete')
+        return True
+
+
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
