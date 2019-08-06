@@ -4,3 +4,5 @@ jishaku
 pylint
 tornado
 markovify
+dialogflow
+google-cloud-storage

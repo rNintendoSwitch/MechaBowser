@@ -35,7 +35,7 @@ class MarkovChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if not message.content or message.content.startswith('()'):
+        if not message.content or message.content.startswith('!') or message.content.startswith(','):
             # Might be an embed or a command, not useful
             return
 
@@ -63,6 +63,8 @@ class MarkovChat(commands.Cog):
 class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.modLogs = self.bot.get_channel(config.modChannel)
+        self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:ebay)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I)
@@ -73,20 +75,22 @@ class ChatControl(commands.Cog):
             return
 
         #Filter test for afiliate links
-        if message.channel.id in [314857672585248768, 276036563866091521]:
-            if re.search(self.affiliateLinks, message.content):
-                hooks = await message.channel.webhooks()
-                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+        if re.search(self.affiliateLinks, message.content):
+            hooks = await message.channel.webhooks()
+            useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
 
-                await message.delete()
-                async with aiohttp.ClientSession() as session:
-                    name = message.author.name if not message.author.nick else message.author.nick
-                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
-                    await webhook.send(content=re.sub(self.affiliateLinks, r'\1', message.content), username=name, avatar_url=message.author.avatar_url)
+            await message.delete()
+            async with aiohttp.ClientSession() as session:
+                name = message.author.name if not message.author.nick else message.author.nick
+                webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
+                await webhook.send(content=re.sub(self.affiliateLinks, r'\1', message.content), username=name, avatar_url=message.author.avatar_url)
 
         #Filter for #mario
         if message.channel.id == 325430144993067049: # #mario
             if re.search(self.SMM2LevelID, message.content):
+                if re.search(self.linkRe, message.content):
+                    return # TODO: Check if SMM2LevelID found in linkRe to correct edge case
+
                 await message.delete()
                 response = await message.channel.send(f'<:redTick:402505117733224448> <@{message.author.id}> Please do not post Super Mario Maker 2 level codes '\
                     'here. Post in <#595203237108252672> with the pinned template instead.')
@@ -275,7 +279,7 @@ class ChatControl(commands.Cog):
                     puns += 1
                     stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
                     punType = config.punStrs[pun['type']]
-                    if pun['type'] in ['clear', 'unmute', 'unban']:
+                    if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
                         punishments += f'- [{stamp}] {punType}\n'
 
                     else:
@@ -284,13 +288,79 @@ class ChatControl(commands.Cog):
                 punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
                     f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
                     f'\n```diff\n{punishments}```'
-        embed.add_field(name='Punishments', value=punishments)
+        embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
 
     @commands.command(name='history')
     @commands.has_any_role(config.moderator, config.eh)
     async def _history(self, ctx, *, x):
         return await ctx.send(f'{config.redTick} This command is not currently ready to use')
+
+    @commands.command(name='roles')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _roles(self, ctx):
+        roleList = 'List of roles in guild:\n```\n'
+        for role in reversed(ctx.guild.roles):
+            roleList += f'{role.name} ({role.id})\n'
+
+        await ctx.send(f'{roleList}```')
+
+    @commands.command(name='blacklist')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _roles_set(self, ctx, member: discord.Member, channel: discord.TextChannel, *, reason='-No reason specified-'):
+        statusText = ''
+        if channel.id == config.suggestions:
+            suggestionsRole = ctx.guild.get_role(config.noSuggestions)
+            if suggestionsRole in member.roles: # Toggle role off
+                await member.remove_roles(suggestionsRole)
+                statusText = 'Unblacklisted'
+
+            else: # Toggle role on
+                await member.add_roles(suggestionsRole)
+                statusText = 'Blacklisted'
+
+        elif channel.id == config.spoilers:
+            spoilersRole = ctx.guild.get_role(config.noSpoilers)
+            if spoilersRole in member.roles: # Toggle role off
+                await member.remove_roles(spoilersRole)
+                statusText = 'Unblacklisted'
+
+            else: # Toggle role on
+                await member.add_roles(spoilersRole)
+                statusText = 'Blacklisted'         
+
+        else:
+            return await ctx.send(f'{config.redTick} You cannot blacklist a user from that channel')
+
+        db = mclient.bowser.puns
+        if statusText.lower() == 'blacklisted':
+            await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=channel.name)
+
+        else:
+            db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True}, {'$set':{
+            'active': False
+            }})
+            await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=channel.name)
+
+        embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'{statusText} | {str(member)}')
+        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Channel', value=channel.mention)
+        embed.add_field(name='Reason', value=reason)
+
+        await self.modLogs.send(embed=embed)
+
+        try:
+            statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
+            await member.send(utils.format_pundm(statusText, reason, ctx.author, channel.mention))
+        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+            pass
+
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {channel.mention}')
 
 def setup(bot):
     global serverLogs

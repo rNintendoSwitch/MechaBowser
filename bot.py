@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import argparse
 
 import pymongo
 import tornado.ioloop
@@ -17,8 +18,8 @@ mclient = pymongo.MongoClient(
 	username=config.mongoUser,
 	password=config.mongoPass
 )
-activityStatus = discord.Activity(type=discord.ActivityType.playing, name='bot dev with MattBSG')
-bot = commands.Bot('()', max_messages=75000, fetch_offline_members=True, activity=activityStatus)
+activityStatus = discord.Activity(type=discord.ActivityType.playing, name='with Fils-a-Mech')
+bot = commands.Bot(['!', ','], max_messages=300000, fetch_offline_members=True, activity=activityStatus)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -44,7 +45,7 @@ class BotCache(commands.Cog):
             for member in NS.members:
                 userCount += 1
                 await asyncio.sleep(0.01)
-                logging.info(f'[Cache] Syncronizing user {userCount}/{guildCount}')
+                logging.debug(f'[Cache] Syncronizing user {userCount}/{guildCount}')
                 doc = db.find_one({'_id': member.id})
                 if not doc:
                     await utils.store_user(member)
@@ -93,6 +94,9 @@ class MainHandler(tornado.web.RequestHandler):
 
 if __name__ == '__main__':
     print('\033[94mFils-A-Mech python by MattBSG#8888 2019\033[0m')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--web-only', action='store_true')
+    args = parser.parse_args()
 
     logging.info('Initializing web framework')
     app = tornado.web.Application([
@@ -100,6 +104,12 @@ if __name__ == '__main__':
     ], xheader=True)
 
     app.listen(8880)
-    logging.info('Initializing discord')
-    tornado.ioloop.IOLoop.current().run_sync(setup_discord)
+
+    if not args.web_only:
+        logging.info('Initializing discord')
+        tornado.ioloop.IOLoop.current().run_sync(setup_discord)
+
+    else:
+        logging.info('[Web] Running in web only mode, discord will not initialize')
+
     tornado.ioloop.IOLoop.current().start()

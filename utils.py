@@ -79,9 +79,9 @@ async def store_user(member, messages=0):
     }
     db.insert_one(userData)
 
-async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None):
+async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None):
     db = mclient.bowser.puns
-    timestamp = int(time.time())
+    timestamp = time.time() if not _date else _date
     docID = str(uuid.uuid4())
     while db.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
         docID = str(uuid.uuid4())
@@ -91,7 +91,7 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'user': user,
         'moderator': moderator,
         'type': _type,
-        'timestamp': timestamp,
+        'timestamp': int(timestamp),
         'reason': reason,
         'expiry': expiry,
         'context': context,
@@ -120,7 +120,7 @@ def resolve_duration(data):
         value += timeUnits[char](int(digits))
         digits = ''
 
-    return datetime.datetime.utcnow() + datetime.timedelta(seconds=value)
+    return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
 
 def humanize_duration(duration):
     '''
@@ -162,13 +162,33 @@ def humanize_duration(duration):
 async def mod_cmd_invoke_delete(channel):
     print(channel.id)
     if channel.id in config.showModCTX:
-        print('no invoke delete')
         return False
 
     else:
-        print('invoke delete')
         return True
 
+def format_pundm(_type, reason, moderator, details=None, auto=False):
+    infoStrs = {
+        'warn': f'You have been **warned (now {details})** on',
+        'warnup': f'Your **warning level** has been **increased (now {details})** on',
+        'warndown': f'Your **warning level** has been **decreased (now {details})** on',
+        'warnclear': f'Your **warning** has been **cleared** on',
+        'mute': f'You have been **muted ({details})** on',
+        'unmute': f'Your **mute** has been **removed** on',
+        'blacklist': f'Your **posting permissions** have been **restricted** in {details} on',
+        'unblacklist': f'Your **posting permissions** have been **restored** in {details} on',
+        'kick': 'You have been kicked from',
+        'ban': 'You have been banned from'
+    }
+    mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
+
+    punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
+    punDM += f'Reason:```{reason}```'
+    punDM += f'Responsible moderator: {mod}\n\n'
+    punDM += 'If you have questions concerning this matter, please feel free to contact the respective moderator that took this action or another member of the moderation team.\n'
+    punDM += 'Please do not respond to this message, I cannot reply.'
+
+    return punDM
 
 def setup(bot):
     logging.info('[Extension] Utils module loaded')

@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import time
+import typing
 
 import pymongo
 import discord
@@ -23,6 +24,7 @@ class MainEvents(commands.Cog):
         try:
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
+            #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
@@ -62,9 +64,9 @@ class MainEvents(commands.Cog):
 
         #log = f':inbox_tray: {new} User **{str(member)}** ({member.id}) joined'
 
-        embed = discord.Embed(description=f'{new}{member} ({member.id}) joined the server', color=0x417505, timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(color=0x417505, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
-        created_at = member.created_at.strftime('%B %d, %Y %H:%M:%S UTC')
+        created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
         created_at += '' if not new else ' (account created less than 14 days ago)'
         embed.add_field(name='Created at', value=created_at)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
@@ -75,9 +77,28 @@ class MainEvents(commands.Cog):
             #roleText = ', '.split(x.name for x in roleList)
 
             #logRestore = f':shield: Roles have been restored for returning member **{str(member)}** ({member.id}):\n{roleText}'
-            embed = discord.Embed(description=f'Roles have been restored for returning member {member} ({member.id})', color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+            punTypes = {
+                'mute': 'Mute',
+                'blacklist': 'Channel Blacklist ({})',
+                'tier1': 'Tier 1 Warning',
+                'tier2': 'Tier 2 Warning',
+                'tier3': 'Tier 3 Warning',
+            }
+            puns = mclient.bowser.puns.find({'user': member.id, 'active': True})
+            restoredPuns = []
+            if puns.count():
+                for x in puns:
+                    if x['type'] == 'blacklist':
+                        restoredPuns.append(punTypes[x['type']].format(x['context']))
+
+                    else:
+                        restoredPuns.append(punTypes[x['type']])
+
+            embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
             embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
             embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList))
+            if restoredPuns:
+                embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
             embed.add_field(name='Mention', value=f'<@{member.id}>')
             await self.serverLogs.send(':shield: Member restored', embed=embed)
 
@@ -90,13 +111,14 @@ class MainEvents(commands.Cog):
                         'tier1',
                         'tier2',
                         'tier3',
-                        'mute'
+                        'mute',
+                        'blacklist'
                     ]
                 }
             }
         )
         if puns.count():
-            embed = discord.Embed(description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:', color=0xF5A623, timestamp=datetime.datetime.utcnow())
+            embed = discord.Embed(description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:', color=0xD62E44, timestamp=datetime.datetime.utcnow())
             punishments = []
             for x in puns:
                 punishments.append(config.punStrs[x['type']])
@@ -105,7 +127,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='Punishment types', value=punishments)
 
         else:
-            embed = discord.Embed(description=f'{member} ({member.id}) left the server', color=0x417505, timestamp=datetime.datetime.utcnow())
+            embed = discord.Embed(color=0x8B572A, timestamp=datetime.datetime.utcnow())
 
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
@@ -116,7 +138,7 @@ class MainEvents(commands.Cog):
         if guild.id != 238080556708003851:
             return
 
-        embed = discord.Embed(description=f'{user} ({user.id}) has been banned from the server', color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
@@ -127,7 +149,7 @@ class MainEvents(commands.Cog):
         if guild.id != 238080556708003851:
             return
 
-        embed = discord.Embed(description=f'{user} ({user.id}) has been unbanned from the server', color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
@@ -328,6 +350,15 @@ class MainEvents(commands.Cog):
 
         else:
             return await ctx.send('Invalid sub command')
+
+    @commands.command(name='pundb')
+    @commands.is_owner()
+    async def _pundb(self, ctx, _type, user, moderator, strTime, active: typing.Optional[bool], *, reason='-No reason specified-'):
+        date = datetime.datetime.strptime(strTime, '%m/%d/%y')
+        expiry = None if not active else int(date.timestamp() + (60 * 60 * 24 * 30))
+        await utils.issue_pun(int(user), int(moderator), _type, reason, expiry, active, 'old', date.timestamp())
+        await ctx.send(f'{config.greenTick} Done')
+        print('done')
 
     @commands.command(name='shutdown')
     @commands.is_owner()
