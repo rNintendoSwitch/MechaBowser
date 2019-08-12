@@ -305,8 +305,51 @@ class ChatControl(commands.Cog):
 
     @commands.command(name='history')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _history(self, ctx, *, x):
-        return await ctx.send(f'{config.redTick} This command is not currently ready to use')
+    async def _history(self, ctx, user: discord.User):
+        db = mclient.bowser.puns
+        puns = db.find({'user': user.id})
+        if not puns.count():
+            return await ctx.send(f'{config.redTick} User has no punishments on record')
+
+        punNames = {
+            'tier1': 'T1 Warn',
+            'tier2': 'T2 Warn',
+            'tier3': 'T3 Warn',
+            'clear': 'Warn Clear',
+            'mute': 'Mute',
+            'unmute': 'Unmute',
+            'kick': 'Kick',
+            'ban': 'Ban',
+            'unban': 'Unban',
+            'blacklist': 'Blacklist ({})',
+            'unblacklist': 'Unblacklist ({})'
+        }
+
+        if puns.count() == 1:
+            desc = f'There is __1__ infraction record for this user:'
+
+        else:
+            desc = f'There are __{puns.count()}__ infraction records for this user:'
+
+        embed = discord.Embed(title='Infraction History', description=desc, color=0x18EE1C)
+        embed.set_author(name=f'{user} | {user.id}', icon_url=user.avatar_url)
+
+        for pun in puns.sort('timestamp', pymongo.ASCENDING):
+            datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
+            moderator = ctx.guild.get_member(pun['moderator'])
+            if not moderator:
+                moderator = await self.bot.fetch_user(pun['moderator'])
+
+            if pun['type'] in ['blacklist', 'unblacklist']:
+                inf = punNames[pun['type']].format(pun['context'])
+
+            else:
+                inf = punNames[pun['type']]
+
+            embed.add_field(name=datestamp, value=f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}')
+
+        return await ctx.send(embed=embed)
+            
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
