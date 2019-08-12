@@ -251,7 +251,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='After', value=after.nick, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
-            await self.serverLogs.send(':pen_fountain: User\'s nickname updated', embed=embed)
+            await self.serverLogs.send(':label: User\'s nickname updated', embed=embed)
 
         if before.roles != after.roles:
             roleList = []
@@ -292,7 +292,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='After', value=str(after), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
-            await self.serverLogs.send(':pen_ballpoint: User\'s name updated', embed=embed)
+            await self.serverLogs.send(':label: User\'s name updated', embed=embed)
 
         elif before.discriminator != after.discriminator:
             # Really only case this would be called, and not username (i.e. discrim reroll after name change)
@@ -303,7 +303,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='After', value=str(after), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
-            await self.serverLogs.send(':pen_ballpoint: User\'s name updated', embed=embed)
+            await self.serverLogs.send(':label: User\'s name updated', embed=embed)
 
     @commands.command(name='update')
     @commands.is_owner()
