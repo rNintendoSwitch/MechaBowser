@@ -212,8 +212,14 @@ class Moderation(commands.Cog):
             }})
             warnLevel = 2 if puns['type'] == 'tier2' else 1
 
+        if _warnType == 'warn':
+            embedWarnType = warnText[warnLevel]
+    
+        elif _warnType == 'warnup':
+            embedWarnType = f'{warnText[warnLevel]} (was Tier {warnLevel})'
+
         embed = discord.Embed(color=embedColor[warnLevel], timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{warnText[warnLevel]} | {str(member)}')
+        embed.set_author(name=f'{embedWarnType} | {str(member)}')
         embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
         embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
         embed.add_field(name='Reason', value=reason)
@@ -315,24 +321,31 @@ class Moderation(commands.Cog):
             }
         )
         _warnType = 'warn'
+        oldTierInt = 0
         if puns:
             for x in puns:
                 db.update_one({'_id': x['_id']}, {'$set': {
                     'active': False
                 }})
-                tierInt = int(x['type'][-1:])
-                if tierInt == tier:
+                oldTierInt = int(x['type'][-1:])
+                if oldTierInt == tier:
                     return await ctx.send(f'{config.redTick} User is already warned at that tier')
 
-                await member.remove_roles(tierLevel[tierInt])
-                if tierInt > tier:
+                await member.remove_roles(tierLevel[oldTierInt])
+                if oldTierInt > tier:
                     _warnType = 'warndown'
 
                 else:
                     _warnType = 'warnup'
 
+        if _warnType == 'warn':
+            embedWarnType = warnText[tier]
+
+        elif _warnType in ['warnup', 'warndown']:
+            embedWarnType = f'{warnText[tier]} (was Tier {oldTierInt})'
+            
         embed = discord.Embed(color=embedColor[tier], timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{warnText[tier]} | {str(member)}')
+        embed.set_author(name=f'{embedWarnType} | {str(member)}')
         embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
         embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
         embed.add_field(name='Reason', value=reason)
@@ -401,7 +414,7 @@ class Moderation(commands.Cog):
 
             if ctx.guild.get_role(config.moderator) in user.roles and str(reaction.emoji) in [config.nextTrack, config.fastForward, config.playButton, config.downTriangle]:
                 metaReactions[str(reaction.emoji)] += 1
-                print(metaReactions)
+                #print(metaReactions)
                 if metaReactions[str(reaction.emoji)] >= 1:
                     return True
 
