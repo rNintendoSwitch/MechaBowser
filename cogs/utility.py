@@ -220,73 +220,86 @@ class ChatControl(commands.Cog):
     @commands.command(name='info')
     @commands.has_any_role(config.moderator, config.eh)
     async def _info(self, ctx, user: typing.Union[discord.Member, int]):
+        inServer = True
         if type(user) == int:
             # User doesn't share the ctx server, fetch it instead
+            dbUser = mclient.bowser.users.find_one({'_id': user})
+            inServer = False
             try:
                 user = await self.bot.fetch_user(user)
 
             except discord.NotFound:
-                return await ctx.send('<:redTick:402505117733224448> User does not exist')
-        
-            embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about this user (<@{user.id}>) from the ' \
-            'API as I do not share this server with them. There may little information to display as such')
-            embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-            embed.set_thumbnail(url=user.avatar_url)
-            embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
-            return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
+                return await ctx.send(f'{config.redTick} User does not exist')
+
+            if not dbUser:
+                embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about {user.mention} from the API because they are not in this server. There is little information to display as such')
+                embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
+                embed.set_thumbnail(url=user.avatar_url)
+                embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
+                return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
 
         else:
-            # Member object, loads of info to work with
-            messages = mclient.bowser.messages.find({'author': user.id})
-            msgCount = 0 if not messages else messages.count()
+            dbUser = mclient.bowser.users.find_one({'_id': user.id})
 
-            embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched member <@{user.id}>')
-            embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-            embed.set_thumbnail(url=user.avatar_url)
-            embed.add_field(name='Messages', value=str(msgCount), inline=True)
+        # Member object, loads of info to work with
+        messages = mclient.bowser.messages.find({'author': user.id})
+        msgCount = 0 if not messages else messages.count()
+
+        desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
+            'from the API because they are not in this server. ' \
+            'Showing last know data from before they left.'
+        embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
+        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
+        embed.set_thumbnail(url=user.avatar_url)
+        embed.add_field(name='Messages', value=str(msgCount), inline=True)
+        if inServer:
             embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
-            roleList = []
+        roleList = []
+        if inServer:
             for role in reversed(user.roles):
                 if role.id == user.guild.id:
                     continue
 
                 roleList.append(role.name)
+
+        else:
+            roleList = dbUser['roles']
             
-            if not roleList:
-                # Empty; no roles
-                roles = '*User has no roles*'
+        if not roleList:
+            # Empty; no roles
+            roles = '*User has no roles*'
 
-            else:
-                roles = ', '.join(roleList)
+        else:
+            roles = ', '.join(roleList)
 
-            embed.add_field(name='Roles', value=roles, inline=False)
+        embed.add_field(name='Roles', value=roles, inline=False)
 
-            lastMsg = 'N/a' if msgCount == 0 else datetime.datetime.utcfromtimestamp(messages.sort('timestamp', pymongo.DESCENDING)[0]['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
-            embed.add_field(name='Last message', value=lastMsg, inline=True)
-            embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
-            punishments = ''
-            punsCol = mclient.bowser.puns.find({'user': user.id})
-            if not punsCol.count():
-                punishments = '__*No punishments on record*__'
+        lastMsg = 'N/a' if msgCount == 0 else datetime.datetime.utcfromtimestamp(messages.sort('timestamp',pymongo.DESCENDING)[0]['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
+        embed.add_field(name='Last message', value=lastMsg, inline=True)
+        embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+        punishments = ''
+        punsCol = mclient.bowser.puns.find({'user': user.id})
+        if not punsCol.count():
+            punishments = '__*No punishments on record*__'
 
-            else:
-                puns = 0
-                for pun in punsCol:
-                    if puns >= 5:
-                        break
+        else:
+            puns = 0
+            for pun in punsCol:
+                if puns >= 5:
+                    break
 
-                    puns += 1
-                    stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
-                    punType = config.punStrs[pun['type']]
-                    if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
-                        punishments += f'- [{stamp}] {punType}\n'
+                puns += 1
+                stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
+                punType = config.punStrs[pun['type']]
+                if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
+                    punishments += f'- [{stamp}] {punType}\n'
 
-                    else:
-                        punishments += f'+ [{stamp}] {punType}\n'
+                else:
+                    punishments += f'+ [{stamp}] {punType}\n'
 
-                punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
-                    f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
-                    f'\n```diff\n{punishments}```'
+            punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
+                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
+                f'\n```diff\n{punishments}```'
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
 
