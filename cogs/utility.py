@@ -213,8 +213,8 @@ class ChatControl(commands.Cog):
         await m.delete(delay=10)
         archiveID = await utils.message_archive(list(reversed(deleted)))
 
-        log = f':printer: New message archive has been generated for <#{ctx.channel.id}> from a clean, view it at {config.baseUrl}/archive/{archiveID}'
-        await self.bot.get_channel(config.logChannel).send(log)
+        embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/archive/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
+        await self.bot.get_channel(config.logChannel).send(f':printer: New message archive generated for {ctx.channel.mention}', embed=embed)
 
         return await m.delete(delay=10)
 
