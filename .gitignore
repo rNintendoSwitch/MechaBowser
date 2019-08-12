@@ -1,5 +1,7 @@
-# Virtualenv
+# Virtualenv and workspace
 bot/
+.vscode/
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
