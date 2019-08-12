@@ -177,6 +177,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages): # TODO: Work with archives channel attribute to list channels
+        await asyncio.sleep(10) # Give chance for clean command to finish and discord to process delete
         db = mclient.bowser.archive
         checkStamp = int(time.time() - 600) # Rate limiting, instability, and being just slow to fire are other factors that could delay the event
         archives = db.find({'timestamp': {'$gt': checkStamp}})
