@@ -349,7 +349,7 @@ class ChatControl(commands.Cog):
             await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=channel.name)
 
         else:
-            db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True}, {'$set':{
+            db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True, 'context': channel.name}, {'$set':{
             'active': False
             }})
             await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=channel.name)
