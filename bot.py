@@ -31,7 +31,7 @@ class BotCache(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        logging.info('[BOT] on_ready')
+        logging.info('[Bot] on_ready')
         if not self.READY:
             self.bot.load_extension('cogs.core')
             #self.READY = True
