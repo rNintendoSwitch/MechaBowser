@@ -138,6 +138,27 @@ class MainEvents(commands.Cog):
         if guild.id != 238080556708003851:
             return
 
+        db = mclient.bowser.puns
+        if not db.find_one({'user': user.id, 'type': 'ban', 'active': True, 'timestamp': {'$gt': time.time() - 60}}):
+            # Manual ban
+            audited = False
+            async for entry in guild.audit_logs(action=discord.AuditLogAction.ban):
+                if entry.target == user:
+                    audited = entry
+                    break
+
+            if audited:
+                reason = '-No reason specified-' if not audited.reason else audited.reason
+                await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
+
+                embed = discord.Embed(description='User was manually banned through Discord', color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
+                embed.set_author(name=f'Ban | {audited.target}')
+                embed.add_field(name='User', value=audited.target.mention, inline=True)
+                embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
+                embed.add_field(name='Reason', value=reason)
+
+                await self.modLogs.send(embed=embed)
+
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
@@ -148,6 +169,30 @@ class MainEvents(commands.Cog):
     async def on_member_unban(self, guild, user):
         if guild.id != 238080556708003851:
             return
+
+        db = mclient.bowser.puns
+        if not db.find_one({'user': user.id, 'type': 'unban', 'timestamp': {'$gt': time.time() - 60}}):
+            # Manual unban
+            audited = False
+            async for entry in guild.audit_logs(action=discord.AuditLogAction.unban):
+                if entry.target == user:
+                    audited = entry
+                    break
+
+            if audited:
+                reason = '-No reason specified-' if not audited.reason else audited.reason
+                await utils.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
+                db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set':{
+                    'active': False
+                }})
+
+                embed = discord.Embed(description='User was manually unbanned through Discord', color=discord.Color(0x4A90E2), timestamp=datetime.datetime.utcnow())
+                embed.set_author(name=f'Unban | {audited.target}')
+                embed.add_field(name='User', value=audited.target.mention, inline=True)
+                embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
+                embed.add_field(name='Reason', value=reason)
+
+                await self.modLogs.send(embed=embed)
 
         embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)

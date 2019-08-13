@@ -207,6 +207,7 @@ class ChatControl(commands.Cog):
         def message_filter(message):
             return True if not memberList or message.author.id in memberList else False
 
+        await ctx.message.delete()
         deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
     
         m = await ctx.send(f'{config.greenTick} Clean action complete')
