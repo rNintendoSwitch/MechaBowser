@@ -61,11 +61,11 @@ class Moderation(commands.Cog):
         except discord.NotFound:
             return await ctx.send(f'{config.redTick} {user} is not currently banned')
 
-        await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
         db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
         await utils.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
+        await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Unban | {user}')
