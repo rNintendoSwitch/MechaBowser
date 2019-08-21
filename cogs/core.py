@@ -35,7 +35,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_resume(self):
-        logging.warning('[MAIN] The bot has been resumed on Discord')
+        logging.warning('[Main] The bot has been resumed on Discord')
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -205,7 +205,7 @@ class MainEvents(commands.Cog):
         if message.author.bot or message.webhook_id:
             return
     
-        if message.channel.type != discord.ChannelType.text:
+        if message.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
             logging.error(f'Discarding bad message {message.channel.type}')
             return
 
