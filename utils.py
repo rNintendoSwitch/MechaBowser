@@ -160,7 +160,6 @@ def humanize_duration(duration):
     return ', '.join(expires)
 
 async def mod_cmd_invoke_delete(channel):
-    print(channel.id)
     if channel.id in config.showModCTX:
         return False
 
