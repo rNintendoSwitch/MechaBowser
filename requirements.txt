@@ -6,3 +6,4 @@ tornado
 markovify
 dialogflow
 google-cloud-storage
+fuzzywuzzy[speedup]
