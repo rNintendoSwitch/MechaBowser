@@ -27,16 +27,23 @@ class Moderation(commands.Cog):
     @commands.has_any_role(config.moderator, config.eh)
     async def _banning(self, ctx, user: typing.Union[discord.Member, int], *, reason='-No reason specified-'):
         userid = user if (type(user) is int) else user.id
-        await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
 
         username = userid if (type(user) is int) else f'{str(user)}'
         user = discord.Object(id=userid) if (type(user) is int) else user # If not a user, manually contruct a user object
+        try:
+            await ctx.guild.fetch_ban(user)
+            return await ctx.send(f'{config.redTick} {username} is already banned')
+
+        except discord.NotFound:
+            pass
 
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Ban | {username}')
         embed.add_field(name='User', value=f'<@{userid}>', inline=True)
         embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
         embed.add_field(name='Reason', value=reason)
+
+        await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
 
         try:
             await user.send(utils.format_pundm('ban', reason, ctx.author))
