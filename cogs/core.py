@@ -226,7 +226,6 @@ class MainEvents(commands.Cog):
         db = mclient.bowser.archive
         checkStamp = int(time.time() - 600) # Rate limiting, instability, and being just slow to fire are other factors that could delay the event
         archives = db.find({'timestamp': {'$gt': checkStamp}})
-        print(archives)
         if archives: # If the bulk delete is the result of us, exit
             for x in archives:
                 if messages[0].id in x['messages']:
@@ -379,7 +378,6 @@ class MainEvents(commands.Cog):
             await ctx.send('Starting syncronization of db for all messages in server. This will take a conciderable amount of time.')
             for channel in ctx.guild.channels:
                 if channel.type != discord.ChannelType.text:
-                    print('not text')
                     continue
 
                 await ctx.send(f'Starting syncronization for <#{channel.id}>')
@@ -404,7 +402,6 @@ class MainEvents(commands.Cog):
         expiry = None if not active else int(date.timestamp() + (60 * 60 * 24 * 30))
         await utils.issue_pun(int(user), int(moderator), _type, reason, expiry, active, 'old', date.timestamp())
         await ctx.send(f'{config.greenTick} Done')
-        print('done')
 
     @commands.command(name='shutdown')
     @commands.is_owner()
