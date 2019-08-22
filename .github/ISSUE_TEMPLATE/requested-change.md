@@ -1,6 +1,6 @@
 ---
 name: Requested Change
-about: Use this template to make any kind of request that changes the bot
+about: Use this template to make any kind of request that changes the bot. Please *do not* open a regular issue not using a template.
 title: ''
 labels: ''
 assignees: MattBSG
