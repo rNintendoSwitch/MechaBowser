@@ -16,7 +16,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 
-archiveHeader = '# Message archive for "#{0.name}" ({0.id}) in guild "{1.name}" ({1.id})\n# Format:\n[date + time] Member ID/Message ID/Username - Message content\n----------------\n'
+archiveHeader = '# Message archive for guild "{0.name}" ({0.id})\nIncluded channels: {1}\n# Format:\n[date + time] Member ID/Message ID/Channel/Username - Message content\n----------------\n'
 timeUnits = {
     's': lambda v: v,
     'm': lambda v: v * 60,
@@ -31,7 +31,12 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
         # Single message to archive
         archive = [archive]
 
-    body = archiveHeader.format(archive[0].channel, archive[0].guild)
+    channels = []
+    for msg in archive:
+        if f'#{msg.channel.name}' not in channels:
+            channels.append(f'#{msg.channel.name}')
+
+    body = archiveHeader.format(archive[0].guild, ', '.join(channels))
     archiveID = f'{archive[0].id}-{int(time.time() * 1000)}'
     messageIDs = []
 
@@ -39,16 +44,22 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
         msgBefore = archive[0]
         msgAfter = archive[1]
 
-        body += f'[{msgBefore.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msgBefore.author.id}/{msgBefore.id}/{str(msgBefore.author)}): message edit:\n'
+        body += f'[{msgBefore.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msgBefore.author.id}/{msgBefore.id}/#{archive[0].channel.name}/{str(msgBefore.author)}): message edit:\n'
         body += f'--- Before ---\n{msgBefore.content}\n\n--- After ---\n{msgAfter.content}'
 
     else:
-        channels = []
         for msg in archive: # TODO: attachment CDN urls should be posted as message
-            if not msg.channel not in channels: channels.append(msg.channel)
             messageIDs.append(msg.id)
-            content = '*No message content could be saved, could be embed or attachment*' if not msg.content else msg.content
-            body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/{str(msg.author)}): {content}\n'
+            if not msg.content and msg.attachments:
+                content = ' '.join([x.url for x in msg.attachments])
+
+            elif not msg.content and not msg.attachements:
+                content = '*No message content could be saved, could be embed*'
+
+            else:
+                content = msg.content
+
+            body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/#{msg.channel.name}/{str(msg.author)}): {content}\n'
 
     db.insert_one({
         '_id': archiveID,
