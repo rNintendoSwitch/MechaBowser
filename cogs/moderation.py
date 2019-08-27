@@ -608,7 +608,7 @@ class LoopTasks(commands.Cog):
                 punsCol = db.find({'user': member.id})
                 puns = 0
                 punishments = ''
-                for n in punsCol:
+                for n in punsCol.sort('timestamp',pymongo.DESCENDING):
                     if puns >= 5:
                         break
 
@@ -631,7 +631,7 @@ class LoopTasks(commands.Cog):
                 embed.add_field(name="Responsible moderator", value=f"{str(moderator)} ({moderator.id})", inline=True)
                 embed.add_field(name="Reason", value=pun['reason'], inline=True)
                 embed.add_field(name="Previous punishments", value=punishments)
-                embed.add_field(name="Making a decision", value=f"An action is required for this review. Please use the `!warn review @{str(member)}` command to proceed")
+                embed.add_field(name="Making a decision", value=f"An action is required for this review. Please use the `!warn review {member.id}` command to proceed")
 
                 await self.adminChannel.send(content=":warning::alarm_clock:", embed=embed)
                 self.expiryWarnNotified[pun['_id']] = time.time()
