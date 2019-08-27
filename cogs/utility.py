@@ -9,7 +9,7 @@ import pymongo
 import discord
 from discord import Webhook, AsyncWebhookAdapter
 from discord.ext import commands, tasks
-import pymarkovchain
+from fuzzywuzzy import fuzz, process
 
 import config
 import utils
@@ -23,42 +23,294 @@ mclient = pymongo.MongoClient(
 serverLogs = None
 modLogs = None
 
-class MarkovChat(commands.Cog):
+class NintenDeals(commands.Cog):
     def __init__(self, bot):
+        self.dealsMongo = pymongo.MongoClient(
+            config.mongoDealsHost,
+            port=config.mongoDealsPort,
+            username=config.mongoDealsUser,
+            password=config.mongoDealsPass,
+            authSource=config.mongoDealsAuth
+        )
         self.bot = bot
-        self.markovChain = pymarkovchain.MarkovChain('markov')
-        #self.dump_markov.start() # pylint: disable=no-member
+        self.games = {}
+        self.dealMessages = []
+        self.saleData = None
+        self.dealChannel = self.bot.get_channel(613785143059939338)
+        self.session = aiohttp.ClientSession()
+        self.creds = {'api_key': config.dealsAPIKey}
+        self.codepoints = {
+            'CA': '\U0001f1e8\U0001f1e6',
+            'MX': '\U0001f1f2\U0001f1fd',
+            'US': '\U0001f1fa\U0001f1f8',
+            'CZ': '\U0001f1e8\U0001f1ff',
+            'DK': '\U0001f1e9\U0001f1f0',
+            'EU': '\U0001f1ea\U0001f1fa',
+            'GB': '\U0001f1ec\U0001f1e7',
+            'NO': '\U0001f1f3\U0001f1f4',
+            'PL': '\U0001f1f5\U0001f1f1',
+            'RU': '\U0001f1f7\U0001f1fa',
+            'ZA': '\U0001f1ff\U0001f1e6',
+            'SE': '\U0001f1f8\U0001f1ea',
+            'CH': '\U0001f1e8\U0001f1ed',
+            'AU': '\U0001f1e6\U0001f1fa',
+            'NZ': '\U0001f1f3\U0001f1ff',
+            'JP': '\U0001f1ef\U0001f1f5'
+        }
+        self.query_deals.start() #pylint: disable=no-member
+        self.fetch_all_games.start() #pylint: disable=no-member
+        logging.info('[Cog] NintenDeals task cogs loaded')
 
     def cog_unload(self):
-        pass
-        #self.dump_markov.cancel() # pylint: disable=no-member
+        logging.info('[Cog] Attempting to cancel tasks...')
+        self.query_deals.cancel() #pylint: disable=no-member
+        self.fetch_all_games.cancel() #pylint: disable=no-member
+        logging.info('[Cog] Task query_deals exited')
+        #asyncio.get_event_loop().run_until_complete(self.session.close())
+        #self.session.close()
+        logging.info('[Cog] NintenDeals task cogs unloaded')
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if not message.content or message.content.startswith('!') or message.content.startswith(','):
-            # Might be an embed or a command, not useful
-            return
+    @tasks.loop(seconds=43200)
+    async def fetch_all_games(self):
+        logging.info('[Deals] Starting game fetch')
+        gameDB = mclient.bowser.games
+        ndealsDB = self.dealsMongo.nintendeals.games
 
-        self.markovChain.generateDatabase(message.content)
-        self.markovChain.dumpdb()
+        games = ndealsDB.find({'system': 'Switch'})
+        for game in games:
+            await asyncio.sleep(0.01)
+            gameEntry = {
+                    '_id': game['_id'],
+                    'nsuids': game['nsuids'],
+                    'titles': game['titles'],
+                    'release_dates': game['release_dates'],
+                    'categories': game['categories'],
+                    'websites': game['websites'],
+                    'scores': game['scores'],
+                    'free_to_play': game['free_to_play']
+                }
+            self.games[game['_id']] = gameEntry
+            if not gameDB.find_one({'_id': game['_id']}): # TODO: IMPORTANT: Compare two databases, and update if diff
+                gameDB.insert_one(gameEntry)
 
-    @tasks.loop(seconds=30)
-    async def dump_markov(self):
-        logging.info('Taking a dump')
-        self.markovChain.dumpdb()
-        logging.info('I\'m done')
+        logging.info('[Deals] Finished game fetch')
 
-    @commands.command(name='markov')
-    @commands.is_owner()
-    async def _markov(self, ctx, seed: typing.Optional[str]):
-        try:
-            if seed:
-                return await ctx.send(self.markovChain.generateStringWithSeed(seed))
+    @tasks.loop(seconds=14400)
+    async def query_deals(self):
+        logging.info('[Deals] Starting deals check')
+        for x in self.dealMessages:
+            await x.delete()
+
+        self.dealMessages = []
+
+        async with self.session.get(config.dealsAPI, params=self.creds) as r:
+            if r.status != 200:
+                logging.error(f'[Deals] NintenDeals API returned non-OK code {r.status}')
+                return
+
+            try:
+                resp = await r.json()
+                self.saleData = resp
+
+            except Exception as e:
+                logging.error(f'[Deals] Error while retrieving deals json: {e}')
+
+            message = f'**Nintendo Switch Game Deals**\nLast updated {datetime.datetime.utcnow().strftime("%B %d, %Y at %H:%M UTC")}\n\n' \
+                'This deals list is updated 4 times each day to contain the 20 top metascore rated games currently on sale. \n' \
+                '> Note: This list only includes games which have prices in USD\n' \
+                '> Game sale date provided gratefully by <http://www.nintendeals.xyz/>' \
+                '\n{}'.format('-' * 30)
+                # Remove newlines above
+                #'You can search any game on Nintendo Switch, even it it is not currently on sale, with the `!games search Name` command ' \
+                #'replacing "Name" with the name of the game\n' \
+            games = []
+
+            maxAmt = 20
+            gameInfo = {}
+            gameScore = {}
+
+            for x in resp['games_on_sale']:
+                await asyncio.sleep(0.01)
+                title = None
+                if 'NA' in x['titles'].keys():
+                    title = x['titles']['NA'] if x['titles']['NA'] else None
+
+                if not title and 'EU' in x['titles'].keys():
+                    title = x['titles']['EU'] if x['titles']['EU'] else None
+
+                if not title:
+                    continue # Ignore if no english title was set by this point
+
+                if not 'US' in x['price'].keys():
+                    continue # Ignore if there is no USD price
+
+                gameInfo[title] = x
+                gameScore[title] = 0 if x['scores']['metascore'] == '-' else x['scores']['metascore']
+
+            sortedScores = sorted(gameScore.items(), key=lambda kv: kv[1], reverse=True)
+            for y in sortedScores:
+                if maxAmt <= 0: break
+                x = gameInfo[y[0]]
+
+                MS = 'N/a' if x['scores']['metascore'] == '-' else x['scores']['metascore']
+                US = 'N/a' if x['scores']['userscore'] == '-' else x['scores']['userscore']
+                gameText = ''
+
+                if 'NA' in x['titles'].keys():
+                    title = x['titles']['NA'] if x['titles']['NA'] else None
+
+                if not title and 'EU' in x['titles'].keys():
+                    title = x['titles']['EU'] if x['titles']['EU'] else None
+
+                gameText += f'**{title}**\n<:barchart:612724385505083392> ___Metascore:___ *{MS}* ___Userscore:___ *{US}*\n'
+
+                entry = 0
+                for key, value in x['price'].items():
+                    if key not in ['US', 'EU', 'GB', 'AU']: continue
+                    if 'discount' not in value.keys(): continue # Game not on sale in that region
+
+                    entry += 1
+                    if entry == 3:
+                        # Make second row
+                        gameText += '\n'
+                    #print(value)
+                    gameText += f'{self.codepoints[key]} {resp["countries"][key]["currency"]}{value["sale_price"]} (-{value["discount"]}%) '
+
+                if entry == 0:
+                    continue # There no prices in the regions we want
+
+                maxAmt -= 1
+                games.append('​\n\n' + gameText) # Add zero-length and newline
+
+            chunk = message
+            num = 0
+            for x in games:
+                if len(chunk) + len(x) <= 1990:
+                    chunk += x
+                    continue
+
+                if num >= 1:
+                    chunk = '​' + chunk[2:] # Remove extra new lines at beginning of new message
+
+                self.dealMessages.append(await self.dealChannel.send(chunk))
+                chunk = x
+                num += 1
+
+            if num >= 1:
+                chunk = '​' + chunk[2:] # Remove extra new lines at beginning of new message
+
+            self.dealMessages.append(await self.dealChannel.send(chunk))
+
+    @commands.group(name='games')
+    async def _games(self, ctx):
+        return
+
+    @_games.command(name='search')
+    async def _games_search(self, ctx, *, game):
+        db = mclient.bowser.games
+        dealprices = self.dealsMongo.nintendeals.prices
+        gameID = ''
+        gameName = ''
+        fuzzyList = []
+        titleList = []
+
+        for x in self.games.values():
+            titles = []
+
+            for y in x['titles'].values():
+                if y == None: continue
+                if y in fuzzyList: continue
+
+                fuzzyList.append(y)
+                titles.append(y)
+
+            titleList.append({x['_id']: titles})
+
+        if game.upper() in (x.upper() for x in fuzzyList):
+            done = False
+            for n in titleList:
+                for key, value in n.items():
+                    for y in value:
+                        if game.upper() == y.upper():
+                            gameID = key
+                            gameName = y
+                            done = True
+                            break
+
+                if done: break
+
+        else:
+            results = process.extract(game, fuzzyList, limit=3, scorer=fuzz.partial_ratio)
+
+            if results[0][1] <= 85:
+                embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
+                f'*{results[0][0]}\n{results[1][0]}\n{results[2][0]}*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
+
+                return await ctx.send(ctx.author.mention, embed=embed)
 
             else:
-                return await ctx.send(self.markovChain.generateString())
-        except pymarkovchain.StringContinuationImpossibleError:
-            return await ctx.send(':warning: Unable to generate chain with provided seed')
+                for n in titles:
+                    for key, value in n:
+                        if results[0][0].upper() == value.upper():
+                            gameName = value
+                            gameID = key
+                            done = True
+                            break
+
+                    if done: break
+
+        if not gameID or not gameName:
+            # Not sure why/if ever this should call, but safety is key
+            logging.error('[Deals] No gameid or name!')
+            return await ctx.send(f'{config.redTick} An error occured while searching for that game. If this keeps happening let a staff member know')
+
+        doc = db.find_one({'_id': gameID})
+        prices = dealprices.find({'game_id': gameID})
+
+        if not prices.count():
+            # Such as unreleased games
+            desc = '*This is no available price data for this game*'
+
+        else:
+            desc = 'Price data:\n\n'
+            gamePrices = {}
+            for x in self.saleData['games_on_sale']:
+                if x['titles'] == doc['titles']:
+                    for key, value in x['price'].items():
+                        gamePrices[key] = {
+                            'discount': value['discount'],
+                            'sale_price': value['sale_price'],
+                            'price': value['full_price']
+                        }
+
+                    break
+
+            for country in prices:
+                for key, value in country['prices'].items():
+                    if key in gamePrices.keys(): continue
+                    gamePrices[key] = {
+                        'discount': None,
+                        'sale_price': None,
+                        'price': value['full_price']
+                    }
+
+            entry = 0
+            for key, value in gamePrices.items():
+                currency = self.saleData["countries"][key]["currency"]
+                entry += 1
+                if entry == 3:
+                    desc += '\n'
+                    entry = 1
+
+                if value['discount']:
+                    desc += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%)]({prices[key]}) '
+
+                else:
+                    desc += f'{self.codepoints[key]} {currency}{value["price"]} '
+
+        embed = discord.Embed(title=gameName, color=0x50E3C2, description=desc)
+        await ctx.send(embed=embed)
+
 
 class ChatControl(commands.Cog):
     def __init__(self, bot):
@@ -285,7 +537,7 @@ class ChatControl(commands.Cog):
 
         else:
             puns = 0
-            for pun in punsCol:
+            for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
                 if puns >= 5:
                     break
 
@@ -335,7 +587,7 @@ class ChatControl(commands.Cog):
         embed = discord.Embed(title='Infraction History', description=desc, color=0x18EE1C)
         embed.set_author(name=f'{user} | {user.id}', icon_url=user.avatar_url)
 
-        for pun in puns.sort('timestamp', pymongo.ASCENDING):
+        for pun in puns.sort('timestamp', pymongo.DESCENDING):
             datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
             moderator = ctx.guild.get_member(pun['moderator'])
             if not moderator:
@@ -426,10 +678,10 @@ def setup(bot):
     modLogs = bot.get_channel(config.modChannel)
 
     bot.add_cog(ChatControl(bot))
-    #bot.add_cog(MarkovChat(bot))
+    bot.add_cog(NintenDeals(bot))
     logging.info('[Extension] Utility module loaded')
 
 def teardown(bot):
     bot.remove_cog('ChatControl')
-    #bot.remove_cog('MarkovChat')
+    bot.remove_cog('NintenDeals')
     logging.info('[Extension] Utility module unloaded')
