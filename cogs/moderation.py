@@ -25,7 +25,7 @@ class Moderation(commands.Cog):
 
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
-    async def _banning(self, ctx, user: typing.Union[discord.Member, int], *, reason='-No reason specified-'):
+    async def _banning(self, ctx, user: typing.Union[discord.User, int], *, reason='-No reason specified-'):
         userid = user if (type(user) is int) else user.id
 
         username = userid if (type(user) is int) else f'{str(user)}'
