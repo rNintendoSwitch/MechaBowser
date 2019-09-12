@@ -349,6 +349,14 @@ class MainEvents(commands.Cog):
 
             await self.serverLogs.send(':label: User\'s name updated', embed=embed)
 
+    @commands.Cog.listener()
+    async def on_guild_role_delete(self, role):
+        db = mclient.bowser.users
+        for user in db.find({'roles': {'$in': [role.id]}}):
+            storedRoles = user['roles']
+            storedRoles.remove(role.id)
+            db.update_one({'_id': user['_id']}, {'$set': {'roles': storedRoles}})
+
     @commands.command(name='update')
     @commands.is_owner()
     async def _update(self, ctx, sub, *args):
