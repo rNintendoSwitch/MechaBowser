@@ -3,6 +3,7 @@ import logging
 import re
 import typing
 import datetime
+import time
 import aiohttp
 
 import pymongo
@@ -35,8 +36,10 @@ class NintenDeals(commands.Cog):
         self.bot = bot
         self.games = {}
         self.dealMessages = []
+        self.gamesReady = False
         self.saleData = None
         self.dealChannel = self.bot.get_channel(613785143059939338)
+        self.releaseChannel = self.bot.get_channel(613785177830981635)
         self.session = aiohttp.ClientSession()
         self.creds = {'api_key': config.dealsAPIKey}
         self.codepoints = {
@@ -57,28 +60,31 @@ class NintenDeals(commands.Cog):
             'NZ': '\U0001f1f3\U0001f1ff',
             'JP': '\U0001f1ef\U0001f1f5'
         }
-        self.query_deals.start() #pylint: disable=no-member
-        self.fetch_all_games.start() #pylint: disable=no-member
-        logging.info('[Cog] NintenDeals task cogs loaded')
+        #self.query_deals.start() #pylint: disable=no-member
+        self.update_game_info.start() #pylint: disable=no-member
+        #self.new_release_posting.start() #pylint: disable=no-member
+        logging.info('[Deals] NintenDeals task cogs loaded')
 
     def cog_unload(self):
-        logging.info('[Cog] Attempting to cancel tasks...')
-        self.query_deals.cancel() #pylint: disable=no-member
-        self.fetch_all_games.cancel() #pylint: disable=no-member
-        logging.info('[Cog] Task query_deals exited')
+        logging.info('[Deals] Attempting to cancel tasks...')
+        #self.query_deals.cancel() #pylint: disable=no-member
+        self.update_game_info.cancel() #pylint: disable=no-member
+        #self.new_release_posting.start() #pylint: disable=no-member
+        logging.info('[Deals] Tasks exited')
         #asyncio.get_event_loop().run_until_complete(self.session.close())
         #self.session.close()
-        logging.info('[Cog] NintenDeals task cogs unloaded')
+        logging.info('[Deals] NintenDeals task cogs unloaded')
 
     @tasks.loop(seconds=43200)
-    async def fetch_all_games(self):
-        logging.info('[Deals] Starting game fetch')
+    async def update_game_info(self):
+        logging.debug('[Deals] Starting game fetch')
         gameDB = mclient.bowser.games
         ndealsDB = self.dealsMongo.nintendeals.games
 
         games = ndealsDB.find({'system': 'Switch'})
         for game in games:
             await asyncio.sleep(0.01)
+            scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
             gameEntry = {
                     '_id': game['_id'],
                     'nsuids': game['nsuids'],
@@ -86,18 +92,87 @@ class NintenDeals(commands.Cog):
                     'release_dates': game['release_dates'],
                     'categories': game['categories'],
                     'websites': game['websites'],
-                    'scores': game['scores'],
+                    'scores': scores,
                     'free_to_play': game['free_to_play']
                 }
+            ourGame = gameDB.find_one({'_id': game['_id']})
             self.games[game['_id']] = gameEntry
-            if not gameDB.find_one({'_id': game['_id']}): # TODO: IMPORTANT: Compare two databases, and update if diff
+
+            if not ourGame:
+                gameEntry['released'] = False # New game. Force new_release_posting to check if it's released, and if so post it
                 gameDB.insert_one(gameEntry)
 
-        logging.info('[Deals] Finished game fetch')
+            else:
+                comparison = {
+                    '_id': ourGame['_id'],
+                    'nsuids': ourGame['nsuids'],
+                    'titles': ourGame['titles'],
+                    'release_dates': ourGame['release_dates'],
+                    'categories': ourGame['categories'],
+                    'websites': ourGame['websites'],
+                    'scores': ourGame['scores'],
+                    'free_to_play': ourGame['free_to_play']
+                }
+                if comparison != gameEntry:
+                    logging.debug(f'Updating out of date game entry {ourGame["_id"]}')
+                    gameDB.update_one({'_id': ourGame['_id']}, {'$set': comparison})
+
+        self.gamesReady = True
+
+    @tasks.loop(seconds=60)
+    async def new_release_posting(self):
+        logging.info('[Deals] Starting new releases check')
+        db = mclient.bowser.games
+        if not self.gamesReady: return # Wait until next pass so game list can update
+
+        for game in db.find({'released': False}):
+            nowReleased = False
+            regionalDates = {}
+            for key, value in game['release_dates'].items():
+                if value == None:
+                    regionalDates[key] = '*Not currently set to release in this region*'
+                    continue
+
+                if value < datetime.datetime.utcnow(): # Release date has now passed
+                    nowReleased = True
+
+                regionalDates[key] = value.strftime("%B %d, %Y at %H:%M UTC")
+
+            if not nowReleased: # Game has not yet released yet
+                continue
+
+            if game['titles']['NA'] != None:
+                name = game['titles']['NA']
+
+            elif game['titles']['EU'] != None:
+                name = game['titles']['EU']
+
+            else:
+                name = game['titles']['JP']
+
+            # Really annoying way to have priority over what site is used
+            websites = game['websites']
+            siteUrl = None
+            if websites['US']: siteUrl = websites['US']
+            elif websites['CA']: siteUrl = websites['CA']
+            elif websites['EU']: siteUrl = websites['EU']
+            elif websites['GB']: siteUrl = websites['GB']
+            elif websites['AU']: siteUrl = websites['AU']
+            elif websites['NZ']: siteUrl = websites['NZ']
+            elif websites['JP']: siteUrl = websites['JP']
+            elif websites['CH']: siteUrl = websites['CH']
+            elif websites['RU']: siteUrl = websites['RU']
+            elif websites['ZA']: siteUrl = websites['ZA']
+
+            description, image = await utils.scrape_nintendo(siteUrl, image=True)
+            if len(description) > 2048: description = description[2045:] + '...'
+            embed = discord.Embed(title=name, description=description, color=0x7ED321)
+            embed.set_thumbnail(url=image)
+            await self.releaseChannel.send(embed=embed)
 
     @tasks.loop(seconds=14400)
     async def query_deals(self):
-        logging.info('[Deals] Starting deals check')
+        logging.debug('[Deals] Starting deals check')
         for x in self.dealMessages:
             await x.delete()
 
@@ -250,6 +325,7 @@ class NintenDeals(commands.Cog):
 
             else:
                 for n in titles:
+                    print(n)
                     for key, value in n:
                         if results[0][0].upper() == value.upper():
                             gameName = value
@@ -320,6 +396,19 @@ class ChatControl(commands.Cog):
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:ebay)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I)
+        self.thirtykEvent = {}
+        self.thirtykEventRoles = [
+            616298509460701186,
+            616298665421701128,
+            616298689044152335,
+            616298709860220928,
+            616298733642186769,
+            616298767108407335,
+            616298787761291267,
+            616298809454100480,
+            616298829830160430,
+            616298851900456991
+            ]
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -393,6 +482,17 @@ class ChatControl(commands.Cog):
                 # Fall back to leaving user text
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
+
+#        # 30k members celebration - ended 9/6/19
+#        if message.author.id not in self.thirtykEvent.keys() or (self.thirtykEvent[message.author.id] + 120) <= time.time():
+#            import random
+#            self.thirtykEvent[message.author.id] = time.time()
+#            newRole = random.choice(self.thirtykEventRoles)
+#            for role in message.author.roles:
+#                if role.id in self.thirtykEventRoles:
+#                    await message.author.remove_roles(role)
+#
+#            await message.author.add_roles(message.guild.get_role(newRole))
 
 #        # Splatoon splatfest event - ended 7/21/19
 #        if message.channel.id == 278557283019915274:
@@ -523,6 +623,15 @@ class ChatControl(commands.Cog):
             roles = '*User has no roles*'
 
         else:
+            if not inServer:
+                tempList = []
+                for x in reversed(roleList):
+                    y = ctx.guild.get_role(x)
+                    name = '*deleted role*' if not y else y.name
+                    tempList.append(name)
+
+                roleList = tempList
+
             roles = ', '.join(roleList)
 
         embed.add_field(name='Roles', value=roles, inline=False)
