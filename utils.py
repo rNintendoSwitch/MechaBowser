@@ -14,6 +14,8 @@ from bs4 import BeautifulSoup as bs
 import config
 
 driver = None
+storePageRe = re.compile(r'(http[s]?:\/\/(?:[^.]*\.)?[^.]*\.[^\/]*)(?:.*)')
+imageTagRe = re.compile(r'(?:src="([^"]*)")')
 mclient = pymongo.MongoClient(
 	config.mongoHost,
 	username=config.mongoUser,
@@ -119,23 +121,42 @@ async def scrape_nintendo(url, image=False):
         await asyncio.sleep(0.5)
 
     driver.get(url)
-    await asyncio.sleep(2)
+    await asyncio.sleep(2) # Because we are using chrome, we need to actually wait for the javascript redirect to run
     soup = bs(driver.page_source, 'html.parser')
+
+    page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
+    if not page:
+        raise KeyError('bullet-list drawer does not exist in HTML scrape')
+
+    scrape = ''
+    for tag in page.children:
+        scrape += str(tag)
+
+    scrape = scrape.replace(u'\xa0', u' ') # Remove any weird latin space chars
+    scrape = scrape.strip() # Remove extra preceding/trailing whitespace
+    scrape = re.sub(r'(<[^>]*>)', '', scrape) # Remove HTML tags leaving text
+
     if not image:
-        page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
-        if not page:
-            raise KeyError('bullet-list drawer does not exist in HTML scrape')
+        return scrape
 
-        description = ''
-        for tag in page.children:
-            description += str(tag)
+    else:
+        imageScrape = soup.find('span', attrs={'class': 'boxart'})
+        if not imageScrape:
+            raise KeyError('boxart does not exist in HTML scrape')
 
-        description = description.replace(u'\xa0', u' ') # Remove any weird latin space chars
-        description = description.strip() # Remove extra preceding/trailing whitespace
-        description = re.sub(r'(<[^>]*>)', '', description) # Remove HTML tags leaving text
+        for tag in imageScrape:
+            scrapeMinusDiv = str(tag)
+            print(scrapeMinusDiv)
+            imageTag = re.search(imageTagRe, scrapeMinusDiv)
+            if not imageTag: continue
+            print(imageTag.group(0))
+            print(imageTag.group(1))
+            if imageTag: break
 
-        return description
+        nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
+        imageLink = nintendoRoot + imageTag.group(1)
 
+        return scrape, imageLink
 
 def resolve_duration(data):
     '''
