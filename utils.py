@@ -4,12 +4,16 @@ import datetime
 import time
 import uuid
 import logging
+import re
 
 import discord
 import pymongo
+from selenium import webdriver
+from bs4 import BeautifulSoup as bs
 
 import config
 
+driver = None
 mclient = pymongo.MongoClient(
 	config.mongoHost,
 	username=config.mongoUser,
@@ -109,6 +113,30 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'active': active
     })
 
+async def scrape_nintendo(url, image=False):
+    while driver == None:
+        # Wait for the driver to start up if called before
+        await asyncio.sleep(0.5)
+
+    driver.get(url)
+    await asyncio.sleep(2)
+    soup = bs(driver.page_source, 'html.parser')
+    if not image:
+        page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
+        if not page:
+            raise KeyError('bullet-list drawer does not exist in HTML scrape')
+
+        description = ''
+        for tag in page.children:
+            description += str(tag)
+
+        description = description.replace(u'\xa0', u' ') # Remove any weird latin space chars
+        description = description.strip() # Remove extra preceding/trailing whitespace
+        description = re.sub(r'(<[^>]*>)', '', description) # Remove HTML tags leaving text
+
+        return description
+
+
 def resolve_duration(data):
     '''
     Takes a raw input string formatted 1w1d1h1m1s (any order)
@@ -201,7 +229,16 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
     return punDM
 
 def setup(bot):
+    global driver
+    logging.info('[Utils] Starting chrome driver')
+    options = webdriver.ChromeOptions()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--headless')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
+    logging.info('[Utils] Chrome driver successfully started')
     logging.info('[Extension] Utils module loaded')
 
 def teardown(bot):
+    driver.quit()
     logging.info('[Extension] Utils module unloaded')
