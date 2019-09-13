@@ -7,3 +7,5 @@ markovify
 dialogflow
 google-cloud-storage
 fuzzywuzzy[speedup]
+bs4
+selenium
