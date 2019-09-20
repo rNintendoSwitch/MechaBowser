@@ -115,7 +115,9 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'active': active
     })
 
-async def scrape_nintendo(url, image=False):
+async def scrape_nintendo(url):
+    print(url)
+    scrapedData = {}
     while driver == None:
         # Wait for the driver to start up if called before
         await asyncio.sleep(0.5)
@@ -136,27 +138,42 @@ async def scrape_nintendo(url, image=False):
     scrape = scrape.strip() # Remove extra preceding/trailing whitespace
     scrape = re.sub(r'(<[^>]*>)', '', scrape) # Remove HTML tags leaving text
 
-    if not image:
-        return scrape
+    scrapedData['description'] = scrape
+
+    imageScrape = soup.find('span', attrs={'class': 'boxart'})
+    if not imageScrape:
+        raise KeyError('boxart does not exist in HTML scrape')
+
+    for tag in imageScrape:
+        scrapeMinusDiv = str(tag)
+        imageTag = re.search(imageTagRe, scrapeMinusDiv)
+        if not imageTag: continue
+        if imageTag: break
+
+    gameRomSize = soup.find('dd', attrs={'itemprop': 'romSize'})
+    if not gameRomSize:
+        scrapedData['romSize'] = None
 
     else:
-        imageScrape = soup.find('span', attrs={'class': 'boxart'})
-        if not imageScrape:
-            raise KeyError('boxart does not exist in HTML scrape')
+        scrapedData['romSize'] = gameRomSize.next_element.strip()
 
-        for tag in imageScrape:
-            scrapeMinusDiv = str(tag)
-            print(scrapeMinusDiv)
-            imageTag = re.search(imageTagRe, scrapeMinusDiv)
-            if not imageTag: continue
-            print(imageTag.group(0))
-            print(imageTag.group(1))
-            if imageTag: break
+    #print('---data---')
+    #print(page.find(string='Category'))
+    #print(page.find(string='Category').next_element)
+    #print(page.find(string='Category').next_element.next_element)
+    #print('---end---')
+    #scrapedData['category'] = re.search(r'([A-Z])\w+', str(page.find(string='Category').next_element.next_element)).group(0)
+    with open('page.html', 'a') as page_html:
+        page_html.write(str(soup.prettify()))
+    scrapedData['manufacturer'] = soup.find('dd', attrs={'itemprop': 'manufacturer'})
+    scrapedData['brand'] = soup.find('dd', attrs={'itemprop': 'brand'})
 
-        nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
-        imageLink = nintendoRoot + imageTag.group(1)
+    nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
+    scrapedData['image'] = nintendoRoot + imageTag.group(1)
 
-        return scrape, imageLink
+    print('image scrape date')
+    print(scrapedData)
+    return scrapedData
 
 def resolve_duration(data):
     '''
