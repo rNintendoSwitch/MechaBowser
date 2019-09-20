@@ -69,7 +69,7 @@ class NintenDeals(commands.Cog):
         logging.info('[Deals] Attempting to cancel tasks...')
         #self.query_deals.cancel() #pylint: disable=no-member
         self.update_game_info.cancel() #pylint: disable=no-member
-        #self.new_release_posting.start() #pylint: disable=no-member
+        #self.new_release_posting.cancel() #pylint: disable=no-member
         logging.info('[Deals] Tasks exited')
         #asyncio.get_event_loop().run_until_complete(self.session.close())
         #self.session.close()
@@ -164,10 +164,20 @@ class NintenDeals(commands.Cog):
             elif websites['RU']: siteUrl = websites['RU']
             elif websites['ZA']: siteUrl = websites['ZA']
 
-            description, image = await utils.scrape_nintendo(siteUrl, image=True)
-            if len(description) > 2048: description = description[2045:] + '...'
-            embed = discord.Embed(title=name, description=description, color=0x7ED321)
-            embed.set_thumbnail(url=image)
+            gameDetails = await utils.scrape_nintendo(siteUrl)
+            
+            if len(gameDetails['description']) > 2048: gameDetails['description'] = f'{gameDetails["description"][:2045]}...'
+            #strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
+            strDetails = ':thought_balloon: **Developer:** {}\n'.format(gameDetails['manufacturer'])
+            strDetails += ':postal_horn: **Publisher:** {}'.format(gameDetails['brand'])
+
+            if gameDetails['romSize']:
+                strDetails += '\n:page_facing_up: **File Size:** {}'.format(gameDetails['romSize'])
+
+            embed = discord.Embed(title=name, description=gameDetails['description'], color=0x7ED321)
+            
+            embed.set_thumbnail(url=gameDetails['image'])
+            embed.add_field(name='Game Details', value=strDetails)
             await self.releaseChannel.send(embed=embed)
 
     @tasks.loop(seconds=14400)
