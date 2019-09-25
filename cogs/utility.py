@@ -60,14 +60,14 @@ class NintenDeals(commands.Cog):
             'NZ': '\U0001f1f3\U0001f1ff',
             'JP': '\U0001f1ef\U0001f1f5'
         }
-        #self.query_deals.start() #pylint: disable=no-member
+        self.query_deals.start() #pylint: disable=no-member
         self.update_game_info.start() #pylint: disable=no-member
         #self.new_release_posting.start() #pylint: disable=no-member
         logging.info('[Deals] NintenDeals task cogs loaded')
 
     def cog_unload(self):
         logging.info('[Deals] Attempting to cancel tasks...')
-        #self.query_deals.cancel() #pylint: disable=no-member
+        self.query_deals.cancel() #pylint: disable=no-member
         self.update_game_info.cancel() #pylint: disable=no-member
         #self.new_release_posting.cancel() #pylint: disable=no-member
         logging.info('[Deals] Tasks exited')
@@ -677,7 +677,15 @@ class ChatControl(commands.Cog):
 
     @commands.command(name='history')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _history(self, ctx, user: discord.User):
+    async def _history(self, ctx, user: typing.Union[discord.User, int]):
+        if type(user) == int:
+            # User doesn't share the ctx server, fetch it instead
+            try:
+                user = await self.bot.fetch_user(user)
+
+            except discord.NotFound:
+                return await ctx.send(f'{config.redTick} User does not exist')
+
         db = mclient.bowser.puns
         puns = db.find({'user': user.id})
         if not puns.count():
