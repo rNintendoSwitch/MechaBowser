@@ -24,6 +24,7 @@ class MainEvents(commands.Cog):
         try:
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
+            #self.bot.load_extension('cogs.statistics')
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
 
@@ -241,13 +242,29 @@ class MainEvents(commands.Cog):
             return
 
         db = mclient.bowser.messages
+        timestamp = int(time.time())
         db.insert_one({
             '_id': message.id,
             'author': message.author.id,
             'guild': message.guild.id,
             'channel': message.channel.id,
-            'timestamp': int(time.time())
+            'timestamp': timestamp
         })
+
+        if message.content and message.channel.type == discord.ChannelType.text:
+            emojiList = re.findall(r'<(?:a)?:[\w\d]+:(\d+)>', message.content)
+            if emojiList:
+                stats = mclient.bowser.stats # Only need to pull emoji at this time
+                for emoji in emojiList:
+                    stats.insert_one({
+                        'type': 'emoji',
+                        'message': message.id,
+                        'author': message.author.id,
+                        'channel': message.channel.id,
+                        'guild': message.guild.id,
+                        'id': emoji,
+                        'timestamp': timestamp
+                    })
 
         return await self.bot.process_commands(message) # Allow commands to fire
 
