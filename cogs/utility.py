@@ -781,8 +781,8 @@ class ChatControl(commands.Cog):
 
         embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{statusText} | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=ctx.author.mention, inline=True)
         embed.add_field(name='Channel', value=channel.mention)
         embed.add_field(name='Reason', value=reason)
 
