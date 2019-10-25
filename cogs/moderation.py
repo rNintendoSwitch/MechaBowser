@@ -3,6 +3,7 @@ import logging
 import datetime
 import time
 import typing
+import re
 
 import pymongo
 import discord
@@ -17,6 +18,29 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 
+class ResolveUser(commands.Converter):
+    async def convert(self, ctx, argument):
+        if not argument:
+            raise commands.BadArgument
+
+        try:
+            userid = int(argument)
+
+        except ValueError:
+            mention = re.search(r'<@!?(\d+)>', argument)
+            if not mention:
+                raise commands.BadArgument
+
+            userid = int(mention.group(1))
+
+        try:
+            member = ctx.guild.get_member(userid)
+            user = await ctx.bot.fetch_user(argument) if not member else member
+            return user
+
+        except discord.NotFound:
+            raise commands.BadArgument
+
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -25,37 +49,69 @@ class Moderation(commands.Cog):
 
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
-    async def _banning(self, ctx, user: typing.Union[discord.User, int], *, reason='-No reason specified-'):
-        userid = user if (type(user) is int) else user.id
+    async def _banning(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
+        '''
+        :func: _banning
+        Takes a member or user of either type(discord.Member) or int(int)
+        and bans them from the guild
+        '''
+        if not users: return await ctx.send(f'{config.redTick} An invalid user was provided')
+        banCount = 0
+        failedBans = 0
+        for user in users:
+            userid = user if (type(user) is int) else user.id
 
-        username = userid if (type(user) is int) else f'{str(user)}'
-        user = discord.Object(id=userid) if (type(user) is int) else user # If not a user, manually contruct a user object
-        try:
-            await ctx.guild.fetch_ban(user)
-            return await ctx.send(f'{config.redTick} {username} is already banned')
+            username = userid if (type(user) is int) else f'{str(user)}'
+            user = discord.Object(id=userid) if (type(user) is int) else user # If not a user, manually contruct a user object
+            try:
+                await ctx.guild.fetch_ban(user)
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} {username} is already banned')
 
-        except discord.NotFound:
-            pass
+                else:
+                    # If a many-user ban, don't exit if a user is already banned
+                    failedBans += 1
+                    continue
 
-        embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Ban | {username}')
-        embed.add_field(name='User', value=f'<@{userid}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
-        embed.add_field(name='Reason', value=reason)
+            except discord.NotFound:
+                pass
 
-        await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
+            embed.set_author(name=f'Ban | {username} ({user.id})')
+            embed.add_field(name='User', value=f'<@{userid}>', inline=True)
+            embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
+            embed.add_field(name='Reason', value=reason)
 
-        try:
-            await user.send(utils.format_pundm('ban', reason, ctx.author))
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
+            try:
+                await user.send(utils.format_pundm('ban', reason, ctx.author))
+            except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+                pass
 
-        await ctx.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
-        await self.modLogs.send(embed=embed)
+            try:
+                await ctx.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
+
+            except discord.NotFound:
+                # User does not exist
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} User {userid} does not exist')
+
+                failedBans += 1
+                continue
+
+            await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            await self.modLogs.send(embed=embed)
+            banCount += 1
+
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {username} has been successfully banned')
+        if len(users) == 1:
+            await ctx.send(f'{config.greenTick} {users[0]} has been successfully banned')
+
+        else:
+            resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
+            if failedBans: resp += f'. Failed to ban **{failedBans}** from the provided list'
+            return await ctx.send(resp)
 
     @commands.command(name='unban')
     @commands.has_any_role(config.moderator, config.eh)
