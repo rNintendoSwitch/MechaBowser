@@ -6,7 +6,7 @@ import typing
 
 import pymongo
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
 import utils
@@ -32,6 +32,32 @@ class MainEvents(commands.Cog):
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
+        self.invites = {}
+
+    @tasks.loop(seconds=15)
+    async def fetch_invites(self):
+        for guild in self.bot.guilds:
+            for invite in await guild.invites():
+                inviteDict = {
+                    'max_age': invite.max_age,
+                    'guild': guild.id,
+                    'created_at': invite.created_at,
+                    'temporary': invite.temporary,
+                    'max_uses': invite.max_uses,
+                    'uses': invite.uses,
+                    'inviter': invite.inviter.id,
+                    'channel': invite.channel.id
+                }
+
+                if invite.id not in self.invites.keys() or inviteDict != self.invites[invite.id]:
+                    self.invites[invite.id] = inviteDict
+        print(self.invites)
+
+    async def check_invite_use(self, guild):
+        for key, value in self.invites.items():
+            if value['guild'] != guild: continue # Not an applicable guild to this check
+            invite = await self.bot.fetch_invite(url=key)
+            #if 
 
     @commands.Cog.listener()
     async def on_resume(self):
