@@ -59,7 +59,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
             if not msg.content and msg.attachments:
                 content = ' '.join([x.url for x in msg.attachments])
 
-            elif not msg.content and not msg.attachements:
+            elif not msg.content and not msg.attachments:
                 content = '*No message content could be saved, could be embed*'
 
             else:
