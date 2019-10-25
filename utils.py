@@ -243,6 +243,44 @@ async def mod_cmd_invoke_delete(channel):
     else:
         return True
 
+async def embed_paginate(chunks: list, page=1, header=None, codeblock=True):
+    if page <= 0: raise IndexError('Requested page cannot be less than one')
+    charLimit = 2048 if not codeblock else 2042 # 2048 - 6 for 6 backticks
+    pages = 1
+    requestedPage = ''
+
+    if not header:
+        text = ''
+
+    else:
+        text = header
+
+    if codeblock:
+        header = '```' if not header else header + '```'
+        text = header
+
+    for x in chunks:
+        if len(x) > charLimit:
+            raise IndexError('Individual chunk surpassed character limit')
+
+        if len(text) + len(x) > charLimit:
+            if pages == page:
+                requestedPage = text if not codeblock else text + '```'
+
+            text = header + x if header else x
+            pages += 1
+            continue
+
+        text += x
+
+    if page > pages:
+        raise IndexError('Requested page out of range')
+
+    if pages == 1:
+        requestedPage = text if not codeblock else text + '```'
+
+    return requestedPage, pages
+
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {
         'warn': f'You have been **warned (now {details})** on',
