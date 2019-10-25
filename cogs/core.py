@@ -26,12 +26,14 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('cogs.utility')
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
+
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
 
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
+        self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.invites = {}
 
     @tasks.loop(seconds=15)
@@ -149,8 +151,11 @@ class MainEvents(commands.Cog):
             for x in puns:
                 punishments.append(config.punStrs[x['type']])
 
-            punishments = ', '.join(punishments)
-            embed.add_field(name='Punishment types', value=punishments)
+            punComma = ', '.join(punishments)
+            embed.add_field(name='Punishment types', value=punComma)
+
+            punCode = '\n'.join(punishments)
+            await self.adminChannel.send(f':warning: **{member}** ({member.id}) left the server with active punishments. See logs for more details\n```{punCode}```')
 
         else:
             embed = discord.Embed(color=0x8B572A, timestamp=datetime.datetime.utcnow())
