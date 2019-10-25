@@ -3,6 +3,7 @@ import datetime
 import logging
 import time
 import typing
+import re
 
 import pymongo
 import discord
@@ -337,10 +338,18 @@ class MainEvents(commands.Cog):
     async def on_member_update(self, before, after):
         userCol = mclient.bowser.users
         if before.nick != after.nick:
+            if not before.nick:
+                before_name = before.name
+
+            else:
+                before_name = discord.utils.escape_markdown(before.nick)
+
+            after_name = discord.utils.escape_markdown(after.nick)
+
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
             embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
-            embed.add_field(name='Before', value=before.name if not before.nick else before.nick, inline=False)
-            embed.add_field(name='After', value=after.nick, inline=False)
+            embed.add_field(name='Before', value=before_name if not before.nick else before.nick, inline=False)
+            embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
             await self.serverLogs.send(':label: User\'s nickname updated', embed=embed)
@@ -368,7 +377,7 @@ class MainEvents(commands.Cog):
             userCol.update_one({'_id': before.id}, {'$set': {'roles': roleList}})
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
+            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
             embed.add_field(name='Before', value=', '.join(n for n in reversed(oldRoleStr)), inline=False)
             embed.add_field(name='After', value=', '.join(n for n in reversed(roleStr)), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -377,9 +386,11 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
+        before_name = discord.utils.escape_markdown(before.name)
+        after_name = discord.utils.escape_markdown(after.name)
         if before.name != after.name:
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(after)} ({after.id})', icon_url=after.avatar_url)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
             embed.add_field(name='Before', value=str(before), inline=False)
             embed.add_field(name='After', value=str(after), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -390,9 +401,9 @@ class MainEvents(commands.Cog):
             # Really only case this would be called, and not username (i.e. discrim reroll after name change)
             # is when nitro runs out with a custom discriminator set
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(after)} ({after.id})', icon_url=after.avatar_url)
-            embed.add_field(name='Before', value=str(before), inline=False)
-            embed.add_field(name='After', value=str(after), inline=False)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
+            embed.add_field(name='Before', value=before_name, inline=False)
+            embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
             await self.serverLogs.send(':label: User\'s name updated', embed=embed)
