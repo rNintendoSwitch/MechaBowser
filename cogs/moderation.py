@@ -133,7 +133,7 @@ class Moderation(commands.Cog):
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Unban | {user}')
         embed.add_field(name='User', value=f'<@{user}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
@@ -153,23 +153,23 @@ class Moderation(commands.Cog):
         await member.kick(reason='Kick action performed by moderator')
 
         embed = discord.Embed(color=0xD18407, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Kick | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.set_author(name=f'Kick | {member} ({member.id})')
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully kicked')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
     async def _muting(self, ctx, member: discord.Member, duration, *, reason='-No reason specified-'):
         db = mclient.bowser.puns
         if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-            return await ctx.send(f'{config.redTick} {str(member)} ({member.id}) is already muted')
+            return await ctx.send(f'{config.redTick} {member} ({member.id}) is already muted')
 
         muteRole = ctx.guild.get_role(config.mute)
         try:
@@ -191,9 +191,9 @@ class Moderation(commands.Cog):
             pass
 
         embed = discord.Embed(color=0xB4A6EF, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Mute | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.set_author(name=f'Mute | {member} ({member.id})')
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}>', inline=True)
         embed.add_field(name='Expires', value=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', inline=True)
         embed.add_field(name='Reason', value=reason)
 
@@ -212,7 +212,7 @@ class Moderation(commands.Cog):
             'active': False
         }})
         if not action:
-            return await ctx.send(f'{config.redTick} Cannot unmute {str(member)} ({member.id}), they are not currently muted')
+            return await ctx.send(f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted')
 
         await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
@@ -223,16 +223,16 @@ class Moderation(commands.Cog):
             pass
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Unmute | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.set_author(name=f'Unmute | {member} ({member.id})')
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully unmuted')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
 
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
@@ -282,9 +282,9 @@ class Moderation(commands.Cog):
             embedWarnType = f'{warnText[warnLevel]} (was Tier {warnLevel})'
 
         embed = discord.Embed(color=embedColor[warnLevel], timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{embedWarnType} | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.set_author(name=f'{embedWarnType} | {member} ({member.id})')
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
         for role in member.roles:
@@ -334,9 +334,9 @@ class Moderation(commands.Cog):
             await member.remove_roles(tierLevel[tierInt])
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Warnings cleared | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.set_author(name=f'Warnings cleared | {member} ({member.id})')
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
         await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
@@ -349,7 +349,7 @@ class Moderation(commands.Cog):
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {str(member)} ({member.id})')
+        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {member} ({member.id})')
 
     @_warning.command(name='level')
     @commands.has_any_role(config.moderator, config.eh)
@@ -408,9 +408,9 @@ class Moderation(commands.Cog):
             embedWarnType = f'{warnText[tier]} (was Tier {oldTierInt})'
             
         embed = discord.Embed(color=embedColor[tier], timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{embedWarnType} | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.set_author(name=f'{embedWarnType} | {member} ({member.id})')
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
         await member.add_roles(tierLevel[tier])
@@ -424,7 +424,7 @@ class Moderation(commands.Cog):
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {tier}')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully warned; they are now tier {tier}')
 
     @_warning.command(name='review')
     @commands.has_any_role(config.moderator, config.eh)
@@ -447,7 +447,7 @@ class Moderation(commands.Cog):
 
         embed = discord.Embed(title="Warning review", colour=discord.Color(0xea4345), description="To change the status of the warning, react with the following emoji. You must react to make a choice.\n\n:track_next: Re-review in 30 days\n:fast_forward: Re-review in 14 days\n:arrow_forward: Re-review in 7 days\n:small_red_triangle_down: Reduce warn tier (or remove if tier1)\n:octagonal_sign: Make warning permanent", timestamp=utils.resolve_duration('15m'))
         embed.set_thumbnail(url=member.avatar_url)
-        embed.set_author(name=f"{str(member)} ({member.id})")
+        embed.set_author(name=f"{member} ({member.id})")
         embed.set_footer(text="This message will expire in 15 minutes")
         embed.add_field(name="Warning details", value=f'**Type:** {config.punStrs[warnPun["type"]]}\n**Issued by:** <@{warnPun["moderator"]}>\n**Issued at:** {issueTime}\n**Reason**: {warnPun["reason"]}')
 
@@ -516,13 +516,13 @@ class Moderation(commands.Cog):
                         pass
 
                     embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
-                    embed.set_author(name=f'Warning reduced | {str(member)}')
-                    embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+                    embed.set_author(name=f'Warning reduced | {member} ({member.id})')
+                    embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
                     embed.add_field(name='Reason', value='Moderator decision to reduce level')
                     await self.modLogs.send(embed=embed)
                     await resp.delete()
-                    return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')
+                    return await ctx.send(f'{config.greenTick} Warning review complete for {member} ({member.id}). Will be reduced one tier')
 
                 else:
                     await member.remove_roles(tierLevel[warnPun['type']])
@@ -539,8 +539,8 @@ class Moderation(commands.Cog):
                         pass
 
                     embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
-                    embed.set_author(name=f'Warning reduced | {str(member)}')
-                    embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
+                    embed.set_author(name=f'Warning reduced | {member} ({member.id})')
+                    embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value=config.punStrs[newTier][:-8], inline=True) # Shave off "warning" str from const
                     embed.add_field(name='Reason', value='Moderator decision to reduce level')
                     await self.modLogs.send(embed=embed)
@@ -551,7 +551,7 @@ class Moderation(commands.Cog):
                 db.update_one({'_id': warnPun['_id']}, {'$set': {'expiry': None}})
 
                 embed = discord.Embed(color=0xD0021B, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Warning made permanent | {member}')
+                embed.set_author(name=f'Warning made permanent | {member} ({member.id})')
                 embed.add_field(name='User', value=member.mention, inline=True)
                 embed.add_field(name='Reason', value='Moderator decision to make warning permanent')
                 await self.modLogs.send(embed=embed)
@@ -644,7 +644,7 @@ class LoopTasks(commands.Cog):
                     pass
 
                 embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Unmute | {str(member)}')
+                embed.set_author(name=f'Unmute | {member} ({member.id})')
                 embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
                 embed.add_field(name='Moderator', value='Automatic', inline=True)
                 embed.add_field(name='Reason', value='Mute expired')
@@ -683,7 +683,7 @@ class LoopTasks(commands.Cog):
                 issueDate = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y')
                 embed = discord.Embed(title="Warning due for staff review", colour=discord.Color(0xddbe2d), description=f"A warning for <@{pun['user']}> was issued over **30 days ago** ({issueDate}) and is now due for moderator review. This can either be __postponed__ to be re-reviewed at a later date or __reduced__ to the tier directly below (removed in the case of tier 1).\n\n**Infraction ID:** __{pun['_id']}__", timestamp=datetime.datetime.utcfromtimestamp(pun['timestamp']))
                 embed.set_thumbnail(url=member.avatar_url)
-                embed.set_author(name=f"{str(member)} ({member.id})", icon_url=member.avatar_url)
+                embed.set_author(name=f"{member} ({member.id})", icon_url=member.avatar_url)
                 embed.add_field(name="Responsible moderator", value=f"{str(moderator)} ({moderator.id})", inline=True)
                 embed.add_field(name="Reason", value=pun['reason'], inline=True)
                 embed.add_field(name="Previous punishments", value=punishments)
