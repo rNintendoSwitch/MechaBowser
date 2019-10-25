@@ -399,7 +399,6 @@ class NintenDeals(commands.Cog):
         embed = discord.Embed(title=gameName, color=0x50E3C2, description=desc)
         await ctx.send(embed=embed)
 
-
 class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -798,6 +797,20 @@ class ChatControl(commands.Cog):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {channel.mention}')
+
+class AntiRaid(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.adminChannel = self.bot.get_channel(633838517306392586)
+        self.muteRole = self.bot.get_guild(314857672585248768).get_role(594377818700251136)
+        self.messages = {}
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        self.messages[message.channel.id].append({'user': message.author.id, 'content': message.content, 'id': message.id})
+
+        # Individual user spam analysis
+        
 
 def setup(bot):
     global serverLogs
