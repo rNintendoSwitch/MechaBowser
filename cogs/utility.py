@@ -286,10 +286,12 @@ class NintenDeals(commands.Cog):
 
             self.dealMessages.append(await self.dealChannel.send(chunk))
 
+    @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='games')
     async def _games(self, ctx):
         return
 
+    @commands.has_any_role(config.moderator, config.eh)
     @_games.command(name='search')
     async def _games_search(self, ctx, *, game):
         db = mclient.bowser.games
