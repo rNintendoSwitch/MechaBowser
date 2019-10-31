@@ -286,10 +286,12 @@ class NintenDeals(commands.Cog):
 
             self.dealMessages.append(await self.dealChannel.send(chunk))
 
+    @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='games')
     async def _games(self, ctx):
         return
 
+    @commands.has_any_role(config.moderator, config.eh)
     @_games.command(name='search')
     async def _games_search(self, ctx, *, game):
         db = mclient.bowser.games
@@ -396,7 +398,6 @@ class NintenDeals(commands.Cog):
 
         embed = discord.Embed(title=gameName, color=0x50E3C2, description=desc)
         await ctx.send(embed=embed)
-
 
 class ChatControl(commands.Cog):
     def __init__(self, bot):
@@ -779,8 +780,8 @@ class ChatControl(commands.Cog):
 
         embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{statusText} | {str(member)}')
-        embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-        embed.add_field(name='Moderator', value=f'<@{ctx.author.id}>', inline=True)
+        embed.add_field(name='User', value=member.mention, inline=True)
+        embed.add_field(name='Moderator', value=ctx.author.mention, inline=True)
         embed.add_field(name='Channel', value=channel.mention)
         embed.add_field(name='Reason', value=reason)
 
@@ -796,6 +797,20 @@ class ChatControl(commands.Cog):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {channel.mention}')
+
+class AntiRaid(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.adminChannel = self.bot.get_channel(633838517306392586)
+        self.muteRole = self.bot.get_guild(314857672585248768).get_role(594377818700251136)
+        self.messages = {}
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        self.messages[message.channel.id].append({'user': message.author.id, 'content': message.content, 'id': message.id})
+
+        # Individual user spam analysis
+        
 
 def setup(bot):
     global serverLogs

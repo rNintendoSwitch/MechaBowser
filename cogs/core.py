@@ -3,10 +3,11 @@ import datetime
 import logging
 import time
 import typing
+import re
 
 import pymongo
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
 import utils
@@ -24,14 +25,43 @@ class MainEvents(commands.Cog):
         try:
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
+            #self.bot.load_extension('cogs.statistics')
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
+
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
 
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
+        self.adminChannel = self.bot.get_channel(config.adminChannel)
+        self.invites = {}
+
+    @tasks.loop(seconds=15)
+    async def fetch_invites(self):
+        for guild in self.bot.guilds:
+            for invite in await guild.invites():
+                inviteDict = {
+                    'max_age': invite.max_age,
+                    'guild': guild.id,
+                    'created_at': invite.created_at,
+                    'temporary': invite.temporary,
+                    'max_uses': invite.max_uses,
+                    'uses': invite.uses,
+                    'inviter': invite.inviter.id,
+                    'channel': invite.channel.id
+                }
+
+                if invite.id not in self.invites.keys() or inviteDict != self.invites[invite.id]:
+                    self.invites[invite.id] = inviteDict
+        print(self.invites)
+
+    async def check_invite_use(self, guild):
+        for key, value in self.invites.items():
+            if value['guild'] != guild: continue # Not an applicable guild to this check
+            invite = await self.bot.fetch_invite(url=key)
+            #if 
 
     @commands.Cog.listener()
     async def on_resume(self):
@@ -123,8 +153,11 @@ class MainEvents(commands.Cog):
             for x in puns:
                 punishments.append(config.punStrs[x['type']])
 
-            punishments = ', '.join(punishments)
-            embed.add_field(name='Punishment types', value=punishments)
+            punComma = ', '.join(punishments)
+            embed.add_field(name='Punishment types', value=punComma)
+
+            punCode = '\n'.join(punishments)
+            await self.adminChannel.send(f':warning: **{member}** ({member.id}) left the server with active punishments. See logs for more details\n```{punCode}```')
 
         else:
             embed = discord.Embed(color=0x8B572A, timestamp=datetime.datetime.utcnow())
@@ -210,13 +243,29 @@ class MainEvents(commands.Cog):
             return
 
         db = mclient.bowser.messages
+        timestamp = int(time.time())
         db.insert_one({
             '_id': message.id,
             'author': message.author.id,
             'guild': message.guild.id,
             'channel': message.channel.id,
-            'timestamp': int(time.time())
+            'timestamp': timestamp
         })
+
+        if message.content and message.channel.type == discord.ChannelType.text:
+            emojiList = re.findall(r'<(?:a)?:[\w\d]+:(\d+)>', message.content)
+            if emojiList:
+                stats = mclient.bowser.stats # Only need to pull emoji at this time
+                for emoji in emojiList:
+                    stats.insert_one({
+                        'type': 'emoji',
+                        'message': message.id,
+                        'author': message.author.id,
+                        'channel': message.channel.id,
+                        'guild': message.guild.id,
+                        'id': emoji,
+                        'timestamp': timestamp
+                    })
 
         return await self.bot.process_commands(message) # Allow commands to fire
 
@@ -289,10 +338,18 @@ class MainEvents(commands.Cog):
     async def on_member_update(self, before, after):
         userCol = mclient.bowser.users
         if before.nick != after.nick:
+            if not before.nick:
+                before_name = before.name
+
+            else:
+                before_name = discord.utils.escape_markdown(before.nick)
+
+            after_name = discord.utils.escape_markdown(after.nick)
+
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
             embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
-            embed.add_field(name='Before', value=before.name if not before.nick else before.nick, inline=False)
-            embed.add_field(name='After', value=after.nick, inline=False)
+            embed.add_field(name='Before', value=before_name if not before.nick else before.nick, inline=False)
+            embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
             await self.serverLogs.send(':label: User\'s nickname updated', embed=embed)
@@ -320,7 +377,7 @@ class MainEvents(commands.Cog):
             userCol.update_one({'_id': before.id}, {'$set': {'roles': roleList}})
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
+            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
             embed.add_field(name='Before', value=', '.join(n for n in reversed(oldRoleStr)), inline=False)
             embed.add_field(name='After', value=', '.join(n for n in reversed(roleStr)), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -329,9 +386,11 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
+        before_name = discord.utils.escape_markdown(before.name)
+        after_name = discord.utils.escape_markdown(after.name)
         if before.name != after.name:
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(after)} ({after.id})', icon_url=after.avatar_url)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
             embed.add_field(name='Before', value=str(before), inline=False)
             embed.add_field(name='After', value=str(after), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -342,9 +401,9 @@ class MainEvents(commands.Cog):
             # Really only case this would be called, and not username (i.e. discrim reroll after name change)
             # is when nitro runs out with a custom discriminator set
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(after)} ({after.id})', icon_url=after.avatar_url)
-            embed.add_field(name='Before', value=str(before), inline=False)
-            embed.add_field(name='After', value=str(after), inline=False)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
+            embed.add_field(name='Before', value=before_name, inline=False)
+            embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
             await self.serverLogs.send(':label: User\'s name updated', embed=embed)

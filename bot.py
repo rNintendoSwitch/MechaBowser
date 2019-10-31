@@ -19,7 +19,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='with Fils-a-Mech')
-bot = commands.Bot(['!', ','], max_messages=300000, fetch_offline_members=True, activity=activityStatus)
+bot = commands.Bot(['!', ','], max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensative=True)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -44,7 +44,6 @@ class BotCache(commands.Cog):
             userCount = 0
             for member in NS.members:
                 userCount += 1
-                await asyncio.sleep(0.01)
                 logging.debug(f'[Cache] Syncronizing user {userCount}/{guildCount}')
                 doc = db.find_one({'_id': member.id})
                 if not doc:

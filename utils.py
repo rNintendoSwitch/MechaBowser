@@ -59,7 +59,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
             if not msg.content and msg.attachments:
                 content = ' '.join([x.url for x in msg.attachments])
 
-            elif not msg.content and not msg.attachements:
+            elif not msg.content and not msg.attachments:
                 content = '*No message content could be saved, could be embed*'
 
             else:
@@ -243,6 +243,44 @@ async def mod_cmd_invoke_delete(channel):
     else:
         return True
 
+async def embed_paginate(chunks: list, page=1, header=None, codeblock=True):
+    if page <= 0: raise IndexError('Requested page cannot be less than one')
+    charLimit = 2048 if not codeblock else 2042 # 2048 - 6 for 6 backticks
+    pages = 1
+    requestedPage = ''
+
+    if not header:
+        text = ''
+
+    else:
+        text = header
+
+    if codeblock:
+        header = '```' if not header else header + '```'
+        text = header
+
+    for x in chunks:
+        if len(x) > charLimit:
+            raise IndexError('Individual chunk surpassed character limit')
+
+        if len(text) + len(x) > charLimit:
+            if pages == page:
+                requestedPage = text if not codeblock else text + '```'
+
+            text = header + x if header else x
+            pages += 1
+            continue
+
+        text += x
+
+    if page > pages:
+        raise IndexError('Requested page out of range')
+
+    if pages == 1:
+        requestedPage = text if not codeblock else text + '```'
+
+    return requestedPage, pages
+
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {
         'warn': f'You have been **warned (now {details})** on',
@@ -253,8 +291,8 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
         'unmute': f'Your **mute** has been **removed** on',
         'blacklist': f'Your **posting permissions** have been **restricted** in {details} on',
         'unblacklist': f'Your **posting permissions** have been **restored** in {details} on',
-        'kick': 'You have been kicked from',
-        'ban': 'You have been banned from'
+        'kick': 'You have been **kicked** from',
+        'ban': 'You have been **banned** from'
     }
     mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
 
