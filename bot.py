@@ -19,7 +19,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='with Fils-a-Mech')
-bot = commands.Bot(['!', ','], max_messages=300000, fetch_offline_members=True, activity=activityStatus)
+bot = commands.Bot(['!', ','], max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensative=True)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
