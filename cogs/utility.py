@@ -743,7 +743,7 @@ class ChatControl(commands.Cog):
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _roles_set(self, ctx, member: discord.Member, channel: discord.TextChannel, *, reason='-No reason specified-'):
+    async def _roles_set(self, ctx, member: discord.Member, channel: typing.Union[discord.TextChannel, discord.CategoryChannel], *, reason='-No reason specified-'):
         statusText = ''
         if channel.id == config.suggestions:
             suggestionsRole = ctx.guild.get_role(config.noSuggestions)
@@ -764,6 +764,16 @@ class ChatControl(commands.Cog):
             else: # Toggle role on
                 await member.add_roles(spoilersRole)
                 statusText = 'Blacklisted'         
+
+        elif channel.id == config.events:
+            eventsRole = ctx.guild.get_role(config.noEvents)
+            if eventsRole in member.roles: # Toggle role off
+                await member.remove_roles(eventsRole)
+                statusText = 'Unblacklisted'
+
+            else: # Toggle role on
+                await member.add_roles(eventsRole)
+                statusText = 'Blacklisted'   
 
         else:
             return await ctx.send(f'{config.redTick} You cannot blacklist a user from that channel')
