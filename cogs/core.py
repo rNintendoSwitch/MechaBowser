@@ -344,7 +344,11 @@ class MainEvents(commands.Cog):
             else:
                 before_name = discord.utils.escape_markdown(before.nick)
 
-            after_name = discord.utils.escape_markdown(after.nick)
+            if not after.nick:
+                after_name = after.name
+
+            else:
+                after_name = discord.utils.escape_markdown(after.nick)
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
             embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
