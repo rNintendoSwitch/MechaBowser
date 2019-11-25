@@ -193,7 +193,7 @@ class Moderation(commands.Cog):
         embed = discord.Embed(color=0xB4A6EF, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Mute | {member} ({member.id})')
         embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}>', inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Expires', value=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', inline=True)
         embed.add_field(name='Reason', value=reason)
 
