@@ -32,6 +32,7 @@ class StatCommands(commands.Cog):
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_server(self, ctx):
+        msg = await ctx.send('One moment, crunching the numbers...')
         messages = mclient.bowser.messages.find({
                     'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
             })
@@ -69,11 +70,12 @@ class StatCommands(commands.Cog):
         embed.add_field(name='Guild features', value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n' \
             f'**Boost level:** {premiumTier}\n**Number of boosters:** {ctx.guild.premium_subscription_count}')
 
-        return await ctx.send(embed=embed)
+        return await msg.edit(content=None, embed=embed)
 
     @_stats.command(name='users')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_users(self, ctx):
+        msg = await ctx.send('One moment, crunching the numbers...')
         messages = mclient.bowser.messages.find({
                     'timestamp': {'$gt': (int(time.time()) - (60 * 60 * 24 * 30))}
             })
@@ -94,11 +96,12 @@ class StatCommands(commands.Cog):
 
             embed.add_field(name=str(msgUser), value=str(x[1]))
 
-        return await ctx.send(embed=embed)
+        return await msg.edit(content=None, embed=embed)
 
     @_stats.command(name='roles', aliases=['role'])
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_roles(self, ctx, *, role: typing.Optional[typing.Union[discord.Role, int, str]]): # TODO: create and pull role add/remove data from events
+        msg = await ctx.send('One moment, crunching the numbers...')
         if role:
             if type(role) is int:
                 role = ctx.guild.get_role(role)
@@ -177,7 +180,7 @@ class StatCommands(commands.Cog):
             roleList = '\n'.join(roleCounts)
             embed = discord.Embed(title=f'{ctx.guild.name} Role Statistics', description=f'Server role list and respective member count\n\n{roleList}', color=0xD267BA)
 
-            return await ctx.send(embed=embed)
+        return await msg.edit(content=None, embed=embed)
 
     @_stats.command(name='channels')
     @commands.has_any_role(config.moderator, config.eh)
@@ -192,6 +195,7 @@ class StatCommands(commands.Cog):
     @_stats.command(name='statuses')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_statuses(self, ctx):
+        pass
 
 def setup(bot):
     bot.add_cog(StatCommands(bot))
