@@ -92,7 +92,9 @@ async def store_user(member, messages=0):
 
     userData = {
         '_id': member.id,
-        'roles': roleList
+	    'roles': roleList,	
+	    'joins': [(datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()],	
+	    'leaves': []
     }
     db.insert_one(userData)
 
