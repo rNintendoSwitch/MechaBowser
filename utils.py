@@ -117,11 +117,21 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'active': active
     })
 
-async def scrape_nintendo(url):
-    print(url)
+async def scrape_nintendo(url, desc_cap=2048):
+    global driver
+    if not driver:
+        logging.info('[Utils] Starting chrome driver')
+        options = webdriver.ChromeOptions()
+        options.add_argument('--no-sandbox')
+        options.add_argument('--headless')
+        options.add_argument('--disable-dev-shm-usage')
+        driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
+        logging.info('[Utils] Chrome driver successfully started')
+
     scrapedData = {}
     while driver == None:
         # Wait for the driver to start up if called before
+        logging.info('[Deals] Waiting for chrome driver to start')
         await asyncio.sleep(0.5)
 
     driver.get(url)
@@ -129,8 +139,16 @@ async def scrape_nintendo(url):
     soup = bs(driver.page_source, 'html.parser')
 
     page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
-    if not page:
-        raise KeyError('bullet-list drawer does not exist in HTML scrape')
+    retrys = 0
+    while not page and retrys < 10: # Up to 20 seconds total wait time for the page to redirect
+        await asyncio.sleep(2)
+        page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
+        retrys += 1
+        logging.warning(f'[Deals] Failed getting store page for {url}. Attempt {retrys + 1}')
+
+    if retrys >= 10:
+        logging.critical(f'[Deals] Failed to resolve data for store page {url}')
+        raise KeyError('Failed to resolve data for store page')
 
     scrape = ''
     for tag in page.children:
@@ -139,8 +157,9 @@ async def scrape_nintendo(url):
     scrape = scrape.replace(u'\xa0', u' ') # Remove any weird latin space chars
     scrape = scrape.strip() # Remove extra preceding/trailing whitespace
     scrape = re.sub(r'(<[^>]*>)', '', scrape) # Remove HTML tags leaving text
-
-    scrapedData['description'] = scrape
+        
+    scrapedData['description'] = discord.utils.escape_markdown(scrape).replace(' \n      ', '').replace('    ', '').replace('\n\n', '\n')
+    if len(scrapedData['description']) > desc_cap: scrapedData['description'] = f'{scrapedData["description"][:desc_cap - 3]}...'
 
     imageScrape = soup.find('span', attrs={'class': 'boxart'})
     if not imageScrape:
@@ -152,12 +171,12 @@ async def scrape_nintendo(url):
         if not imageTag: continue
         if imageTag: break
 
-    gameRomSize = soup.find('dd', attrs={'itemprop': 'romSize'})
-    if not gameRomSize:
-        scrapedData['romSize'] = None
-
-    else:
-        scrapedData['romSize'] = gameRomSize.next_element.strip()
+#    gameRomSize = soup.find('dd', attrs={'itemprop': 'romSize'})
+#    if not gameRomSize:
+#        scrapedData['romSize'] = None
+#
+#    else:
+#        scrapedData['romSize'] = gameRomSize.next_element.strip()
 
     #print('---data---')
     #print(page.find(string='Category'))
@@ -165,16 +184,25 @@ async def scrape_nintendo(url):
     #print(page.find(string='Category').next_element.next_element)
     #print('---end---')
     #scrapedData['category'] = re.search(r'([A-Z])\w+', str(page.find(string='Category').next_element.next_element)).group(0)
-    with open('page.html', 'a') as page_html:
-        page_html.write(str(soup.prettify()))
-    scrapedData['manufacturer'] = soup.find('dd', attrs={'itemprop': 'manufacturer'})
-    scrapedData['brand'] = soup.find('dd', attrs={'itemprop': 'brand'})
+#    with open('page.html', 'a') as page_html:
+#        page_html.write(str(soup.prettify()))
+#   scrapedData['manufacturer'] = soup.find('dd', attrs={'itemprop': 'manufacturer'})
+#   scrapedData['brand'] = soup.find('dd', attrs={'itemprop': 'brand'})
+
+    scrapedData['category'] = None if not soup.find('div', attrs={'class': 'category'}) else soup.find('div', attrs={'class': 'category'}).dd.text.replace('\n', '').replace('  ', '')
+    scrapedData['publisher'] = None if not soup.find('div', attrs={'class': 'publisher'}) else soup.find('div', attrs={'class': 'publisher'}).dd.text.replace('\n', '').replace('  ', '')
+    if scrapedData['publisher']:
+        print(soup.find('div', attrs={'class': 'publisher'}).dd)
+    scrapedData['developer'] = None if not soup.find('div', attrs={'class': 'developer'}) else soup.find('div', attrs={'class': 'developer'}).dd.text.replace('\n', '').replace('  ', '')
+    if scrapedData['developer']:
+        print(soup.find('div', attrs={'class': 'developer'}).dd)
+    scrapedData['size'] = None if not soup.find('div', attrs={'class': 'file-size'}) else soup.find('div', attrs={'class': 'file-size'}).dd.text.replace('\n', '').replace('  ', '')
 
     nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
     scrapedData['image'] = nintendoRoot + imageTag.group(1)
 
-    print('image scrape date')
-    print(scrapedData)
+    #print('image scrape date')
+    #print(scrapedData)
     return scrapedData
 
 def resolve_duration(data):
@@ -236,6 +264,7 @@ def humanize_duration(duration):
             else:
                 expires.append('{} {}'.format(units[x], unit_strs[x]))
     
+    if not expires: return '0 seconds'
     return ', '.join(expires)
 
 async def mod_cmd_invoke_delete(channel):
@@ -307,16 +336,8 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
     return punDM
 
 def setup(bot):
-    global driver
-    logging.info('[Utils] Starting chrome driver')
-    options = webdriver.ChromeOptions()
-    options.add_argument('--no-sandbox')
-    options.add_argument('--headless')
-    options.add_argument('--disable-dev-shm-usage')
-    driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
-    logging.info('[Utils] Chrome driver successfully started')
     logging.info('[Extension] Utils module loaded')
 
 def teardown(bot):
-    driver.quit()
+    if driver: driver.quit()
     logging.info('[Extension] Utils module unloaded')
