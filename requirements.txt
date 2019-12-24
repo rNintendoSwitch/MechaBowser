@@ -1,4 +1,4 @@
-discord
+git+git://github.com/Rapptz/discord.py.git@5517a42ee39aff364a66fd0242d18109a382f790
 pymongo
 jishaku
 pylint
@@ -9,3 +9,5 @@ google-cloud-storage
 fuzzywuzzy[speedup]
 bs4
 selenium
+pillow
+numpy
