@@ -709,6 +709,36 @@ class ChatControl(commands.Cog):
 #
 #            except (discord.Forbidden, discord.HTTPException):
 #                pass
+
+#        # Pokemon sword/shield event -  ended 12/1/19
+#        if message.channel.id == 360767024059777027:
+#            sword = re.compile(r'(<:sword:643477122249392149>)+', re.I)
+#            shield = re.compile(r'(<:shield:643477137864785950>)+', re.I)
+#            swordRole = message.guild.get_role(643595841139114016)
+#            shieldRole = message.guild.get_role(643595961184026626)
+#            if re.search(sword, message.content) and re.search(shield, message.content):
+#                return
+#
+#            try:    
+#                if re.search(sword, message.content):
+#                    if shieldRole in message.author.roles:
+#                        await message.author.remove_roles(shieldRole)
+#
+#                    if swordRole not in message.author.roles:
+#                        msg = await message.channel.send(f'<@{message.author.id}> You have been registered as part of team Sword <:sword:643477122249392149>!')
+#                        await msg.delete(delay=5.0)
+#                        await message.author.add_roles(swordRole)
+#
+#                elif re.search(shield, message.content):
+#                    if swordRole in message.author.roles:
+#                        await message.author.remove_roles(swordRole)
+#
+#                    if shieldRole not in message.author.roles:
+#                        msg = await message.channel.send(f'<@{message.author.id}> You have been registered as part of team Shield <:shield:643477137864785950>!')
+#                        await msg.delete(delay=5.0)
+#                        await message.author.add_roles(shieldRole)
+#
+#            except (discord.Forbidden, discord.HTTPException):
 #                pass
 
     @commands.command(name='ping')
