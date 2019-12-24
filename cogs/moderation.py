@@ -616,10 +616,16 @@ class LoopTasks(commands.Cog):
         warns = ['tier1', 'tier2', 'tier3']
         for pun in activePuns:
             #print('processing pun')
-            member = self.NS.get_member(pun['user'])
-            moderator = self.NS.get_member(pun['moderator'])
-            if not member: continue#print('BAD!!!') # This member not apart of the server, deal with expiry if they ever rejoin
-            if not moderator:
+            try:
+                member = await self.NS.fetch_member(pun['user'])
+
+            except discord.NotFound: # User not in guild
+                continue
+
+            try:
+                moderator = await self.NS.fetch_member(pun['moderator'])
+
+            except:
                 logging.warning(f'[expiry_check] Moderator not in server for pun {pun["_id"]}, fetching instead')
                 moderator = await self.bot.fetch_user(pun['moderator'])
 
