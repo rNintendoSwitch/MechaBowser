@@ -155,30 +155,47 @@ class NintenDeals(commands.Cog):
             siteUrl = None
             if websites['US']: siteUrl = websites['US']
             elif websites['CA']: siteUrl = websites['CA']
-            elif websites['EU']: siteUrl = websites['EU']
-            elif websites['GB']: siteUrl = websites['GB']
-            elif websites['AU']: siteUrl = websites['AU']
-            elif websites['NZ']: siteUrl = websites['NZ']
-            elif websites['JP']: siteUrl = websites['JP']
-            elif websites['CH']: siteUrl = websites['CH']
-            elif websites['RU']: siteUrl = websites['RU']
-            elif websites['ZA']: siteUrl = websites['ZA']
+            else:
+                continue # No non-NA games yet
+            #elif websites['EU']: siteUrl = websites['EU']
+            #elif websites['GB']: siteUrl = websites['GB']
+            #elif websites['AU']: siteUrl = websites['AU']
+            #elif websites['NZ']: siteUrl = websites['NZ']
+            #elif websites['JP']: siteUrl = websites['JP']
+            #elif websites['CH']: siteUrl = websites['CH']
+            #elif websites['RU']: siteUrl = websites['RU']
+            #elif websites['ZA']: siteUrl = websites['ZA']
 
-            gameDetails = await utils.scrape_nintendo(siteUrl)
+            try:
+                gameDetails = await utils.scrape_nintendo(siteUrl)
+
+            except KeyError:
+                continue
             
-            if len(gameDetails['description']) > 2048: gameDetails['description'] = f'{gameDetails["description"][:2045]}...'
-            #strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
-            strDetails = ':thought_balloon: **Developer:** {}\n'.format(gameDetails['manufacturer'])
-            strDetails += ':postal_horn: **Publisher:** {}'.format(gameDetails['brand'])
+            strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
+            strDetails += ':postal_horn: **Publisher:** {}\n'.format(gameDetails['publisher'])
+            strDetails += ':thought_balloon: **Developer:** {}\n'.format(gameDetails['developer']) if gameDetails['developer'] else ':thought_balloon: **Developer:** *Developer not known*\n'
 
-            if gameDetails['romSize']:
-                strDetails += '\n:page_facing_up: **File Size:** {}'.format(gameDetails['romSize'])
+            if gameDetails['size']:
+                strDetails += '\n:page_facing_up: **File Size:** {}'.format(gameDetails['size'])
+
+            regionCodes = {
+                'NA': 'North America',
+                'EU': 'Europe',
+                'JP': 'Japan'
+            }
+            regions = ''
+            for key, value in regionalDates.items():
+                regions += f'**{regionCodes[key]}:** {value}\n'
 
             embed = discord.Embed(title=name, description=gameDetails['description'], color=0x7ED321)
             
             embed.set_thumbnail(url=gameDetails['image'])
             embed.add_field(name='Game Details', value=strDetails)
+            embed.add_field(name='🌐 Release Schedule', value=regions, inline=False)
+            embed.url = siteUrl
             await self.releaseChannel.send(embed=embed)
+            
 
     @tasks.loop(seconds=14400)
     async def query_deals(self):
@@ -287,7 +304,7 @@ class NintenDeals(commands.Cog):
             self.dealMessages.append(await self.dealChannel.send(chunk))
 
     @commands.has_any_role(config.moderator, config.eh)
-    @commands.group(name='games')
+    @commands.group(name='games', invoke_without_command=True)
     async def _games(self, ctx):
         return
 
@@ -296,71 +313,90 @@ class NintenDeals(commands.Cog):
     async def _games_search(self, ctx, *, game):
         db = mclient.bowser.games
         dealprices = self.dealsMongo.nintendeals.prices
-        gameID = ''
-        gameName = ''
-        fuzzyList = []
-        titleList = []
+        msg = await ctx.send('🔰 Searching through some great games, this should only take a moment...')
+        while not self.gamesReady:
+            logging.debug('[Deals] Internal game list not yet ready for game search call')
+            await asyncio.sleep(0.5)
+        print('Got out of loop')
+        gameObj = None
+        titleList = {}
 
-        for x in self.games.values():
-            titles = []
+        for gameEntry in self.games.values():
+            for title in gameEntry['titles'].values():
+#                for titleLocale in title.values():
+                if not title or title in titleList.keys(): continue
+                if title.upper() == game.upper(): # We found an exact match, get the gameID
+                    gameObj = gameEntry
+                    break
 
-            for y in x['titles'].values():
-                if y == None: continue
-                if y in fuzzyList: continue
+                titleList[title] = gameEntry['_id']
 
-                fuzzyList.append(y)
-                titles.append(y)
+        with open('html2.html', 'w') as f:
+            f.write(str(titleList.keys()))
+        #print(process.extract('Mario Kart 8 Deluxe', titleList.keys(), limit=10, scorer=fuzz.token_sort_ratio))
+        results = process.extract(game, titleList.keys(), limit=10)#, scorer=fuzz.token_set_ratio)
+        print(results)
+        if not gameObj: # No exact match was found, do a fuzzy search instead
+            print('No match yet')
+            if results[0][1] < 85:
+                embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
+                f'*"{results[0][0]}"\nor "{results[1][0]}"\nor "{results[2][0]}"*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
 
-            titleList.append({x['_id']: titles})
+                return await msg.edit(content=ctx.author.mention, embed=embed)
 
-        if game.upper() in (x.upper() for x in fuzzyList):
-            done = False
-            for n in titleList:
-                for key, value in n.items():
-                    for y in value:
-                        if game.upper() == y.upper():
-                            gameID = key
-                            gameName = y
-                            done = True
-                            break
+            gameConfidence = results[0][1]
 
-                if done: break
+        gameObj = self.games[titleList[results[0][0]]]
+
+        if gameObj['titles']['NA']:
+            title = gameObj['titles']['NA']
+
+        elif gameObj['titles']['EU']:
+            title = gameObj['titles']['EU']
 
         else:
-            results = process.extract(game, fuzzyList, limit=3, scorer=fuzz.partial_ratio)
+            title = gameObj['titles']['JP']
 
-            if results[0][1] <= 85:
-                embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
-                f'*{results[0][0]}\n{results[1][0]}\n{results[2][0]}*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
+        websites = gameObj['websites']
+        siteUrl = None
+        if websites['US']: siteUrl = websites['US']
+        elif websites['CA']: siteUrl = websites['CA']
+        else:
+            return await msg.edit(content=f'{config.redTick} Sorry, that game is from a country that is not supported yet!')
+        #elif websites['EU']: siteUrl = websites['EU']
+        #elif websites['GB']: siteUrl = websites['GB']
+        #elif websites['AU']: siteUrl = websites['AU']
+        #elif websites['NZ']: siteUrl = websites['NZ']
+        #elif websites['JP']: siteUrl = websites['JP']
+        #elif websites['CH']: siteUrl = websites['CH']
+        #elif websites['RU']: siteUrl = websites['RU']
+        #elif websites['ZA']: siteUrl = websites['ZA']
 
-                return await ctx.send(ctx.author.mention, embed=embed)
+        gameDetails = await utils.scrape_nintendo(siteUrl, desc_cap=1024)
+        embed = discord.Embed(title=title, description=gameDetails['description'])
 
-            else:
-                for n in titles:
-                    print(n)
-                    for key, value in n:
-                        if results[0][0].upper() == value.upper():
-                            gameName = value
-                            gameID = key
-                            done = True
-                            break
+        strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
+        strDetails += ':postal_horn: **Publisher:** {}\n'.format(gameDetails['publisher'])
+        strDetails += ':thought_balloon: **Developer:** {}\n'.format(gameDetails['developer']) if gameDetails['developer'] else ':thought_balloon: **Developer:** *Developer not known*\n'
 
-                    if done: break
+        if gameDetails['size']:
+            strDetails += '\n:page_facing_up: **File Size:** {}'.format(gameDetails['size'])
 
-        if not gameID or not gameName:
-            # Not sure why/if ever this should call, but safety is key
-            logging.error('[Deals] No gameid or name!')
-            return await ctx.send(f'{config.redTick} An error occured while searching for that game. If this keeps happening let a staff member know')
-
-        doc = db.find_one({'_id': gameID})
-        prices = dealprices.find({'game_id': gameID})
+        embed = discord.Embed(title=title, description=gameDetails['description'], color=0x7ED321)
+            
+        embed.set_thumbnail(url=gameDetails['image'])
+        embed.add_field(name='Game Details', value=strDetails)
+        print('Starting to get prices')
+        # Get price data
+        doc = db.find_one({'_id': gameObj['_id']})
+        prices = dealprices.find({'game_id': gameObj['_id']})
 
         if not prices.count():
             # Such as unreleased games
-            desc = '*This is no available price data for this game*'
+            gamePricesStr = '*This is no available price data for this game*'
 
         else:
-            desc = 'Price data:\n\n'
+            gamePricesStr = ''
             gamePrices = {}
             for x in self.saleData['games_on_sale']:
                 if x['titles'] == doc['titles']:
@@ -387,26 +423,140 @@ class NintenDeals(commands.Cog):
                 currency = self.saleData["countries"][key]["currency"]
                 entry += 1
                 if entry == 3:
-                    desc += '\n'
+                    gamePricesStr += '\n'
                     entry = 1
 
                 if value['discount']:
-                    desc += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%)]({prices[key]}) '
+                    gamePricesStr += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%)]({prices[key]}) '
 
                 else:
-                    desc += f'{self.codepoints[key]} {currency}{value["price"]} '
+                    try:
+                        gamePricesStr += f'[{self.codepoints[key]} {currency}{value["price"]}]({gameObj["websites"][key]}) '
+                    except KeyError:
+                        gamePricesStr += f'{self.codepoints[key]} {currency}{value["price"]} '
 
-        embed = discord.Embed(title=gameName, color=0x50E3C2, description=desc)
-        await ctx.send(embed=embed)
+            embed.add_field(name='Price Data', value=gamePricesStr)
+            return await msg.edit(content=None, embed=embed)
+
+#    @commands.Cog.listener()
+#    async def on_command_error(self, ctx, error):
+#        if error == commands.CommandOnCooldown:
+#            cooldown, retry = error
+#            await ctx.message.delete()
+#            return await ctx.send(f'{config.redTick} You must wait to use that command again for another {retry} {"seconds" if retry != 1 else "second"}', delete_after=10)
+
+#        fuzzyList = []
+#        titleList = []
+#
+#        for x in self.games.values():
+#            titles = []
+#
+#            for y in x['titles'].values():
+#                if y == None: continue
+#                if y in fuzzyList: continue
+#
+#                fuzzyList.append(y)
+#                titles.append(y)
+#
+#            titleList.append({x['_id']: titles})
+#
+#        if game.upper() in (x.upper() for x in fuzzyList):
+#            done = False
+#            for n in titleList:
+#                for key, value in n.items():
+#                    for y in value:
+#                        if game.upper() == y.upper():
+#                            gameID = key
+#                            gameName = y
+#                            done = True
+#                            break
+#
+#                if done: break
+#
+#        else:
+#            results = process.extract(game, fuzzyList, limit=3, scorer=fuzz.partial_ratio)
+#
+#            if results[0][1] <= 85:
+#                embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
+#                f'*{results[0][0]}\n{results[1][0]}\n{results[2][0]}*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
+#
+#                return await ctx.send(ctx.author.mention, embed=embed)
+#
+#            else:
+#                print(titleList)
+#                for n in titleList:
+#                    print(n)
+#                    for key, value in n.items():
+#                        if results[0][0].upper() in (name.upper() for name in value):
+#                            gameName = value
+#                            gameID = key
+#                            done = True
+#                            break
+#
+#                    if done: break
+#
+#        if not gameID or not gameName:
+#            # Not sure why/if ever this should call, but safety is key
+#            logging.error('[Deals] No gameid or name!')
+#            return await ctx.send(f'{config.redTick} An error occured while searching for that game. If this keeps happening let a staff member know')
+#
+#        doc = db.find_one({'_id': gameID})
+#        prices = dealprices.find({'game_id': gameID})
+#
+#        if not prices.count():
+#            # Such as unreleased games
+#            desc = '*This is no available price data for this game*'
+#
+#        else:
+#            desc = 'Price data:\n\n'
+#            gamePrices = {}
+#            for x in self.saleData['games_on_sale']:
+#                if x['titles'] == doc['titles']:
+#                    for key, value in x['price'].items():
+#                        gamePrices[key] = {
+#                            'discount': value['discount'],
+#                            'sale_price': value['sale_price'],
+#                            'price': value['full_price']
+#                        }
+#
+#                    break
+#
+#            for country in prices:
+#                for key, value in country['prices'].items():
+#                    if key in gamePrices.keys(): continue
+#                    gamePrices[key] = {
+#                        'discount': None,
+#                        'sale_price': None,
+#                        'price': value['full_price']
+#                    }
+#
+#            entry = 0
+#            for key, value in gamePrices.items():
+#                currency = self.saleData["countries"][key]["currency"]
+#                entry += 1
+#                if entry == 3:
+#                    desc += '\n'
+#                    entry = 1
+#
+#                if value['discount']:
+#                    desc += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%)]({prices[key]}) '
+#
+#                else:
+#                    desc += f'{self.codepoints[key]} {currency}{value["price"]} '
+#
+#        embed = discord.Embed(title=gameName, color=0x50E3C2, description=desc)
+#        await ctx.send(embed=embed)
 
 class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.modLogs = self.bot.get_channel(config.modChannel)
+        self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
+        self.voiceTextAccess = self.bot.get_guild(238080556708003851).get_role(config.voiceTextAccess)
         self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
-        self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:ebay)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I)
+        self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I) # TODO: Proper ebay filtering that doesn't nuke normal links
         self.thirtykEvent = {}
         self.thirtykEventRoles = [
             616298509460701186,
@@ -420,6 +570,30 @@ class ChatControl(commands.Cog):
             616298829830160430,
             616298851900456991
             ]
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if before.channel == after.channel: # If other info than channel (such as mute status), ignore
+            #print(f'Same state: b/a\n{before}\n{after}')
+            return
+
+        if not before.channel and after.afk: # Joined direct to afk
+            #print('Joined AFK direct')
+            return
+
+        if not before.channel or before.afk and after.channel: # User just joined a channel or moved from AFK
+            #print('Joined a channel')
+            await member.add_roles(self.voiceTextAccess)
+
+        elif not after.channel or after.afk: # User just left a channel or moved to AFK
+            if not await member.guild.fetch_member(member.id): # Check if user left the server since their `Member` may be cached
+                #print('Not member left')
+                mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
+
+            else:
+                #print('Member left')
+                await member.remove_roles(self.voiceTextAccess)
+            
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -534,6 +708,7 @@ class ChatControl(commands.Cog):
 #                        await message.author.add_roles(orderRole)
 #
 #            except (discord.Forbidden, discord.HTTPException):
+#                pass
 #                pass
 
     @commands.command(name='ping')
