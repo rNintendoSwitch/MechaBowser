@@ -78,6 +78,7 @@ class MainEvents(commands.Cog):
             await utils.store_user(member)
 
         else:
+            db.update_one({'_id': member.id}, {'$push': {'joins': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
             if doc['roles']:
                 for x in doc['roles']:
                     if x == member.guild.id:
@@ -121,6 +122,9 @@ class MainEvents(commands.Cog):
                     if x['type'] == 'blacklist':
                         restoredPuns.append(punTypes[x['type']].format(x['context']))
 
+                    elif x['type'] in ['kick', 'ban']:
+                        continue # These are not punishments being "restored", instead only status is being tracked
+
                     else:
                         restoredPuns.append(punTypes[x['type']])
 
@@ -147,6 +151,8 @@ class MainEvents(commands.Cog):
                 }
             }
         )
+
+        mclient.bowser.users.update_one({'_id': member.id}, {'$push': {'leaves': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
         if puns.count():
             embed = discord.Embed(description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:', color=0xD62E44, timestamp=datetime.datetime.utcnow())
             punishments = []
