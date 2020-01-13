@@ -25,9 +25,11 @@ class StatCommands(commands.Cog):
     async def _stats(self, ctx):
         return await ctx.send("Valid subcommands:```\n" \
         "stats server\n    -Returns server activity statistics\n\n" \
-        "stats users\n    -Returns most active users in the last 30 days\n\n" \
+        "stats users\n    -Returns most active users\n\n" \
         "stats roles\n    -Returns statistics on the ownership of roles\n\n" \
-        "stats emoji\n    -Returns stats on emoji usage\n```")
+        "stats emoji\n    -Returns stats on emoji usage\n\n" \
+        "stats channels\n    -Returns most active channels" \
+        "stats statuses\n    -Returns user statuses over the last 24 hours```")
 
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
@@ -122,16 +124,16 @@ class StatCommands(commands.Cog):
             embed.add_field(name='Instructions', value='Use :arrow_right: and :arrow_left: to scroll between pages. :stop_button: To end')
             newPage, pages = await utils.embed_paginate(chunks, header=header)
             embed.description = newPage
-            message = await ctx.send(embed=embed)
+            await msg.edit(content=None, embed=embed)
             page = 1 # pylint: disable=unused-variable
             stop = time.time() + 1800
 
-            await message.add_reaction('⬅')
-            await message.add_reaction('➡')
-            await message.add_reaction('⏹')
+            await msg.add_reaction('⬅')
+            await msg.add_reaction('➡')
+            await msg.add_reaction('⏹')
 
             def check(reaction, user):
-                if user.id != ctx.author.id or reaction.message.id != message.id:
+                if user.id != ctx.author.id or reaction.message.id != msg.id:
                     return False
 
                 return True
@@ -165,12 +167,12 @@ class StatCommands(commands.Cog):
 
                     newPage, pages = await utils.embed_paginate(chunks, header=header, page=page)
                     embed.description = newPage
-                    await message.edit(embed=embed)
+                    await msg.edit(embed=embed)
 
                 except asyncio.TimeoutError:
                     pass
 
-            await message.clear_reactions()
+            await msg.clear_reactions()
 
         else:
             roleCounts = []
