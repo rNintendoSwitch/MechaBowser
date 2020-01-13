@@ -58,32 +58,33 @@ class NintenDeals(commands.Cog):
             'CH': '\U0001f1e8\U0001f1ed',
             'AU': '\U0001f1e6\U0001f1fa',
             'NZ': '\U0001f1f3\U0001f1ff',
-            'JP': '\U0001f1ef\U0001f1f5'
+            'JP': '\U0001f1ef\U0001f1f5',
+            'CZ': '\U0001F1E8\U0001F1FF'
         }
         self.query_deals.start() #pylint: disable=no-member
         self.update_game_info.start() #pylint: disable=no-member
-        #self.new_release_posting.start() #pylint: disable=no-member
+        self.new_release_posting.start() #pylint: disable=no-member
         logging.info('[Deals] NintenDeals task cogs loaded')
 
     def cog_unload(self):
         logging.info('[Deals] Attempting to cancel tasks...')
         self.query_deals.cancel() #pylint: disable=no-member
         self.update_game_info.cancel() #pylint: disable=no-member
-        #self.new_release_posting.cancel() #pylint: disable=no-member
+        self.new_release_posting.cancel() #pylint: disable=no-member
         logging.info('[Deals] Tasks exited')
-        #asyncio.get_event_loop().run_until_complete(self.session.close())
+        asyncio.get_event_loop().run_until_complete(self.session.close())
         #self.session.close()
         logging.info('[Deals] NintenDeals task cogs unloaded')
 
     @tasks.loop(seconds=43200)
     async def update_game_info(self):
-        logging.debug('[Deals] Starting game fetch')
+        logging.info('[Deals] Starting game fetch')
         gameDB = mclient.bowser.games
         ndealsDB = self.dealsMongo.nintendeals.games
 
         games = ndealsDB.find({'system': 'Switch'})
         for game in games:
-            await asyncio.sleep(0.01)
+            #await asyncio.sleep(0.01)
             scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
             gameEntry = {
                     '_id': game['_id'],
@@ -114,17 +115,17 @@ class NintenDeals(commands.Cog):
                     'free_to_play': ourGame['free_to_play']
                 }
                 if comparison != gameEntry:
-                    logging.debug(f'Updating out of date game entry {ourGame["_id"]}')
-                    gameDB.update_one({'_id': ourGame['_id']}, {'$set': comparison})
+                    logging.debug(f'Updating out of date game entry {ourGame["_id"]}: {comparison["titles"]}')
 
         self.gamesReady = True
+        logging.info('[Deals] Finished game fetch')
 
     @tasks.loop(seconds=60)
     async def new_release_posting(self):
-        logging.info('[Deals] Starting new releases check')
         db = mclient.bowser.games
-        if not self.gamesReady: return # Wait until next pass so game list can update
+        if not self.gamesReady or not self.saleData: return # Wait until next pass so game list can update
 
+        logging.info('[Deals] Starting new releases check')
         for game in db.find({'released': False}):
             nowReleased = False
             regionalDates = {}
@@ -170,6 +171,7 @@ class NintenDeals(commands.Cog):
                 gameDetails = await utils.scrape_nintendo(siteUrl)
 
             except KeyError:
+                print(siteUrl)
                 continue
             
             strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
@@ -195,7 +197,10 @@ class NintenDeals(commands.Cog):
             embed.add_field(name='🌐 Release Schedule', value=regions, inline=False)
             embed.url = siteUrl
             await self.releaseChannel.send(embed=embed)
-            
+
+            db.update_one({'_id': game['_id']}, {'$set': {'released': True}})
+
+        logging.info('[Deals] Finished new releases check')
 
     @tasks.loop(seconds=14400)
     async def query_deals(self):
@@ -303,17 +308,43 @@ class NintenDeals(commands.Cog):
 
             self.dealMessages.append(await self.dealChannel.send(chunk))
 
-    @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='games', invoke_without_command=True)
     async def _games(self, ctx):
         return
 
+    @_games.command(name='test')
     @commands.has_any_role(config.moderator, config.eh)
+    async def _games_test(self, ctx, *, game):
+        db = mclient.bowser.games
+        dealprices = self.dealsMongo.nintendeals.prices
+        msg = await ctx.send(f'{config.loading} Searching through some great games, this should only take a moment...')
+        while not self.gamesReady:
+            logging.debug('[Deals] Internal game list not yet ready for game search call')
+            await asyncio.sleep(0.5)
+        print('Got out of loop')
+        gameObj = None
+        titleList = {}
+
+        print(len(self.games))
+        for gameEntry in self.games.values():
+            for title in gameEntry['titles'].values():
+#                for titleLocale in title.values():
+                if not title or title in titleList.keys(): continue
+                if title.upper() == game.upper(): # We found an exact match, get the gameID
+                    gameObj = gameEntry
+                    #break
+
+                titleList[title] = gameEntry['_id']
+
+        results = process.extract(game, list(titleList.keys()), limit=10)#, scorer=fuzz.token_set_ratio)
+        return await msg.edit(content=str(results))
+
+    @commands.cooldown(1, 15, type=commands.cooldowns.BucketType.member)
     @_games.command(name='search')
     async def _games_search(self, ctx, *, game):
         db = mclient.bowser.games
         dealprices = self.dealsMongo.nintendeals.prices
-        msg = await ctx.send('🔰 Searching through some great games, this should only take a moment...')
+        msg = await ctx.send(f'{config.loading} Searching through some great games, this should only take a moment...')
         while not self.gamesReady:
             logging.debug('[Deals] Internal game list not yet ready for game search call')
             await asyncio.sleep(0.5)
@@ -323,12 +354,8 @@ class NintenDeals(commands.Cog):
 
         for gameEntry in self.games.values():
             for title in gameEntry['titles'].values():
-#                for titleLocale in title.values():
+               #for titleLocale in title.values():
                 if not title or title in titleList.keys(): continue
-                if title.upper() == game.upper(): # We found an exact match, get the gameID
-                    gameObj = gameEntry
-                    break
-
                 titleList[title] = gameEntry['_id']
 
         with open('html2.html', 'w') as f:
@@ -338,15 +365,15 @@ class NintenDeals(commands.Cog):
         print(results)
         if not gameObj: # No exact match was found, do a fuzzy search instead
             print('No match yet')
-            if results[0][1] < 85:
+            if results[0][1] < 90:
                 embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
                 f'*"{results[0][0]}"\nor "{results[1][0]}"\nor "{results[2][0]}"*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
 
                 return await msg.edit(content=ctx.author.mention, embed=embed)
 
-            gameConfidence = results[0][1]
+            #gameConfidence = results[0][1]
 
-        gameObj = self.games[titleList[results[0][0]]]
+            gameObj = self.games[titleList[results[0][0]]]
 
         if gameObj['titles']['NA']:
             title = gameObj['titles']['NA']
@@ -362,7 +389,7 @@ class NintenDeals(commands.Cog):
         if websites['US']: siteUrl = websites['US']
         elif websites['CA']: siteUrl = websites['CA']
         else:
-            return await msg.edit(content=f'{config.redTick} Sorry, that game is from a country that is not supported yet!')
+            return await msg.edit(content=f'{config.redTick} Sorry, that game requested is from a country that is not supported yet!')
         #elif websites['EU']: siteUrl = websites['EU']
         #elif websites['GB']: siteUrl = websites['GB']
         #elif websites['AU']: siteUrl = websites['AU']
@@ -372,7 +399,15 @@ class NintenDeals(commands.Cog):
         #elif websites['RU']: siteUrl = websites['RU']
         #elif websites['ZA']: siteUrl = websites['ZA']
 
-        gameDetails = await utils.scrape_nintendo(siteUrl, desc_cap=1024)
+        try:
+            gameDetails = await utils.scrape_nintendo(siteUrl, desc_cap=512)
+
+        except KeyError: # Nintendo POS failed to return
+            return await msg.edit(content=f'{config.redTick} Sorry, it appears that *{title}* has either been taken down or hidden on the eshop.\nDetails: Nintendo POS link - {siteUrl}\n\nIf you believe this is in error, please contact a chat moderator')
+
+        except RuntimeError:
+            return await msg.edit(content=f'{config.redTick} Sorry, there was a problem getting info for that game. Try again later')
+
         embed = discord.Embed(title=title, description=gameDetails['description'])
 
         strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
@@ -411,7 +446,9 @@ class NintenDeals(commands.Cog):
 
             for country in prices:
                 for key, value in country['prices'].items():
+                    if not value: continue # No price data at all or bug on Nintendeals?
                     if key in gamePrices.keys(): continue
+                    print(f'key: {key}, value: {value}')
                     gamePrices[key] = {
                         'discount': None,
                         'sale_price': None,
@@ -427,13 +464,28 @@ class NintenDeals(commands.Cog):
                     entry = 1
 
                 if value['discount']:
-                    gamePricesStr += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%)]({prices[key]}) '
+                    # Discounts should be on their own lines
+                    if entry == 2:
+                        gamePricesStr += '\n'
+
+                    entry == 2
+                    try:
+                        gamePricesStr += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%)]({gameObj["websites"][key]}) '
+                        #gamePricesStr += f'[{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]}]({gameObj["websites"][key]}) '
+                        #gamePricesStr += 'sale '
+
+                    except KeyError:
+                        gamePricesStr += f'{self.codepoints[key]} ~~{currency}{value["price"]}~~ {currency}{value["sale_price"]} (-{value["discount"]}%) '
 
                 else:
                     try:
                         gamePricesStr += f'[{self.codepoints[key]} {currency}{value["price"]}]({gameObj["websites"][key]}) '
+
                     except KeyError:
                         gamePricesStr += f'{self.codepoints[key]} {currency}{value["price"]} '
+
+            if not gamePricesStr: # No price data at all, physical only?
+                gamePricesStr = '*No price data available. This game may not be released or only sold physically*'
 
             embed.add_field(name='Price Data', value=gamePricesStr)
             return await msg.edit(content=None, embed=embed)
@@ -547,6 +599,22 @@ class NintenDeals(commands.Cog):
 #        embed = discord.Embed(title=gameName, color=0x50E3C2, description=desc)
 #        await ctx.send(embed=embed)
 
+    @_games.error
+    @_games_test.error
+    @_games_search.error
+    async def mod_error(self, ctx, error):
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.message.delete()
+            return await ctx.send(f'{config.redTick} Missing game name', delete_after=10)
+
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.message.delete()
+            return await ctx.send(f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=10)
+
+        else:
+            await ctx.send(f'{config.redTick} An unknown error has occured. Try again later')
+            raise error
+
 class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -570,6 +638,8 @@ class ChatControl(commands.Cog):
             616298829830160430,
             616298851900456991
             ]
+        #self.holidayJolly = self.bot.get_guild(238080556708003851).get_role(659400540849176637)
+        #self.holidayHolly = self.bot.get_guild(238080556708003851).get_role(659400610680143889)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -667,6 +737,13 @@ class ChatControl(commands.Cog):
                 # Fall back to leaving user text
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
+
+#        # Holiday season celebration - ended 1/2/20
+#        if self.holidayHolly not in message.author.roles and self.holidayJolly not in message.author.roles:
+#            import random
+
+#            newRole = random.choice([self.holidayJolly, self.holidayHolly])
+#            await message.author.add_roles(newRole)
 
 #        # 30k members celebration - ended 9/6/19
 #        if message.author.id not in self.thirtykEvent.keys() or (self.thirtykEvent[message.author.id] + 120) <= time.time():
@@ -779,10 +856,10 @@ class ChatControl(commands.Cog):
         deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
     
         m = await ctx.send(f'{config.greenTick} Clean action complete')
-        archiveID = await utils.message_archive(list(reversed(deleted)))
+        #archiveID = await utils.message_archive(list(reversed(deleted)))
 
-        embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/archive/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
-        await self.bot.get_channel(config.logChannel).send(f':printer: New message archive generated for {ctx.channel.mention}', embed=embed)
+        #embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/archive/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
+        #await self.bot.get_channel(config.logChannel).send(f':printer: New message archive generated for {ctx.channel.mention}', embed=embed)
 
         return await m.delete(delay=5)
 
