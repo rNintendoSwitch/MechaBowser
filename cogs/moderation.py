@@ -50,11 +50,6 @@ class Moderation(commands.Cog):
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
     async def _banning(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
-        '''
-        :func: _banning
-        Takes a member or user of either type(discord.Member) or int(int)
-        and bans them from the guild
-        '''
         if not users: return await ctx.send(f'{config.redTick} An invalid user was provided')
         banCount = 0
         failedBans = 0
@@ -629,7 +624,6 @@ class LoopTasks(commands.Cog):
                 logging.warning(f'[expiry_check] Moderator not in server for pun {pun["_id"]}, fetching instead')
                 moderator = await self.bot.fetch_user(pun['moderator'])
 
-            #print(pun['type'] + str(pun['expiry']))
             if pun['type'] == 'mute' and pun['expiry']: # A mute that has an expiry, for member in currently in guild
                 if int(time.time()) < pun['expiry']: continue # Has not expired yet
 
