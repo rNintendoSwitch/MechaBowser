@@ -2,8 +2,10 @@ import asyncio
 import logging
 import time
 import typing
+import datetime
 
 import pymongo
+import pytz
 import discord
 from discord.ext import commands, tasks
 
@@ -33,11 +35,32 @@ class StatCommands(commands.Cog):
 
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _stats_server(self, ctx):
+    async def _stats_server(self, ctx, start_date=None, end_date=None):
         msg = await ctx.send('One moment, crunching the numbers...')
-        messages = mclient.bowser.messages.find({
-                    'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
-            })
+
+        if not start_date:
+            messages = mclient.bowser.messages.find({
+                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
+                })
+
+        else:
+            try:
+                searchDate = datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+                endDate = searchDate + datetime.timedelta(days=30) if not end_date else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+                endDate = endDate.replace(hour=23, minute=59, second=59)
+
+            except ValueError:
+                return await msg.edit(content=f'{config.redTick} Invalid date provided. Please make sure it is in the format of `yyyy-mm-dd`')
+
+            if endDate <= searchDate:
+                return await msg.edit(content=f'{config.redTick} Invalid dates provided. The end date is before the starting date. `{ctx.prefix}stats server [starting date] [ending date]`')
+
+            endDate
+
+            messages = mclient.bowser.messages.find({
+                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
+                })
+
         msgCount = messages.count()
         channelCounts = {}
         userCounts = {}
@@ -54,9 +77,18 @@ class StatCommands(commands.Cog):
             else:
                 userCounts[message['author']] += 1
 
-        puns = mclient.bowser.puns.find({
-                    'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
-            }).count()
+
+
+        if not start_date:
+            puns = mclient.bowser.puns.find({
+                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
+                }).count()
+
+        else:
+            puns = mclient.bowser.puns.find({
+                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
+                }).count()
+
         topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[0:5] # Get a list of tuple sorting by most active channel to least, and only include top 5
         topChannelsList = []
         for x in topChannels:
@@ -65,9 +97,11 @@ class StatCommands(commands.Cog):
         activeChannels = ', '.join(topChannelsList)
         premiumTier = 'No tier' if ctx.guild.premium_tier == 0 else f'Tier {ctx.guild.premium_tier}'
 
-        embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__In the last 30 days...__*\n\n' \
+        dayStr = 'In the last 30 days' if not start_date else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
+
+        embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__{dayStr}...__*\n\n' \
             f':incoming_envelope:**{msgCount}** messages have been sent\n:information_desk_person:**{len(userCounts)}** members were active\n' \
-            f':hammer:**{puns}** punishment actions were handed down\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
+            f':hammer:**{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
         embed.set_thumbnail(url=ctx.guild.icon_url)
         embed.add_field(name='Guild features', value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n' \
             f'**Boost level:** {premiumTier}\n**Number of boosters:** {ctx.guild.premium_subscription_count}')
