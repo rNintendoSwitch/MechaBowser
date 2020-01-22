@@ -610,6 +610,8 @@ class ChatControl(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.modLogs = self.bot.get_channel(config.modChannel)
+        self.adminChannel = self.bot.get_channel(config.adminChannel)
+        self.boostChannel = self.bot.get_channel(config.boostChannel)
         self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
         self.voiceTextAccess = self.bot.get_guild(238080556708003851).get_role(config.voiceTextAccess)
         self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
@@ -658,6 +660,10 @@ class ChatControl(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if message.type == discord.MessageType.premium_guild_subscription:
+            await self.adminChannel.send(message.system_content)
+            await self.boostChannel.send(message.system_content)
+
         if message.author.bot or message.type != discord.MessageType.default:
             return
 
