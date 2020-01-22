@@ -125,7 +125,7 @@ class NintenDeals(commands.Cog):
         db = mclient.bowser.games
         if not self.gamesReady or not self.saleData: return # Wait until next pass so game list can update
 
-        logging.info('[Deals] Starting new releases check')
+        logging.debug('[Deals] Starting new releases check')
         for game in db.find({'released': False}):
             nowReleased = False
             regionalDates = {}
@@ -170,8 +170,7 @@ class NintenDeals(commands.Cog):
             try:
                 gameDetails = await utils.scrape_nintendo(siteUrl)
 
-            except KeyError:
-                print(siteUrl)
+            except (KeyError, RuntimeError):
                 continue
             
             strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
@@ -200,7 +199,7 @@ class NintenDeals(commands.Cog):
 
             db.update_one({'_id': game['_id']}, {'$set': {'released': True}})
 
-        logging.info('[Deals] Finished new releases check')
+        logging.debug('[Deals] Finished new releases check')
 
     @tasks.loop(seconds=14400)
     async def query_deals(self):
@@ -225,11 +224,11 @@ class NintenDeals(commands.Cog):
             message = f'**Nintendo Switch Game Deals**\nLast updated {datetime.datetime.utcnow().strftime("%B %d, %Y at %H:%M UTC")}\n\n' \
                 'This deals list is updated 4 times each day to contain the 20 top metascore rated games currently on sale. \n' \
                 '> Note: This list only includes games which have prices in USD\n' \
-                '> Game sale date provided gratefully by <http://www.nintendeals.xyz/>' \
+                '> Game sale date provided gratefully by <http://www.nintendeals.xyz/>\n' \
+                '> You can search any game on Nintendo Switch, even it it is not currently on sale, with the `!games search Name` command ' \
+                'replacing "Name" with the name of the game\n' \
                 '\n{}'.format('-' * 30)
-                # Remove newlines above
-                #'You can search any game on Nintendo Switch, even it it is not currently on sale, with the `!games search Name` command ' \
-                #'replacing "Name" with the name of the game\n' \
+
             games = []
 
             maxAmt = 20
@@ -280,7 +279,7 @@ class NintenDeals(commands.Cog):
                     if entry == 3:
                         # Make second row
                         gameText += '\n'
-                    #print(value)
+
                     gameText += f'{self.codepoints[key]} {resp["countries"][key]["currency"]}{value["sale_price"]} (-{value["discount"]}%) '
 
                 if entry == 0:
@@ -328,15 +327,13 @@ class NintenDeals(commands.Cog):
         print(len(self.games))
         for gameEntry in self.games.values():
             for title in gameEntry['titles'].values():
-#                for titleLocale in title.values():
                 if not title or title in titleList.keys(): continue
                 if title.upper() == game.upper(): # We found an exact match, get the gameID
                     gameObj = gameEntry
-                    #break
 
                 titleList[title] = gameEntry['_id']
 
-        results = process.extract(game, list(titleList.keys()), limit=10)#, scorer=fuzz.token_set_ratio)
+        results = process.extract(game, list(titleList.keys()), limit=10)
         return await msg.edit(content=str(results))
 
     @commands.cooldown(1, 15, type=commands.cooldowns.BucketType.member)
@@ -354,14 +351,10 @@ class NintenDeals(commands.Cog):
 
         for gameEntry in self.games.values():
             for title in gameEntry['titles'].values():
-               #for titleLocale in title.values():
                 if not title or title in titleList.keys(): continue
                 titleList[title] = gameEntry['_id']
 
-        with open('html2.html', 'w') as f:
-            f.write(str(titleList.keys()))
-        #print(process.extract('Mario Kart 8 Deluxe', titleList.keys(), limit=10, scorer=fuzz.token_sort_ratio))
-        results = process.extract(game, titleList.keys(), limit=10)#, scorer=fuzz.token_set_ratio)
+        results = process.extract(game, titleList.keys(), limit=10)
         print(results)
         if not gameObj: # No exact match was found, do a fuzzy search instead
             print('No match yet')
@@ -370,8 +363,6 @@ class NintenDeals(commands.Cog):
                 f'*"{results[0][0]}"\nor "{results[1][0]}"\nor "{results[2][0]}"*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
 
                 return await msg.edit(content=ctx.author.mention, embed=embed)
-
-            #gameConfidence = results[0][1]
 
             gameObj = self.games[titleList[results[0][0]]]
 
