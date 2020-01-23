@@ -406,11 +406,15 @@ class NintenDeals(commands.Cog):
             for x in self.saleData['games_on_sale']:
                 if x['titles'] == doc['titles']:
                     for key, value in x['price'].items():
-                        gamePrices[key] = {
-                            'discount': value['discount'],
-                            'sale_price': value['sale_price'],
-                            'price': value['full_price']
-                        }
+                        print(value)
+                        try:
+                            gamePrices[key] = {
+                                'discount': value['discount'],
+                                'sale_price': value['sale_price'],
+                                'price': value['full_price']
+                            }
+
+                        except KeyError: continue # No discount on sale or bug on Nintendeals?
 
                     break
 
