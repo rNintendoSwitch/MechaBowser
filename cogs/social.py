@@ -38,7 +38,7 @@ class SocialFeatures(commands.Cog):
 
         #return print(await member.avatar_url_as(format='png', size=256).read())
         # Profile icon
-        pfp = Image.open(io.BytesIO(await member.avatar_url_as(format='png', size=256).read())).convert("RGBA")
+        pfp = Image.open(io.BytesIO(await member.avatar_url_as(format='png', size=256).read())).convert("RGBA").resize((256, 256))
         card = Image.open("profilecard.png")
         background = Image.new("RGBA", card.size, (255, 0, 0, 0))
         background.paste(pfp, (50, 185), pfp)
