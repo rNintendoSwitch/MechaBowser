@@ -204,6 +204,11 @@ class NintenDeals(commands.Cog):
     @tasks.loop(seconds=14400)
     async def query_deals(self):
         logging.debug('[Deals] Starting deals check')
+
+        if not self.dealMessages:
+            async for message in self.dealChannel.history(limit=None):
+                await message.delete()
+
         for x in self.dealMessages:
             await x.delete()
 
