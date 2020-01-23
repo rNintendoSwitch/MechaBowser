@@ -320,7 +320,7 @@ class NintenDeals(commands.Cog):
         while not self.gamesReady:
             logging.debug('[Deals] Internal game list not yet ready for game search call')
             await asyncio.sleep(0.5)
-        print('Got out of loop')
+
         gameObj = None
         titleList = {}
 
@@ -332,7 +332,6 @@ class NintenDeals(commands.Cog):
         results = process.extract(game, titleList.keys(), limit=10)
         print(results)
         if not gameObj: # No exact match was found, do a fuzzy search instead
-            print('No match yet')
             if results[0][1] < 90:
                 embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
                 f'*"{results[0][0]}"\nor "{results[1][0]}"\nor "{results[2][0]}"*', color=0xCF675A, timestamp=datetime.datetime.utcnow())
@@ -387,7 +386,7 @@ class NintenDeals(commands.Cog):
             
         embed.set_thumbnail(url=gameDetails['image'])
         embed.add_field(name='Game Details', value=strDetails)
-        print('Starting to get prices')
+
         # Get price data
         doc = db.find_one({'_id': gameObj['_id']})
         prices = dealprices.find({'game_id': gameObj['_id']})
@@ -414,7 +413,6 @@ class NintenDeals(commands.Cog):
                 for key, value in country['prices'].items():
                     if not value: continue # No price data at all or bug on Nintendeals?
                     if key in gamePrices.keys(): continue
-                    print(f'key: {key}, value: {value}')
                     gamePrices[key] = {
                         'discount': None,
                         'sale_price': None,
@@ -566,7 +564,6 @@ class NintenDeals(commands.Cog):
 #        await ctx.send(embed=embed)
 
     @_games.error
-    @_games_test.error
     @_games_search.error
     async def mod_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
@@ -1065,7 +1062,7 @@ class ChatControl(commands.Cog):
 class AntiRaid(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.adminChannel = self.bot.get_channel(633838517306392586)
+        self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.muteRole = self.bot.get_guild(314857672585248768).get_role(594377818700251136)
         self.messages = {}
 
