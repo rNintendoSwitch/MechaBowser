@@ -311,31 +311,6 @@ class NintenDeals(commands.Cog):
     async def _games(self, ctx):
         return
 
-    @_games.command(name='test')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _games_test(self, ctx, *, game):
-        db = mclient.bowser.games
-        dealprices = self.dealsMongo.nintendeals.prices
-        msg = await ctx.send(f'{config.loading} Searching through some great games, this should only take a moment...')
-        while not self.gamesReady:
-            logging.debug('[Deals] Internal game list not yet ready for game search call')
-            await asyncio.sleep(0.5)
-        print('Got out of loop')
-        gameObj = None
-        titleList = {}
-
-        print(len(self.games))
-        for gameEntry in self.games.values():
-            for title in gameEntry['titles'].values():
-                if not title or title in titleList.keys(): continue
-                if title.upper() == game.upper(): # We found an exact match, get the gameID
-                    gameObj = gameEntry
-
-                titleList[title] = gameEntry['_id']
-
-        results = process.extract(game, list(titleList.keys()), limit=10)
-        return await msg.edit(content=str(results))
-
     @commands.cooldown(1, 15, type=commands.cooldowns.BucketType.member)
     @_games.command(name='search')
     async def _games_search(self, ctx, *, game):
