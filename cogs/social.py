@@ -31,7 +31,7 @@ class SocialFeatures(commands.Cog):
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member: member = ctx.author
         db = mclient.bowser.users
-        dbUser = db.find_one({'_id': ctx.author.id})
+        dbUser = db.find_one({'_id': member.id})
         namefont = ImageFont.truetype('26141.otf', 48)
         subtextfont = ImageFont.truetype('26141.otf', 26)
         nonheaderfont = ImageFont.truetype('26141.otf', 32)
@@ -63,10 +63,10 @@ class SocialFeatures(commands.Cog):
         draw.text((372,248), friendcode, (50,80,255), font=subtextfont)
 
         # Member since
-        draw.text((356,376), ctx.author.joined_at.strftime('%B %d, %Y'), (56,56,56), font=nonheaderfont)
+        draw.text((356,376), member.joined_at.strftime('%B %d, %Y'), (56,56,56), font=nonheaderfont)
 
         # Messages
-        draw.text((776,376), f'{mclient.bowser.messages.find({"author": ctx.author.id}).count():,}', (56,56,56), font=nonheaderfont)
+        draw.text((776,376), f'{mclient.bowser.messages.find({"author": member.id}).count():,}', (56,56,56), font=nonheaderfont)
 
         bytesFile = io.BytesIO()
         background.save(bytesFile, format='PNG')
