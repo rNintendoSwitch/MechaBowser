@@ -374,7 +374,7 @@ class MainEvents(commands.Cog):
                 if x.id == before.guild.id:
                     continue
 
-                roleList.append(x.id)
+                if not x.managed: roleList.append(x.id)
                 roleStr.append(x.name)
 
             for n in before.roles:
