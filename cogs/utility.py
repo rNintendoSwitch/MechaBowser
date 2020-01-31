@@ -1016,6 +1016,82 @@ class ChatControl(commands.Cog):
 
         await ctx.send(f'{roleList}```')
 
+    @commands.group(name='tag', aliases=['tags'], invoke_without_command=True)
+    async def _tag(self, ctx, *, query=None):
+        db = mclient.bowser.tags
+        await ctx.message.delete()
+
+        if query:
+            query = query.lower()
+            tag = db.find_one({'_id': query, 'active': True})
+
+            if not tag:
+                return await ctx.send(f'{config.redTick} A tag with that name does not exist', delete_after=10)
+
+            embed = discord.Embed(title=tag['_id'], description=tag['content'])
+            return await ctx.send(embed=embed)
+
+        else:
+            tagList = []
+            for x in db.find({'active': True}):
+                tagList.append(x['_id'])
+
+            embed = discord.Embed(title='Tag List', description='Here is a list of tags you can access:\n\n' + ', '.join(tagList))
+            return await ctx.send(embed=embed)
+
+    @_tag.command(name='edit')
+    @commands.has_any_role(config.moderator, 584016937663594529)
+    async def _tag_create(self, ctx, name, *, content):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+        await ctx.message.delete()
+        if name in ['edit', 'delete']:
+            return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
+
+        if tag:
+            db.update_one({'_id': tag['_id']},
+                {'$push': {'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}},
+                '$set': {'content': content, 'active': True}
+            })
+            msg = f'{config.greenTick} The **{name}** tag has been '
+            msg += 'updated' if tag['active'] else 'created'
+            return await ctx.send(msg, delete_after=10)
+
+        else:
+            db.insert_one({'_id': name, 'content': content, 'revisions': [], 'active': True})
+            return await ctx.send(f'{config.greenTick} The **{name}** tag has been created', delete_after=10)
+
+    @_tag.command(name='delete')
+    @commands.has_any_role(config.moderator, 584016937663594529)
+    async def _tag_delete(self, ctx, name):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+        await ctx.message.delete()
+        if tag:
+            def confirm_check(reaction, member):
+                return member == ctx.author and str(reaction.emoji) in [config.redTick, config.greenTick]
+
+            confirmMsg = await ctx.send(f'This action will delete the tag "{name}", are you sure you want to proceed?')
+            await confirmMsg.add_reaction(config.greenTick)
+            await confirmMsg.add_reaction(config.redTick)
+            try:
+                reaction = await self.bot.wait_for('reaction_add', timeout=15, check=confirm_check)
+                if str(reaction[0]) != config.greenTick:
+                    await confirmMsg.edit(content='Delete canceled')
+                    return await confirmMsg.clear_reactions()
+
+            except asyncio.TimeoutError:
+                await confirmMsg.edit(content='Reaction timed out. Rerun command to try again')
+                return await confirmMsg.clear_reactions()
+
+            else:
+                db.update_one({'_id': name}, {'$set': {'active': False}})
+                await confirmMsg.edit(content=f'{config.greenTick} The "{name}" tag has been deleted')
+                await confirmMsg.clear_reactions()
+
+
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
     async def _roles_set(self, ctx, member: discord.Member, channel: typing.Union[discord.TextChannel, discord.CategoryChannel], *, reason='-No reason specified-'):
