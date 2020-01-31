@@ -562,9 +562,19 @@ class Moderation(commands.Cog):
             await resp.delete()
             return await ctx.send(content=f'{config.redTick} Command timed out. Rerun to continue.')
 
+    @commands.has_any_role(config.moderator, config.eh)
+    @commands.command(name='note')
+    async def _note(self, ctx, user: discord.User, *, content):
+        await utils.issue_pun(user.id, ctx.author.id, 'note', content, active=False)
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
+
     @_warning.error
     @_warning_clear.error
     @_warning_setlevel.error
+    @_note.error
     async def mod_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(f'{config.redTick} Missing argument')
