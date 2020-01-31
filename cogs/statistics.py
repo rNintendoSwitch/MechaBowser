@@ -221,17 +221,17 @@ class StatCommands(commands.Cog):
     @_stats.command(name='channels')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_channels(self, ctx):
-        pass
+        return await ctx.send(f'{config.redTick} Channel statistics are not ready for use')
 
     @_stats.command(name='emoji')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_emoji(self, ctx):
-        pass
+        return await ctx.send(f'{config.redTick} Emoji statistics are not ready for use')
 
     @_stats.command(name='statuses')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_statuses(self, ctx):
-        pass
+        return await ctx.send(f'{config.redTick} Status statistics are not ready for use')
 
 def setup(bot):
     bot.add_cog(StatCommands(bot))
