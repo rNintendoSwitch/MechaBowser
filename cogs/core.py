@@ -25,7 +25,7 @@ class MainEvents(commands.Cog):
         try:
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
-            #self.bot.load_extension('cogs.statistics')
+            self.bot.load_extension('cogs.statistics')
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
 
