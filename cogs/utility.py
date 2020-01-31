@@ -856,7 +856,7 @@ class ChatControl(commands.Cog):
                 return await ctx.send(f'{config.redTick} User does not exist')
 
             if not dbUser:
-                embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about {user.mention} from the API because they are not in this server. There is little information to display as such')
+                embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about {user.mention} from the API because they are not in this server. There is little information to display as they have not been recorded joining the server before.')
                 embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
                 embed.set_thumbnail(url=user.avatar_url)
                 embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
@@ -871,7 +871,10 @@ class ChatControl(commands.Cog):
 
         desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
             'from the API because they are not in this server. ' \
-            'Showing last know data from before they left.'
+            'Showing last known data from before they left.'
+
+
+
         embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
         embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
         embed.set_thumbnail(url=user.avatar_url)
@@ -910,8 +913,19 @@ class ChatControl(commands.Cog):
         lastMsg = 'N/a' if msgCount == 0 else datetime.datetime.utcfromtimestamp(messages.sort('timestamp',pymongo.DESCENDING)[0]['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
         embed.add_field(name='Last message', value=lastMsg, inline=True)
         embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+
+        noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
+        if noteDocs.count():
+            noteCnt = noteDocs.count()
+            noteList = []
+            for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
+                stamp = datetime.datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
+                noteList.append(f'{stamp}: {x["reason"]}')
+
+            embed.add_field(name='User notes', value='View history to get more details on who issued the note.\n\n' + '\n'.join(noteList), inline=False)
+
         punishments = ''
-        punsCol = mclient.bowser.puns.find({'user': user.id})
+        punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
         if not punsCol.count():
             punishments = '__*No punishments on record*__'
 
@@ -963,7 +977,8 @@ class ChatControl(commands.Cog):
             'ban': 'Ban',
             'unban': 'Unban',
             'blacklist': 'Blacklist ({})',
-            'unblacklist': 'Unblacklist ({})'
+            'unblacklist': 'Unblacklist ({})',
+            'note': 'User note'
         }
 
         if puns.count() == 1:
