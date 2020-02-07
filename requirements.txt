@@ -11,3 +11,4 @@ bs4
 selenium
 pillow
 numpy
+pytz
