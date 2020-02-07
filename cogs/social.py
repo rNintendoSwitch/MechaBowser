@@ -111,13 +111,8 @@ class SocialFeatures(commands.Cog):
         draw.text((350, 275), '#' + member.discriminator, (126, 126, 126), font=subtextFont)
 
         # Friend code
-        if dbUser['friendcode'] == None:
-            friendcode = 'I haven\'t set a friend code yet!'
-
-        else:
-            friendcode = f'Switch Friend Code: {dbUser["friendcode"]}'
-
-        draw.text((350, 330), friendcode, (87, 111, 251), font=subtextFont)
+        if dbUser['friendcode']:
+            draw.text((350, 330), dbUser['friendcode'], (87, 111, 251), font=subtextFont)
 
         # Start customized content -- stats
         draw.text((440, 505), f'{mclient.bowser.messages.find({"author": member.id}).count():,}', (80, 80, 80), font=mediumFont)
