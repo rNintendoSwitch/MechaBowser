@@ -1046,7 +1046,7 @@ class ChatControl(commands.Cog):
         name = name.lower()
         tag = db.find_one({'_id': name})
         await ctx.message.delete()
-        if name in ['edit', 'delete']:
+        if name in ['edit', 'delete', 'source']:
             return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
 
         if tag:
@@ -1064,7 +1064,7 @@ class ChatControl(commands.Cog):
 
     @_tag.command(name='delete')
     @commands.has_any_role(config.moderator, 584016937663594529)
-    async def _tag_delete(self, ctx, name):
+    async def _tag_delete(self, ctx, *, name):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
@@ -1091,6 +1091,23 @@ class ChatControl(commands.Cog):
                 await confirmMsg.edit(content=f'{config.greenTick} The "{name}" tag has been deleted')
                 await confirmMsg.clear_reactions()
 
+        else:
+            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
+    @_tag.command(name='source')
+    @commands.has_any_role(config.moderator, 584016937663594529)
+    async def _tag_source(self, ctx, *, name):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+        await ctx.message.delete()
+
+        if tag:
+            embed = discord.Embed(title=f'{name} source', description=f'```\n{tag["content"]}\n```')
+            return await ctx.send(embed=embed)
+
+        else:
+            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
