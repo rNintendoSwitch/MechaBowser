@@ -423,7 +423,7 @@ class Moderation(commands.Cog):
 
     @_warning.command(name='review')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _review(self, ctx, member: discord.Member):
+    async def _warning_review(self, ctx, member: discord.Member):
         db = mclient.bowser.puns
         warnPun = db.find_one({'user': member.id, 'active': True, 'type': {
                     '$in': [
@@ -514,7 +514,7 @@ class Moderation(commands.Cog):
                     embed.set_author(name=f'Warning reduced | {member} ({member.id})')
                     embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
-                    embed.add_field(name='Reason', value='Moderator decision to reduce level')
+                    embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
                     await self.modLogs.send(embed=embed)
                     await resp.delete()
                     return await ctx.send(f'{config.greenTick} Warning review complete for {member} ({member.id}). Will be reduced one tier')
@@ -657,7 +657,7 @@ class LoopTasks(commands.Cog):
                 embed.set_author(name=f'Unmute | {member} ({member.id})')
                 embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
                 embed.add_field(name='Moderator', value='Automatic', inline=True)
-                embed.add_field(name='Reason', value='Mute expired')
+                embed.add_field(name='Reason', value='Mute expired', inline=False)
 
                 await self.modLogs.send(embed=embed)
 
