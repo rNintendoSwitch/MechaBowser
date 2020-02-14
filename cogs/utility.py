@@ -101,6 +101,13 @@ class NintenDeals(commands.Cog):
 
             if not ourGame:
                 gameEntry['released'] = False # New game. Force new_release_posting to check if it's released, and if so post it
+                gameEntry['description'] = None
+                gameEntry['publisher'] = None
+                gameEntry['developer'] = None
+                gameEntry['category'] = None
+                gameEntry['size'] = None
+                gameEntry['cacheUpdate'] = int(time.time())
+
                 gameDB.insert_one(gameEntry)
 
             else:
@@ -115,7 +122,15 @@ class NintenDeals(commands.Cog):
                     'free_to_play': ourGame['free_to_play']
                 }
                 if comparison != gameEntry:
-                    logging.debug(f'Updating out of date game entry {ourGame["_id"]}: {comparison["titles"]}')
+                    logging.info(f'[Deals] Updating out of date game entry {ourGame["_id"]}')
+                    gameEntry['cacheUpdate'] = int(time.time())
+                    gameDB.update_one({'_id': gameEntry['_id']}, {'$set': gameEntry})
+
+        for localGame in gameDB.find({}):
+            await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
+            if not ndealsDB.find_one({'_id': localGame['_id']}):
+                print(localGame['_id'])
+                #gameDM.delete_one({'_id': localGame['_id']})
 
         self.gamesReady = True
         logging.info('[Deals] Finished game fetch')
@@ -321,7 +336,12 @@ class NintenDeals(commands.Cog):
     async def _games_search(self, ctx, *, game):
         db = mclient.bowser.games
         dealprices = self.dealsMongo.nintendeals.prices
-        msg = await ctx.send(f'{config.loading} Searching through some great games, this should only take a moment...')
+        if not self.gamesReady:
+            msg = await ctx.send(f'{config.loading} I need to refresh my game list before looking up that title, this search may take a little longer than usual...')
+
+        else:
+            msg = await ctx.send(f'{config.loading} Searching through some great games, this should only take a moment...')
+
         while not self.gamesReady:
             logging.debug('[Deals] Internal game list not yet ready for game search call')
             await asyncio.sleep(0.5)
