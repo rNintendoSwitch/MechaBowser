@@ -8,6 +8,8 @@ import re
 
 import discord
 import pymongo
+import gridfs
+import requests
 from selenium import webdriver
 from bs4 import BeautifulSoup as bs
 
@@ -87,14 +89,23 @@ async def store_user(member, messages=0):
     for role in member.roles:
         if role.id == member.guild.id:
             continue
-        
+
         roleList.append(role.id)
 
     userData = {
         '_id': member.id,
-	    'roles': roleList,	
-	    'joins': [(datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()],	
-	    'leaves': []
+	    'roles': roleList,
+	    'joins': [(datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()],
+	    'leaves': [],
+        'lockdown': False,
+        'jailed': False,
+        'friendcode': None,
+        'timezone': None,
+        'trophies': [],
+        'trophyPreference': [],
+        'favgames': [],
+        'regionFlag': None,
+        'profileSetup': False
     }
     db.insert_one(userData)
 
@@ -117,21 +128,29 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'active': active
     })
 
-async def scrape_nintendo(url, desc_cap=2048):
-    global driver
-    if not driver:
-        logging.info('[Utils] Starting chrome driver')
-        options = webdriver.ChromeOptions()
-        options.add_argument('--no-sandbox')
-        options.add_argument('--headless')
-        options.add_argument('--disable-dev-shm-usage')
-        driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
-        logging.info('[Utils] Chrome driver successfully started')
+async def scrape_nintendo(url, nxid, desc_cap=2048):
+    db = mclient.bowser.games
+    fs = gridfs.GridFS(mclient.bowser)
+    gameDoc = db.find_one({'_id': nxid})
+
+    if gameDoc['description'] and gameDoc['cacheUpdate'] > (time.time() - 86400 * 30): # Younger than 30 days
+        return gameDoc
+
+    logging.debug('[Utils] Starting chrome driver')
+    options = webdriver.ChromeOptions()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--headless')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-cache')
+    options.add_argument('--disable-extensions')
+    #options.add_argument('--user-data-dir=/dev/null')
+    driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
+    logging.debug('[Utils] Chrome driver successfully started')
 
     scrapedData = {}
     while driver == None:
         # Wait for the driver to start up if called before
-        logging.info('[Deals] Waiting for chrome driver to start')
+        logging.debug('[Deals] Waiting for chrome driver to start')
         await asyncio.sleep(0.5)
 
     driver.get(url)
@@ -140,15 +159,18 @@ async def scrape_nintendo(url, desc_cap=2048):
 
     page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
     retrys = 0
-    while not page and retrys < 10: # Up to 20 seconds total wait time for the page to redirect
+    while not page and retrys < 4: # Up to 10 seconds total wait time for the page to redirect
+        if driver.current_url == 'https://www.nintendo.com/games/':
+            raise KeyError('[Deals] scrape link redirected to main games site, dead link')
+
         await asyncio.sleep(2)
         page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
         retrys += 1
         logging.warning(f'[Deals] Failed getting store page for {url}. Attempt {retrys + 1}')
 
-    if retrys >= 10:
+    if retrys >= 4:
         logging.critical(f'[Deals] Failed to resolve data for store page {url}')
-        raise KeyError('Failed to resolve data for store page')
+        raise RuntimeError('Failed to resolve data for store page')
 
     scrape = ''
     for tag in page.children:
@@ -157,7 +179,7 @@ async def scrape_nintendo(url, desc_cap=2048):
     scrape = scrape.replace(u'\xa0', u' ') # Remove any weird latin space chars
     scrape = scrape.strip() # Remove extra preceding/trailing whitespace
     scrape = re.sub(r'(<[^>]*>)', '', scrape) # Remove HTML tags leaving text
-        
+
     scrapedData['description'] = discord.utils.escape_markdown(scrape).replace(' \n      ', '').replace('    ', '').replace('\n\n', '\n')
     if len(scrapedData['description']) > desc_cap: scrapedData['description'] = f'{scrapedData["description"][:desc_cap - 3]}...'
 
@@ -171,38 +193,33 @@ async def scrape_nintendo(url, desc_cap=2048):
         if not imageTag: continue
         if imageTag: break
 
-#    gameRomSize = soup.find('dd', attrs={'itemprop': 'romSize'})
-#    if not gameRomSize:
-#        scrapedData['romSize'] = None
-#
-#    else:
-#        scrapedData['romSize'] = gameRomSize.next_element.strip()
-
-    #print('---data---')
-    #print(page.find(string='Category'))
-    #print(page.find(string='Category').next_element)
-    #print(page.find(string='Category').next_element.next_element)
-    #print('---end---')
-    #scrapedData['category'] = re.search(r'([A-Z])\w+', str(page.find(string='Category').next_element.next_element)).group(0)
-#    with open('page.html', 'a') as page_html:
-#        page_html.write(str(soup.prettify()))
-#   scrapedData['manufacturer'] = soup.find('dd', attrs={'itemprop': 'manufacturer'})
-#   scrapedData['brand'] = soup.find('dd', attrs={'itemprop': 'brand'})
-
+    nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
+    print('foo')
+    print(str(nintendoRoot + imageTag.group(1)))
+    scrapedData['image'] = nintendoRoot + imageTag.group(1)
     scrapedData['category'] = None if not soup.find('div', attrs={'class': 'category'}) else soup.find('div', attrs={'class': 'category'}).dd.text.replace('\n', '').replace('  ', '')
     scrapedData['publisher'] = None if not soup.find('div', attrs={'class': 'publisher'}) else soup.find('div', attrs={'class': 'publisher'}).dd.text.replace('\n', '').replace('  ', '')
-    if scrapedData['publisher']:
-        print(soup.find('div', attrs={'class': 'publisher'}).dd)
     scrapedData['developer'] = None if not soup.find('div', attrs={'class': 'developer'}) else soup.find('div', attrs={'class': 'developer'}).dd.text.replace('\n', '').replace('  ', '')
-    if scrapedData['developer']:
-        print(soup.find('div', attrs={'class': 'developer'}).dd)
     scrapedData['size'] = None if not soup.find('div', attrs={'class': 'file-size'}) else soup.find('div', attrs={'class': 'file-size'}).dd.text.replace('\n', '').replace('  ', '')
 
-    nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
-    scrapedData['image'] = nintendoRoot + imageTag.group(1)
+    if not fs.exists(nxid) or gameDoc['cacheUpdate'] < (time.time() - 86400 * 30): # Image not stored or older than 30 days
+        if fs.exists(nxid): fs.delete(nxid)
+        r = requests.get(nintendoRoot + imageTag.group(1), stream=True)
+        if r.status_code != 200:
+            raise RuntimeError(f'Nintendo returned non-200 status code {r.status_code}')
 
-    #print('image scrape date')
-    #print(scrapedData)
+        fs.put(r.raw, _id=nxid)
+
+    db.update_one({'_id': nxid}, {'$set': {
+        'description': scrapedData['description'],
+        'category': scrapedData['category'],
+        'publisher': scrapedData['publisher'],
+        'developer': scrapedData['developer'],
+        'size': scrapedData['size'],
+        'cacheUpdate': int(time.time())
+        }})
+
+    driver.quit()
     return scrapedData
 
 def resolve_duration(data):
@@ -339,5 +356,4 @@ def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
 def teardown(bot):
-    if driver: driver.quit()
     logging.info('[Extension] Utils module unloaded')

@@ -122,7 +122,7 @@ class NintenDeals(commands.Cog):
                     'free_to_play': ourGame['free_to_play']
                 }
                 if comparison != gameEntry:
-                    logging.info(f'[Deals] Updating out of date game entry {ourGame["_id"]}')
+                    logging.debug(f'[Deals] Updating out of date game entry {ourGame["_id"]}')
                     gameEntry['cacheUpdate'] = int(time.time())
                     gameDB.update_one({'_id': gameEntry['_id']}, {'$set': gameEntry})
 
@@ -183,7 +183,7 @@ class NintenDeals(commands.Cog):
             #elif websites['ZA']: siteUrl = websites['ZA']
 
             try:
-                gameDetails = await utils.scrape_nintendo(siteUrl)
+                gameDetails = await utils.scrape_nintendo(siteUrl, game['_id'])
 
             except (KeyError, RuntimeError):
                 continue
@@ -346,7 +346,7 @@ class NintenDeals(commands.Cog):
             logging.debug('[Deals] Internal game list not yet ready for game search call')
             await asyncio.sleep(0.5)
 
-        gameObj = None
+        gameObj = None # TODO: Exact name searching
         titleList = {}
 
         for gameEntry in self.games.values():
@@ -355,7 +355,6 @@ class NintenDeals(commands.Cog):
                 titleList[title] = gameEntry['_id']
 
         results = process.extract(game, titleList.keys(), limit=10)
-        print(results)
         if not gameObj: # No exact match was found, do a fuzzy search instead
             if results[0][1] < 90:
                 embed = discord.Embed(title='No game found', description=f'Unable to find a game with the title of **{game}**. Did you mean...\n\n' \
@@ -390,7 +389,7 @@ class NintenDeals(commands.Cog):
         #elif websites['ZA']: siteUrl = websites['ZA']
 
         try:
-            gameDetails = await utils.scrape_nintendo(siteUrl, desc_cap=512)
+            gameDetails = await utils.scrape_nintendo(siteUrl, gameObj['_id'], desc_cap=512)
 
         except KeyError: # Nintendo POS failed to return
             return await msg.edit(content=f'{config.redTick} Sorry, it appears that *{title}* has either been taken down or hidden on the eshop.\nDetails: Nintendo POS link - {siteUrl}\n\nIf you believe this is in error, please contact a chat moderator')
