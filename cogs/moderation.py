@@ -657,7 +657,7 @@ class LoopTasks(commands.Cog):
                 embed.set_author(name=f'Unmute | {member} ({member.id})')
                 embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
                 embed.add_field(name='Moderator', value='Automatic', inline=True)
-                embed.add_field(name='Reason', value='Mute expired', inline=False)
+                embed.add_field(name='Reason', value='Mute expired', inline=True)
 
                 await self.modLogs.send(embed=embed)
 
@@ -696,8 +696,8 @@ class LoopTasks(commands.Cog):
                 embed.set_author(name=f"{member} ({member.id})", icon_url=member.avatar_url)
                 embed.add_field(name="Responsible moderator", value=f"{str(moderator)} ({moderator.id})", inline=True)
                 embed.add_field(name="Reason", value=pun['reason'], inline=True)
-                embed.add_field(name="Previous punishments", value=punishments)
-                embed.add_field(name="Making a decision", value=f"An action is required for this review. Please use the `!warn review {member.id}` command to proceed")
+                embed.add_field(name="Previous punishments", value=punishments, inline=False)
+                embed.add_field(name="Making a decision", value=f"An action is required for this review. Please use the `!warn review {member.id}` command to proceed", inline=False)
 
                 await self.adminChannel.send(content=":warning::alarm_clock:", embed=embed)
                 self.expiryWarnNotified[pun['_id']] = time.time()
