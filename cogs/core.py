@@ -29,6 +29,8 @@ class MainEvents(commands.Cog):
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
 
+            self.sanitize_eud.start() #pylint: disable=no-member
+
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
 
@@ -37,6 +39,17 @@ class MainEvents(commands.Cog):
         self.debugChannel = self.bot.get_channel(config.debugChannel)
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.invites = {}
+
+    def cog_unload(self):
+        self.sanitize_eud.cancel() #pylint: disable=no-member
+
+    @tasks.loop(hours=1)
+    async def sanitize_eud(self):
+        logging.debug('[Core] Starting sanitzation of old EUD')
+        msgDB = mclient.bowser.messages
+        msgDB.update_many({'timestamp': {"$gte": time.time() - (86400 * 30)}, 'content': {"$ne": None}}, {"$set": {'content': None}})
+
+        logging.debug('[Core] Finished sanitzation of old EUD')
 
     @tasks.loop(seconds=15)
     async def fetch_invites(self):
@@ -245,7 +258,7 @@ class MainEvents(commands.Cog):
             return
     
         if message.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
-            logging.error(f'Discarding bad message {message.channel.type}')
+            logging.debug(f'Discarding bad message {message.channel.type}')
             return
 
         db = mclient.bowser.messages
@@ -255,6 +268,7 @@ class MainEvents(commands.Cog):
             'author': message.author.id,
             'guild': message.guild.id,
             'channel': message.channel.id,
+            'content': message.content,
             'timestamp': timestamp
         })
 
