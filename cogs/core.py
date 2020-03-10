@@ -47,7 +47,7 @@ class MainEvents(commands.Cog):
     async def sanitize_eud(self):
         logging.debug('[Core] Starting sanitzation of old EUD')
         msgDB = mclient.bowser.messages
-        msgDB.update_many({'timestamp': {"$gte": time.time() - (86400 * 30)}, 'content': {"$ne": None}}, {"$set": {'content': None}})
+        msgDB.update_many({'timestamp': {"$lte": time.time() - (86400 * 30)}, 'content': {"$ne": None}}, {"$set": {'content': None}})
 
         logging.debug('[Core] Finished sanitzation of old EUD')
 
