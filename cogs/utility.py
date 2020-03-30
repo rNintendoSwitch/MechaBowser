@@ -816,6 +816,10 @@ class ChatControl(commands.Cog):
         msg = await ctx.send('Evaluating...')
         return await msg.edit(content=f'Pong! Roundtrip latency {(msg.created_at - initiated).total_seconds()} seconds')
 
+#    @commands.command(name='archive')
+#    async def _archive(self, ctx, members: commands.Greey[discord.Member], channels: commands.Greedy[discord.Channel], limit: typing.Optional[int] = 200, channel_limiter: typing.Greedy[discord.Channel]):
+#        pass
+
     @commands.command(name='clean')
     @commands.has_any_role(config.moderator, config.eh)
     async def _clean(self, ctx, messages: int, members: commands.Greedy[discord.Member]):
