@@ -105,7 +105,9 @@ async def store_user(member, messages=0):
         'trophyPreference': [],
         'favgames': [],
         'regionFlag': None,
-        'profileSetup': False
+        'profileSetup': False,
+        'background': 'default',
+        'backgrounds': ['default']
     }
     db.insert_one(userData)
 
@@ -128,7 +130,115 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'active': active
     })
 
-async def scrape_nintendo(url, nxid, desc_cap=2048):
+async def _request_noa(nsuid):
+    infoDict = {}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': 'https://www.nintendo.com',
+        'X-Algolia-API-Key': '9a20c93440cf63cf1a7008d75f7438bf',
+        'X-Algolia-Application-ID': 'U3B6GR4UA3',
+        'Host': 'u3b6gr4ua3-dsn.algolia.net',
+        'Referer': 'https://www.nintendo.com/pos-redirect/{}?a=gdp'.format(nsuid)
+    }
+    body = {
+        "requests": [
+            {
+                "indexName": "noa_aem_game_en_us",
+                "params": "query={}&hitsPerPage=1&maxValuesPerFacet=30&page=0".format(nsuid),
+                "facetFilters": [["platform:Nintendo Switch"]]
+            }
+        ]
+    }
+    algolia = requests.post('https://u3b6gr4ua3-dsn.algolia.net/1/indexes/*/queries', headers=headers, json=body)
+    try:
+        algolia.raise_for_status()
+
+    except Exception as e:
+        raise RuntimeError(e)
+
+    response = algolia.json()
+    #print(response)
+    if not response['results'][0]['hits']:
+        raise KeyError('_noa game not found based on id')
+
+    game = response['results'][0]['hits'][0]
+    if not game:
+        pass # TODO: fill in title for slug and web request
+
+    description = discord.utils.escape_markdown(game['description']).replace(' \n      ', '').replace('    ', '').replace('\n\n', '\n')
+    infoDict['description'] = re.sub(r'([,!?.:;])(?![\\n ])', '\g<1>', description)
+    infoDict['category'] = ', '.join(game['categories'])
+    infoDict['publisher'] = None if not game['publishers'] else ' & '.join(game['publishers'])
+    infoDict['developer'] = None if not game['developers'] else ' & '.join(game['developers'])
+    infoDict['image'] = 'https://nintendo.com' + game['boxArt']
+
+    return infoDict
+
+async def _request_noe(title):
+    infoDict = {}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
+    }
+
+    search = requests.get('https://search.nintendo-europe.com/en/select?q="{}"&start=0&rows=4000&wt=json&sort=title asc&fq=type:GAME AND system_names_txt:"switch"'.format(title), headers=headers)
+    try:
+        search.raise_for_status()
+
+    except Exception as e:
+        raise RuntimeError(e)
+
+    response = search.json()
+    #print(response)
+    gameList = response['response']['docs']
+    game = None
+
+    for entry in gameList:
+        if entry['title'] == title:
+            game = entry
+            break
+
+    if not game:
+        raise KeyError('Game {} not found in returned NOE search array'.format(title))
+
+    infoDict['description'] = None if not game['excerpt'] else game['excerpt']
+    infoDict['category'] = ', '.join(game['pretty_game_categories_txt'])
+    infoDict['publisher'] = None if not game['publisher'] else game['publisher']
+    infoDict['developer'] = None if not game['developer'] else game['developer']
+    infoDict['image'] = 'https:' + game['image_url']
+
+    return infoDict
+
+
+async def _request_noj(nsuid):
+    infoDict = {}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
+    }
+
+    titleAPI = requests.get('https://ec.nintendo.com/api/JP/ja/related/title/{}'.format(nsuid), headers=headers)
+    try:
+        titleAPI.raise_for_status()
+
+    except Exception as e:
+        raise RuntimeError(e)
+
+    gameDesc = titleAPI.json()
+    #print(gameDesc)
+    response = gameDesc['related_informations']['related_information'][0]
+
+    infoDict['description'] = None if not response['description'] else response['description']
+    infoDict['image'] = response['image_url']
+    # TODO: Scrape nintendo.co.jp entries for extra details
+    infoDict['category'] = None
+    infoDict['publisher'] = None
+    infoDict['developer'] = None
+
+    return infoDict
+
+
+async def game_data(nxid, desc_cap=2048):
     db = mclient.bowser.games
     fs = gridfs.GridFS(mclient.bowser)
     gameDoc = db.find_one({'_id': nxid})
@@ -136,91 +246,134 @@ async def scrape_nintendo(url, nxid, desc_cap=2048):
     if gameDoc['description'] and gameDoc['cacheUpdate'] > (time.time() - 86400 * 30): # Younger than 30 days
         return gameDoc
 
-    logging.debug('[Utils] Starting chrome driver')
-    options = webdriver.ChromeOptions()
-    options.add_argument('--no-sandbox')
-    options.add_argument('--headless')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-cache')
-    options.add_argument('--disable-extensions')
-    #options.add_argument('--user-data-dir=/dev/null')
-    driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
-    logging.debug('[Utils] Chrome driver successfully started')
+    titles = gameDoc['titles']
+    print(titles)
 
-    scrapedData = {}
-    while driver == None:
-        # Wait for the driver to start up if called before
-        logging.debug('[Deals] Waiting for chrome driver to start')
-        await asyncio.sleep(0.5)
+    if titles['NA']:
+        infoDict = await _request_noa(gameDoc['nsuids']['NA'])
 
-    driver.get(url)
-    await asyncio.sleep(2) # Because we are using chrome, we need to actually wait for the javascript redirect to run
-    soup = bs(driver.page_source, 'html.parser')
+    elif titles['EU']:
+        infoDict = await _request_noe(gameDoc['titles']['EU'].encode('latin-1', errors='replace'))
 
-    page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
-    retrys = 0
-    while not page and retrys < 4: # Up to 10 seconds total wait time for the page to redirect
-        if driver.current_url == 'https://www.nintendo.com/games/':
-            raise KeyError('[Deals] scrape link redirected to main games site, dead link')
+    else:
+        infoDict = await _request_noj(gameDoc['nsuids']['JP'])
 
-        await asyncio.sleep(2)
-        page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
-        retrys += 1
-        logging.warning(f'[Deals] Failed getting store page for {url}. Attempt {retrys + 1}')
-
-    if retrys >= 4:
-        logging.critical(f'[Deals] Failed to resolve data for store page {url}')
-        raise RuntimeError('Failed to resolve data for store page')
-
-    scrape = ''
-    for tag in page.children:
-        scrape += str(tag)
-
-    scrape = scrape.replace(u'\xa0', u' ') # Remove any weird latin space chars
-    scrape = scrape.strip() # Remove extra preceding/trailing whitespace
-    scrape = re.sub(r'(<[^>]*>)', '', scrape) # Remove HTML tags leaving text
-
-    scrapedData['description'] = discord.utils.escape_markdown(scrape).replace(' \n      ', '').replace('    ', '').replace('\n\n', '\n')
-    if len(scrapedData['description']) > desc_cap: scrapedData['description'] = f'{scrapedData["description"][:desc_cap - 3]}...'
-
-    imageScrape = soup.find('span', attrs={'class': 'boxart'})
-    if not imageScrape:
-        raise KeyError('boxart does not exist in HTML scrape')
-
-    for tag in imageScrape:
-        scrapeMinusDiv = str(tag)
-        imageTag = re.search(imageTagRe, scrapeMinusDiv)
-        if not imageTag: continue
-        if imageTag: break
-
-    nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
-    print('foo')
-    print(str(nintendoRoot + imageTag.group(1)))
-    scrapedData['image'] = nintendoRoot + imageTag.group(1)
-    scrapedData['category'] = None if not soup.find('div', attrs={'class': 'category'}) else soup.find('div', attrs={'class': 'category'}).dd.text.replace('\n', '').replace('  ', '')
-    scrapedData['publisher'] = None if not soup.find('div', attrs={'class': 'publisher'}) else soup.find('div', attrs={'class': 'publisher'}).dd.text.replace('\n', '').replace('  ', '')
-    scrapedData['developer'] = None if not soup.find('div', attrs={'class': 'developer'}) else soup.find('div', attrs={'class': 'developer'}).dd.text.replace('\n', '').replace('  ', '')
-    scrapedData['size'] = None if not soup.find('div', attrs={'class': 'file-size'}) else soup.find('div', attrs={'class': 'file-size'}).dd.text.replace('\n', '').replace('  ', '')
+    if len(infoDict['description']) > desc_cap: infoDict['description'] = f'{infoDict["description"][:desc_cap - 3]}...'
 
     if not fs.exists(nxid) or gameDoc['cacheUpdate'] < (time.time() - 86400 * 30): # Image not stored or older than 30 days
         if fs.exists(nxid): fs.delete(nxid)
-        r = requests.get(nintendoRoot + imageTag.group(1), stream=True)
+        r = requests.get(infoDict['image'], stream=True)
         if r.status_code != 200:
             raise RuntimeError(f'Nintendo returned non-200 status code {r.status_code}')
 
         fs.put(r.raw, _id=nxid)
 
+    infoDict['size'] = None # Depreciated
     db.update_one({'_id': nxid}, {'$set': {
-        'description': scrapedData['description'],
-        'category': scrapedData['category'],
-        'publisher': scrapedData['publisher'],
-        'developer': scrapedData['developer'],
-        'size': scrapedData['size'],
+        'description': infoDict['description'],
+        'category': infoDict['category'],
+        'publisher': infoDict['publisher'],
+        'developer': infoDict['developer'],
+        'size': infoDict['size'],
+        'image': infoDict['image'],
         'cacheUpdate': int(time.time())
         }})
 
-    driver.quit()
-    return scrapedData
+    return infoDict
+
+#async def scrape_nintendo(url, nxid, desc_cap=2048):
+#    db = mclient.bowser.games
+#    fs = gridfs.GridFS(mclient.bowser)
+#    gameDoc = db.find_one({'_id': nxid})
+#
+#    if gameDoc['description'] and gameDoc['cacheUpdate'] > (time.time() - 86400 * 30): # Younger than 30 days
+#        return gameDoc
+#
+#    logging.debug('[Utils] Starting chrome driver')
+#    options = webdriver.ChromeOptions()
+#    options.add_argument('--no-sandbox')
+#    options.add_argument('--headless')
+#    options.add_argument('--disable-dev-shm-usage')
+#    options.add_argument('--disable-cache')
+#    options.add_argument('--disable-extensions')
+#    #options.add_argument('--user-data-dir=/dev/null')
+#    driver = webdriver.Chrome('/root/mecha-bowser/python/bin/chromedriver', chrome_options=options)
+#    logging.debug('[Utils] Chrome driver successfully started')
+#
+#    scrapedData = {}
+#    while driver == None:
+#        # Wait for the driver to start up if called before
+#        logging.debug('[Deals] Waiting for chrome driver to start')
+#        await asyncio.sleep(0.5)
+#
+#    driver.get(url)
+#    await asyncio.sleep(2) # Because we are using chrome, we need to actually wait for the javascript redirect to run
+#    soup = bs(driver.page_source, 'html.parser')
+#
+#    page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
+#    retrys = 0
+#    while not page and retrys < 4: # Up to 10 seconds total wait time for the page to redirect
+#        if driver.current_url == 'https://www.nintendo.com/games/':
+#            raise KeyError('[Deals] scrape link redirected to main games site, dead link')
+#
+#        await asyncio.sleep(2)
+#        page = soup.find('div', attrs={'class': re.compile(r'(bullet-list drawer(?: truncated)?)')})
+#        retrys += 1
+#        logging.warning(f'[Deals] Failed getting store page for {url}. Attempt {retrys + 1}')
+#
+#    if retrys >= 4:
+#        logging.critical(f'[Deals] Failed to resolve data for store page {url}')
+#        raise RuntimeError('Failed to resolve data for store page')
+#
+#    scrape = ''
+#    for tag in page.children:
+#        scrape += str(tag)
+#
+#    scrape = scrape.replace(u'\xa0', u' ') # Remove any weird latin space chars
+#    scrape = scrape.strip() # Remove extra preceding/trailing whitespace
+#    scrape = re.sub(r'(<[^>]*>)', '', scrape) # Remove HTML tags leaving text
+#
+#    scrapedData['description'] = discord.utils.escape_markdown(scrape).replace(' \n      ', '').replace('    ', '').replace('\n\n', '\n')
+#    if len(scrapedData['description']) > desc_cap: scrapedData['description'] = f'{scrapedData["description"][:desc_cap - 3]}...'
+#
+#    imageScrape = soup.find('span', attrs={'class': 'boxart'})
+#    if not imageScrape:
+#        raise KeyError('boxart does not exist in HTML scrape')
+#
+#    for tag in imageScrape:
+#        scrapeMinusDiv = str(tag)
+#        imageTag = re.search(imageTagRe, scrapeMinusDiv)
+#        if not imageTag: continue
+#        if imageTag: break
+#
+#    nintendoRoot = re.search(storePageRe, driver.current_url).group(1)
+#
+#    scrapedData['image'] = nintendoRoot + imageTag.group(1)
+#    scrapedData['category'] = None if not soup.find('div', attrs={'class': 'category'}) else soup.find('div', attrs={'class': 'category'}).dd.text.replace('\n', '').replace('  ', '')
+#    scrapedData['publisher'] = None if not soup.find('div', attrs={'class': 'publisher'}) else soup.find('div', attrs={'class': 'publisher'}).dd.text.replace('\n', '').replace('  ', '')
+#    scrapedData['developer'] = None if not soup.find('div', attrs={'class': 'developer'}) else soup.find('div', attrs={'class': 'developer'}).dd.text.replace('\n', '').replace('  ', '')
+#    scrapedData['size'] = None if not soup.find('div', attrs={'class': 'file-size'}) else soup.find('div', attrs={'class': 'file-size'}).dd.text.replace('\n', '').replace('  ', '')
+#
+#    if not fs.exists(nxid) or gameDoc['cacheUpdate'] < (time.time() - 86400 * 30): # Image not stored or older than 30 days
+#        if fs.exists(nxid): fs.delete(nxid)
+#        r = requests.get(nintendoRoot + imageTag.group(1), stream=True)
+#        if r.status_code != 200:
+#            raise RuntimeError(f'Nintendo returned non-200 status code {r.status_code}')
+#
+#        fs.put(r.raw, _id=nxid)
+#
+#    db.update_one({'_id': nxid}, {'$set': {
+#        'description': scrapedData['description'],
+#        'category': scrapedData['category'],
+#        'publisher': scrapedData['publisher'],
+#        'developer': scrapedData['developer'],
+#        'size': scrapedData['size'],
+#        'image': scrapedData['image'],
+#        'cacheUpdate': int(time.time())
+#        }})
+#
+#    driver.quit()
+#    return scrapedData
 
 def resolve_duration(data):
     '''

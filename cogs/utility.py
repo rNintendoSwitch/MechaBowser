@@ -25,6 +25,8 @@ serverLogs = None
 modLogs = None
 
 class NintenDeals(commands.Cog):
+    extGames = {}
+    gamesReady = False
     def __init__(self, bot):
         self.dealsMongo = pymongo.MongoClient(
             config.mongoDealsHost,
@@ -75,6 +77,9 @@ class NintenDeals(commands.Cog):
         asyncio.get_event_loop().run_until_complete(self.session.close())
         #self.session.close()
         logging.info('[Deals] NintenDeals task cogs unloaded')
+
+    async def _ready_status(self):
+        return self.gamesReady
 
     @tasks.loop(seconds=43200)
     async def update_game_info(self):
@@ -135,13 +140,14 @@ class NintenDeals(commands.Cog):
         self.gamesReady = True
         logging.info('[Deals] Finished game fetch')
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(hours=60)
     async def new_release_posting(self):
         db = mclient.bowser.games
         if not self.gamesReady or not self.saleData: return # Wait until next pass so game list can update
 
-        logging.debug('[Deals] Starting new releases check')
+        logging.info('[Deals] Starting new releases check')
         for game in db.find({'released': False}):
+            await asyncio.sleep(0.1)
             nowReleased = False
             regionalDates = {}
             for key, value in game['release_dates'].items():
@@ -166,30 +172,14 @@ class NintenDeals(commands.Cog):
             else:
                 name = game['titles']['JP']
 
-            # Really annoying way to have priority over what site is used
-            websites = game['websites']
-            siteUrl = None
-            if websites['US']: siteUrl = websites['US']
-            elif websites['CA']: siteUrl = websites['CA']
-            else:
-                continue # No non-NA games yet
-            #elif websites['EU']: siteUrl = websites['EU']
-            #elif websites['GB']: siteUrl = websites['GB']
-            #elif websites['AU']: siteUrl = websites['AU']
-            #elif websites['NZ']: siteUrl = websites['NZ']
-            #elif websites['JP']: siteUrl = websites['JP']
-            #elif websites['CH']: siteUrl = websites['CH']
-            #elif websites['RU']: siteUrl = websites['RU']
-            #elif websites['ZA']: siteUrl = websites['ZA']
-
             try:
-                gameDetails = await utils.scrape_nintendo(siteUrl, game['_id'])
+                gameDetails = await utils.game_data(game['_id'])
 
             except (KeyError, RuntimeError):
                 continue
-            
-            strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category'])
-            strDetails += ':postal_horn: **Publisher:** {}\n'.format(gameDetails['publisher'])
+            print(game['_id'])
+            strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category']) if gameDetails['category'] else ':book: **Genre:** *Genre not known*\n'
+            strDetails += ':postal_horn: **Publisher:** {}\n'.format(gameDetails['publisher']) if gameDetails['publisher'] else ':postal_horn: **Publisher:** *Publisher not known*\n'
             strDetails += ':thought_balloon: **Developer:** {}\n'.format(gameDetails['developer']) if gameDetails['developer'] else ':thought_balloon: **Developer:** *Developer not known*\n'
 
             if gameDetails['size']:
@@ -209,16 +199,16 @@ class NintenDeals(commands.Cog):
             embed.set_thumbnail(url=gameDetails['image'])
             embed.add_field(name='Game Details', value=strDetails)
             embed.add_field(name='🌐 Release Schedule', value=regions, inline=False)
-            embed.url = siteUrl
+            embed.url = gameDetails['image']
             await self.releaseChannel.send(embed=embed)
 
             db.update_one({'_id': game['_id']}, {'$set': {'released': True}})
 
-        logging.debug('[Deals] Finished new releases check')
+        logging.info('[Deals] Finished new releases check')
 
     @tasks.loop(seconds=14400)
     async def query_deals(self):
-        logging.debug('[Deals] Starting deals check')
+        logging.info('[Deals] Starting deals check')
 
         if not self.dealMessages:
             async for message in self.dealChannel.history(limit=None):
@@ -326,6 +316,7 @@ class NintenDeals(commands.Cog):
                 chunk = '​' + chunk[2:] # Remove extra new lines at beginning of new message
 
             self.dealMessages.append(await self.dealChannel.send(chunk))
+            logging.info('[Deals] Finished deals check')
 
     @commands.group(name='games', invoke_without_command=True)
     async def _games(self, ctx):
@@ -373,28 +364,10 @@ class NintenDeals(commands.Cog):
         else:
             title = gameObj['titles']['JP']
 
-        websites = gameObj['websites']
-        siteUrl = None
-        if websites['US']: siteUrl = websites['US']
-        elif websites['CA']: siteUrl = websites['CA']
-        else:
-            return await msg.edit(content=f'{config.redTick} Sorry, that game requested is from a country that is not supported yet!')
-        #elif websites['EU']: siteUrl = websites['EU']
-        #elif websites['GB']: siteUrl = websites['GB']
-        #elif websites['AU']: siteUrl = websites['AU']
-        #elif websites['NZ']: siteUrl = websites['NZ']
-        #elif websites['JP']: siteUrl = websites['JP']
-        #elif websites['CH']: siteUrl = websites['CH']
-        #elif websites['RU']: siteUrl = websites['RU']
-        #elif websites['ZA']: siteUrl = websites['ZA']
-
         try:
-            gameDetails = await utils.scrape_nintendo(siteUrl, gameObj['_id'], desc_cap=512)
+            gameDetails = await utils.game_data(gameObj['_id'], desc_cap=512)
 
-        except KeyError: # Nintendo POS failed to return
-            return await msg.edit(content=f'{config.redTick} Sorry, it appears that *{title}* has either been taken down or hidden on the eshop.\nDetails: Nintendo POS link - {siteUrl}\n\nIf you believe this is in error, please contact a chat moderator')
-
-        except RuntimeError:
+        except (KeyError, RuntimeError):
             return await msg.edit(content=f'{config.redTick} Sorry, there was a problem getting info for that game. Try again later')
 
         embed = discord.Embed(title=title, description=gameDetails['description'])
@@ -618,6 +591,7 @@ class ChatControl(commands.Cog):
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I) # TODO: Proper ebay filtering that doesn't nuke normal links
+        self.inviteRe = re.compile(r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discordapp\.com\/invite)\/[\da-z-]+)', re.I)
         self.thirtykEvent = {}
         self.thirtykEventRoles = [
             616298509460701186,
