@@ -4,18 +4,22 @@ import io
 import logging
 import re
 import datetime
+import pytz
+import time
+from pathlib import Path
 
 import numpy as np
 import pymongo
 import gridfs
 import requests
+import codepoints
 import discord
 from discord.ext import commands
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
 from emoji import UNICODE_EMOJI
-from codepoints import from_unicode
+from fuzzywuzzy import fuzz, process
 
 import config
 import utils
@@ -29,10 +33,11 @@ mclient = pymongo.MongoClient(
 class SocialFeatures(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.friendcodeRe = re.compile(r'(?:SW)?-?(\d{4})[ -]?(\d{4})[ -]?(\d{4})', re.I)
+        self.friendcodeRe = re.compile(r'(?:sw)?-?(\d{4})[ -]?(\d{4})[ -]?(\d{4})', re.I)
+        self.inprogressEdits = {}
+        self.letterCodepoints = ['1f1e6', '1f1e7', '1f1e8', '1f1e9', '1f1ea', '1f1eb', '1f1ec', '1f1ed', '1f1ee', '1f1ef', '1f1f0', '1f1f1', '1f1f2', '1f1f3', '1f1f4', '1f1f5', '1f1f6', '1f1f7', '1f1f8', '1f1f9', '1f1fa', '1f1fb', '1f1fc', '1f1fd', '1f1fe', '1f1ff']
 
     @commands.group(name='profile', invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)#, 585536225725775893, 283753284483809280)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member: member = ctx.author
         db = mclient.bowser.users
@@ -49,7 +54,7 @@ class SocialFeatures(commands.Cog):
         pfp = Image.open(io.BytesIO(await member.avatar_url_as(format='png', size=256).read())).convert("RGBA").resize((250, 250))
         pfpBack = Image.open('resources/pfp-background.png').convert('RGBA')
         pfpBack.paste(pfp, (50, 170), pfp)
-        card = Image.open('resources/profile-default.png').convert("RGBA")
+        card = Image.open('resources/profile-{}.png'.format(dbUser['background'])).convert("RGBA")
         pfpBack.paste(card, mask=card)
         card = pfpBack
         snoo = Image.open('resources/snoo.png').convert("RGBA")
@@ -86,7 +91,7 @@ class SocialFeatures(commands.Cog):
                     nameW += W
                     memberName = ''
 
-                charset = tuple(from_unicode(char))
+                charset = tuple(codepoints.from_unicode(char))
                 unicodePoint = []
                 for x in charset:
                     unicodePoint.append(hex(x)[2:])
@@ -121,7 +126,8 @@ class SocialFeatures(commands.Cog):
             draw.text((800, 505), 'Not specified', (126, 126, 126), font=mediumFont)
 
         else:
-            draw.text((800, 505), dbUser['timezone'], (80, 80, 80), font=mediumFont)
+            tzOffset = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%z')
+            draw.text((800, 505), 'GMT' + tzOffset, (80, 80, 80), font=mediumFont)
 
         # Start trophies
         trophyLocations = {
@@ -146,7 +152,23 @@ class SocialFeatures(commands.Cog):
             for x in dbUser:
                 trophies.append(x)
 
-        if ctx.guild.get_role(585536225725775893) in member.roles and 'booster' not in trophies:
+        # Hardcoding IDs like a genius
+        if member.id == 115840403458097161: # FlapSnapple - Server owner
+            trophies.append('owner')
+
+        if member.id == 125233822760566784: # MattBSG -  Developer
+            trophies.append('developer')
+
+        if ctx.guild.get_role(263762796875874304) in member.roles: # Chat-mod role
+            trophies.append('chat-mod')
+
+        if ctx.guild.get_role(238082857313107978) in member.roles: # Sub-mod role
+            trophies.append('sub-mod')
+
+        if ctx.guild.get_role(625679906071642118) in member.roles: # Mod emeritus
+            trophies.append('mod-emeritus')
+
+        if ctx.guild.get_role(585536225725775893) in member.roles: # Booster role
             trophies.append('booster')
 
         if len(trophies) < 15: # Check for additional non-prefered trophies
@@ -188,34 +210,15 @@ class SocialFeatures(commands.Cog):
                     card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 else:
-                    websites = gameDoc['websites']
-                    siteUrl = None
-                    if websites['US']: siteUrl = websites['US']
-                    elif websites['CA']: siteUrl = websites['CA']
-                    else:
-                        continue # No non-NA games yet
-                    #elif websites['EU']: siteUrl = websites['EU']
-                    #elif websites['GB']: siteUrl = websites['GB']
-                    #elif websites['AU']: siteUrl = websites['AU']
-                    #elif websites['NZ']: siteUrl = websites['NZ']
-                    #elif websites['JP']: siteUrl = websites['JP']
-                    #elif websites['CH']: siteUrl = websites['CH']
-                    #elif websites['RU']: siteUrl = websites['RU']
-                    #elif websites['ZA']: siteUrl = websites['ZA']
-
                     try:
-                        gameScrape = await utils.scrape_nintendo(siteUrl)
+                        await utils.game_data(gameDoc['_id'])
+                        if fs.exists(game): # Image should have been put in storage after scrape
+                            fs.get(game)
+                            gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+                            card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                     except:
-                        return await ctx.send(f'{config.redTick} An unexpected error has occured while getting game data for the profile, please try again later')
-
-                    r = requests.get(gameScrape['image'], stream=True)
-                    if r.status_code != 200:
-                        return await ctx.send(f'{config.redTick} An unexpected error has occured while getting game data for the profile, please try again later')
-
-                    fs.put(r.raw, _id=game)
-                    gameIcon = Image.open(fs.get(game)).convert('RGBA').resize((45, 45))
-                    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
+                        pass
 
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
@@ -242,23 +245,333 @@ class SocialFeatures(commands.Cog):
         card.save(bytesFile, format='PNG')
         await ctx.send(file=discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png'))
 
+    @commands.has_any_role(config.moderator, config.eh, 585536225725775893, 283753284483809280)
     @_profile.command(name='edit')
-    async def _profile_edit(self, ctx, code):
-        # People are sneaky and guessing command syntax for unreleased features
-        sneaky = True
-        for role in ctx.author.roles:
-            if role.id == 263764663152541696:
-                sneaky = False
-                break
-
-        if sneaky:
-            import random
-            return await ctx.send(random.choice(['lol no.', 'being sneaky eh?', 'how do you know about a undocumented command?', 'nah bro.', f'{config.redTick} Error: Suc']))
-
-        embed = discord.Embed(title='Edit profile information', description='Please click the reaction of the option you would like to edit:\n\n1️⃣ Friend code')
+    async def _profile_edit(self, ctx):
         db = mclient.bowser.users
-        db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': code}})
-        return await ctx.send(db.find_one({'_id': ctx.author.id}))
+        dbUser = db.find_one({'_id': ctx.author.id})
+        mainMsg = None
+        if ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != 670999043740270602: # commands
+            await ctx.message.delete()
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use bot commands in <#670999043740270602>, not {ctx.channel.mention}', delete_after=15)
+
+        if ctx.author.id in self.inprogressEdits.keys() and (time.time() - self.inprogressEdits[ctx.author.id]) < 300:
+            await ctx.message.delete()
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} You are already editing your profile! Please finish or wait a few minutes before trying again', delete_after=15)
+
+        self.inprogressEdits[ctx.author.id] = time.time()
+        await ctx.message.add_reaction('📬')
+
+        header = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.\n\n'
+        reedit = header[2:] + ' If you would like to instead reset a section of your profile that you have previously set, just respond `reset` to any prompt.\n\n'
+        phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
+        phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
+        phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>; this is case-insensative. For example, `America/New_York`'
+        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
+        phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
+
+        def check(m):
+            return m.author.id == ctx.author.id and m.channel.id == mainMsg.channel.id
+
+        botMsg = None
+
+        async def _phase1(message):
+            response = await self.bot.wait_for('message', timeout=120, check=check)
+
+            content = response.content.lower().strip()
+            if response.content.lower().strip() == 'skip': return True
+            if response.content.lower().strip() == 'reset':
+                db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': None}})
+                await message.channel.send('I\'ve gone ahead and reset your setting for **friend code**')
+                return True
+
+            code = re.search(self.friendcodeRe, content)
+            if code: # re match
+                friendcode = f'SW-{code.group(1)}-{code.group(2)}-{code.group(3)}'
+                db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': friendcode}})
+                return True
+
+            else:
+                return False
+                   
+        async def _phase2(message):
+            response = await self.bot.wait_for('message', timeout=120, check=check)
+
+            content = response.content.strip()
+            if response.content.lower().strip() == 'skip': return True
+            if response.content.lower().strip() == 'reset':
+                db.update_one({'_id': ctx.author.id}, {'$set': {'regionFlag': None}})
+                await message.channel.send('I\'ve gone ahead and reset your setting for **regional flag**')
+                return True
+
+            for x in content:
+                if x not in UNICODE_EMOJI: return False
+
+            rawPoints = tuple(codepoints.from_unicode(content))
+            points = []
+
+            for x in rawPoints:
+                if str(hex(x)[2:]) not in self.letterCodepoints: # Flags are the 2 letter abbrev. in regional letter emoji
+                    return False
+
+                points.append(str(hex(x)[2:]))
+
+            pointStr = '-'.join(points)
+            if not Path(f'resources/twemoji/{pointStr}.png').is_file():
+                return False
+
+            db.update_one({'_id': ctx.author.id}, {'$set': {'regionFlag': pointStr}})
+            return True
+
+        async def _phase3(message):
+            response = await self.bot.wait_for('message', timeout=180, check=check)
+
+            content = response.content.lower().strip()
+            if response.content.lower().strip() == 'skip': return True
+            if response.content.lower().strip() == 'reset':
+                db.update_one({'_id': ctx.author.id}, {'$set': {'timezone': None}})
+                await message.channel.send('I\'ve gone ahead and reset your setting for **timezone**')
+                return True
+
+            for x in pytz.all_timezones:
+                if content == x.lower():
+                    db.update_one({'_id': ctx.author.id}, {'$set': {'timezone': x}})
+                    return True
+
+            return False
+
+        async def _phase4(message):
+            gameCnt = 0
+            failedFetch = False
+            while gameCnt < 3:
+                if failedFetch: await message.channel.send(f'{config.redTick} Hmm, not sure what game that is. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase4.format(gameCnt))
+                else: await message.channel.send(phase4.format(gameCnt))
+                failedFetch = False
+
+                response = await self.bot.wait_for('message', timeout=180, check=check)
+                if response.content.lower().strip() == 'skip': break
+                if response.content.lower().strip() == 'reset':
+                    db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+                    await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
+                    return True
+
+                content = response.content.lower().strip()
+
+                NintenDeals = self.bot.get_cog('NintenDeals')
+                if not NintenDeals.gamesReady:
+                    waitMsg = await message.channel.send(f'{config.loading} Please wait a few moments, getting info on that game')
+                    while not NintenDeals.gamesReady:
+                        await asyncio.sleep(0.5)
+
+                    await waitMsg.delete()
+
+                games = NintenDeals.games
+
+                gameObj = None
+                titleList = {}
+
+                for gameEntry in games.values():
+                    for title in gameEntry['titles'].values():
+                        if not title or title in titleList.keys(): continue
+                        titleList[title] = gameEntry['_id']
+
+                results = process.extract(content, titleList.keys(), limit=2)
+                if results[0][1] >= 86:
+                    if gameCnt == 0 and dbUser['favgames']: db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+                    while True:
+                        await message.channel.send(f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__')
+                        checkResp = await self.bot.wait_for('message', timeout=120, check=check)
+                        if checkResp.content.lower().strip() in ['yes', 'y']:
+                            gameObj = games[titleList[results[0][0]]]
+                            if gameObj['_id'] in dbUser['favgames']: break
+                                    
+                            db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': gameObj['_id']}})
+                            gameCnt += 1
+                            break
+
+                        elif checkResp.content.lower().strip() in ['no', 'n']:
+                            break
+
+                else:
+                    failedFetch = True
+
+        async def _phase5(message):
+            backgrounds = list(dbUser['backgrounds'])
+            backgrounds.remove('default')
+
+            if not backgrounds:
+                await message.channel.send('Since you don\'t have any background themes unlocked we\'ll skip this step')
+                return True
+
+            else:
+                backgrounds = list(dbUser['backgrounds'])
+                await message.channel.send(phase5.format(', '.join(backgrounds)))
+                while True:
+                    response = await self.bot.wait_for('message', timeout=120, check=check)
+
+                    content = response.content.lower().strip()
+                    if response.content.lower().strip() == 'reset':
+                        db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default'}})
+                        await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
+                        return True
+
+                    elif content != 'skip':
+                        if content in backgrounds:
+                            db.update_one({'_id': ctx.author.id}, {'$set': {'background': content}})
+                            break
+
+                        else:
+                            await message.channel.send(f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n' + phase5.format(', '.join(backgrounds)))
+
+                    else:
+                        break
+
+        if not dbUser['profileSetup']: # User has not set their profile up
+            embed = discord.Embed(title='Setup your user profile', description='It appears you have not setup your profile before, lets get that taken care of!' \
+                                    '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
+                                    '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
+                                    '\n\nWhen prompted, simply reply with what you would like to set the field as.')
+            embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+            db.update_one({'_id': ctx.author.id}, {'$set': {'profileSetup': True}})
+            try:
+                mainMsg = await ctx.author.send(embed=embed)
+                private = True
+
+            except discord.Forbidden: # DMs not allowed, try in channel
+                private = False
+                return await ctx.send(f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you')
+                mainMsg = await ctx.send(ctx.author.mention, embed=embed)
+
+            botMsg = await mainMsg.channel.send(header + phase1)
+            try:
+                # Phase 1
+                phaseStart = time.time()
+                phaseSuccess = False
+                while not phaseSuccess:
+                    if not await _phase1(botMsg):
+                        botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1)
+
+                    else:
+                        phaseSuccess = True
+
+                # Phase 2
+                await botMsg.channel.send(phase2)
+
+                phaseStart = time.time()
+                phaseSuccess = False
+                while not phaseSuccess:
+                    if not await _phase2(botMsg):
+                        botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase2)
+
+                    else:
+                        phaseSuccess = True
+
+                # Phase 3
+                await botMsg.channel.send(phase3)
+
+                phaseStart = time.time()
+                phaseSuccess = False
+                while not phaseSuccess:
+                    if not await _phase3(botMsg):
+                        botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase3)
+
+                    else:
+                        phaseSuccess = True
+
+
+                phaseStart = time.time()
+                phaseSuccess = False
+
+                # Phase 4
+                phaseStart = time.time()
+                phaseSuccess = False
+                await _phase4(botMsg)
+
+                # Phase 5
+                phaseStart = time.time()
+                phaseSuccess = False
+                await _phase5(botMsg)
+
+                del self.inprogressEdits[ctx.author.id]
+                await mainMsg.channel.send('You are all set! Your profile has been edited')
+
+            except asyncio.TimeoutError:
+                await mainMsg.delete()
+                del self.inprogressEdits[ctx.author.id]
+                return await botMsg.edit(content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again')
+
+        else:
+            embed = discord.Embed(title='Edit your user profile', description='Welcome back to profile setup.' \
+                                    '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
+                                    '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
+                                    '\n\nWhen prompted, simply reply with what you would like to set the field as.')
+            embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+            try:
+                mainMsg = await ctx.author.send(embed=embed)
+                private = True
+
+            except discord.Forbidden: # DMs not allowed, try in channel
+                private = False
+                return await ctx.send(f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you')
+                mainMsg = await ctx.send(ctx.author.mention, embed=embed)
+
+            botMsg = await mainMsg.channel.send(reedit + phase1)
+            try:
+                # Phase 1
+                phaseStart = time.time()
+                phaseSuccess = False
+                while not phaseSuccess:
+                    if not await _phase1(botMsg):
+                        botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1)
+
+                    else:
+                        phaseSuccess = True
+
+                # Phase 2
+                await botMsg.channel.send(phase2)
+
+                phaseStart = time.time()
+                phaseSuccess = False
+                while not phaseSuccess:
+                    if not await _phase2(botMsg):
+                        botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase2)
+
+                    else:
+                        phaseSuccess = True
+
+                # Phase 3
+                await botMsg.channel.send(phase3)
+
+                phaseStart = time.time()
+                phaseSuccess = False
+                while not phaseSuccess:
+                    if not await _phase3(botMsg):
+                        botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase3)
+
+                    else:
+                        phaseSuccess = True
+
+
+                phaseStart = time.time()
+                phaseSuccess = False
+
+                # Phase 4
+                phaseStart = time.time()
+                phaseSuccess = False
+                await _phase4(botMsg)
+
+                # Phase 5
+                phaseStart = time.time()
+                phaseSuccess = False
+                await _phase5(botMsg)
+
+                del self.inprogressEdits[ctx.author.id]
+                await mainMsg.channel.send('You are all set! Your profile has been edited')
+
+            except asyncio.TimeoutError:
+                await mainMsg.delete()
+                del self.inprogressEdits[ctx.author.id]
+                return await botMsg.edit(content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again')  
 
     @commands.Cog.listener()
     async def on_message(self, message):
