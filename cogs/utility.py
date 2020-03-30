@@ -641,6 +641,30 @@ class ChatControl(commands.Cog):
         if message.author.bot or message.type != discord.MessageType.default:
             return
 
+        #Filter invite links
+        msgInvites = re.findall(self.inviteRe, message.content)
+        if msgInvites and config.moderator not in [x.id for x in message.author.roles]:
+            guildWhitelist = mclient.bowser.guilds.find_one({'_id': message.guild.id})['inviteWhitelist']
+            fetchedInvites = []
+            inviteInfos = []
+            for x in msgInvites:
+                try:
+                    if x not in fetchedInvites:
+                        fetchedInvites.append(x)
+                        invite = await self.bot.fetch_invite(x)
+                        if invite.guild.id in guildWhitelist: continue
+                        if 'VERIFIED' in invite.guild.features: continue
+
+                        inviteInfos.append(invite)
+
+                except (discord.NotFound, discord.HTTPException):
+                    inviteInfos.append(x)
+
+            if inviteInfos:
+                await message.delete()
+                await message.channel.send(f':bangbang: {message.author.mention} please do not post invite links to other Discord servers. If you believe the linked server(s) should be whitelisted, contact a moderator', delete_after=10)
+                await self.adminChannel.send(f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}')
+
         #Filter test for afiliate links
         if re.search(self.affiliateLinks, message.content):
             hooks = await message.channel.webhooks()
