@@ -623,15 +623,12 @@ class ChatControl(commands.Cog):
             await member.add_roles(self.voiceTextAccess)
 
         elif not after.channel or after.afk: # User just left a channel or moved to AFK
-            if not await member.guild.fetch_member(member.id): # Check if user left the server since their `Member` may be cached
-                #print('Not member left')
-                mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
-
-            else:
-                #print('Member left')
+            try:
                 await member.remove_roles(self.voiceTextAccess)
-            
 
+            except:
+                mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
+            
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.type == discord.MessageType.premium_guild_subscription:
