@@ -12,3 +12,5 @@ selenium
 pillow
 numpy
 pytz
+cchardet
+aiodns

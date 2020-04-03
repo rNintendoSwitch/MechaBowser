@@ -211,14 +211,15 @@ class SocialFeatures(commands.Cog):
 
                 else:
                     try:
-                        await utils.game_data(gameDoc['_id'])
-                        if fs.exists(game): # Image should have been put in storage after scrape
-                            fs.get(game)
-                            gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-                            card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
+                        await utils.game_data(game)
+                        # Image should have been put in storage after scrape
+                        fs.get(game)
+                        gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+                        card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                     except:
-                        pass
+                        missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
+                        card.paste(missingImage, gameIconLocations[gameCount], missingImage)
 
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
@@ -245,7 +246,6 @@ class SocialFeatures(commands.Cog):
         card.save(bytesFile, format='PNG')
         await ctx.send(file=discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png'))
 
-    @commands.has_any_role(config.moderator, config.eh, 585536225725775893, 283753284483809280)
     @_profile.command(name='edit')
     async def _profile_edit(self, ctx):
         db = mclient.bowser.users
@@ -263,10 +263,10 @@ class SocialFeatures(commands.Cog):
         await ctx.message.add_reaction('📬')
 
         header = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.\n\n'
-        reedit = header[2:] + ' If you would like to instead reset a section of your profile that you have previously set, just respond `reset` to any prompt.\n\n'
+        reedit = header[:-2] + ' If you would like to instead reset a section of your profile that you have previously set, just respond `reset` to any prompt.\n\n'
         phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
         phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
-        phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>; this is case-insensative. For example, `America/New_York`'
+        phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
         phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
         phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
 
@@ -343,8 +343,9 @@ class SocialFeatures(commands.Cog):
         async def _phase4(message):
             gameCnt = 0
             failedFetch = False
+            userGames = []
             while gameCnt < 3:
-                if failedFetch: await message.channel.send(f'{config.redTick} Hmm, not sure what game that is. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase4.format(gameCnt))
+                if failedFetch: await message.channel.send(f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase4.format(gameCnt))
                 else: await message.channel.send(phase4.format(gameCnt))
                 failedFetch = False
 
@@ -383,10 +384,13 @@ class SocialFeatures(commands.Cog):
                         checkResp = await self.bot.wait_for('message', timeout=120, check=check)
                         if checkResp.content.lower().strip() in ['yes', 'y']:
                             gameObj = games[titleList[results[0][0]]]
-                            if gameObj['_id'] in dbUser['favgames']: break
-                                    
+                            if gameObj['_id'] in userGames:
+                                failedFetch = True
+                                break
+
                             db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': gameObj['_id']}})
                             gameCnt += 1
+                            userGames.append(gameObj['_id'])
                             break
 
                         elif checkResp.content.lower().strip() in ['no', 'n']:
@@ -427,7 +431,7 @@ class SocialFeatures(commands.Cog):
                         break
 
         if not dbUser['profileSetup']: # User has not set their profile up
-            embed = discord.Embed(title='Setup your user profile', description='It appears you have not setup your profile before, lets get that taken care of!' \
+            embed = discord.Embed(title='Setup your user profile', description='It appears you have not setup your profile before, let\'s get that taken care of!' \
                                     '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
                                     '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
                                     '\n\nWhen prompted, simply reply with what you would like to set the field as.')

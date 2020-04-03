@@ -26,6 +26,7 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
             self.bot.load_extension('cogs.statistics')
+            self.bot.load_extension('cogs.social')
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
 
