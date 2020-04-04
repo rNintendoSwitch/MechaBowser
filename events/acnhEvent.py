@@ -108,6 +108,7 @@ class AnimalGame(commands.Cog):
         db = mclient.bowser.animalEvent
         doc = db.find_one({'_type': 'server'})
         self.durabilities = {int(x): y  for x, y in doc['durabilities'].items()}
+        self.completedQuests = {int(x): y  for x, y in doc['completedQuests'].items()}
         self.todaysQuests = doc['quests']
         #self._roll_quests()
         for user in db.find({'_type': 'user'}):
@@ -131,13 +132,13 @@ class AnimalGame(commands.Cog):
                     }
                 }
 
-        print(self.durabilities)
         self._regen_tools.start() #pylint: disable=no-member
 
     def cog_unload(self):
         db = mclient.bowser.animalEvent
-        newDict = {str(x): y for x, y in self.durabilities.items()}
-        db.update_one({'_id': 'server'}, {'$set': {'quests': self.todaysQuests, 'durabilities': newDict}})
+        newDura = {str(x): y for x, y in self.durabilities.items()}
+        newCom = {str(x): y for x, y in self.completedQuests.items()}
+        db.update_one({'_id': 'server'}, {'$set': {'quests': self.todaysQuests, 'durabilities': newDura, 'completedQuests': newCom}})
         self._regen_tools.cancel() #pylint: disable=no-member
 
     def _roll_quests(self):
@@ -219,9 +220,10 @@ class AnimalGame(commands.Cog):
 
         # Forget durability usage and restore tools
         self.durabilities = {}
+        self.completedQuests = {}
 
         for user in db.find({'_type': 'user'}):
-            self.durabilities[user['_id']] = {'fishrod': {'value': 30, 'regenAt': None}, 'shovel': {'value': 15, 'regenAt': None}, 'bait': {'value': 15, 'regenAt': None}}
+            self.durabilities[user['_id']] = {'fishrod': {'value': 25, 'regenAt': None}, 'shovel': {'value': 20, 'regenAt': None}, 'bait': {'value': 1, 'regenAt': None}, 'gift': {'value': 1, 'regenAt': None}}
 
             # Advance saplings and regrow fruit
             newTrees = {}
@@ -446,7 +448,7 @@ class AnimalGame(commands.Cog):
         if trophyProgress == 5 and not user['hasRole']:
             db.update_one({'_id': ctx.author.id}, {'$set': {'hasRole': True}})
             mclient.bowser.users.update_one({'_id': ctx.author.id}, {'$push': {'trophies': 'acevent'}})
-            await ctx.send(f'🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have earned the event trophy on your `!profile`, great job!', delete_after=20)
+            await ctx.send(f'🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have earned the event trophy on your `!profile`, great job!')
 
         if not animal:
             description = 'Here\'s an overview of the requests that your island\'s residents have today!\n\n\n'
@@ -506,7 +508,7 @@ class AnimalGame(commands.Cog):
                 if user['homeFruit'] != questInfo['value']:
                     itemCost += 200
         
-                actionHint = 'You can find this item by visiting other users islands with `!visit` or by picking fruit from your trees in <#674357969852432384>'
+                actionHint = 'You can get this item if another player gifts it to you or if you `!harvest` it from your trees in <#674357969852432384>. See more info about gifting and harvesting in <#674357224176615455>'
 
             else:
                 actionHint = 'You can find this item with `!dig` over in <#674357969852432384>'
@@ -673,7 +675,7 @@ class AnimalGame(commands.Cog):
         db.update_one({'_id': ctx.author.id}, {'$inc': {'items.bait': -1}})
         self.activeBait[ctx.author.id] = time.time() + 7200
         self.durabilities[ctx.author.id]
-        return await ctx.send(f'{ctx.author.mention} You used 1 bait! You have a higher chance to catch fish for 1 hour')
+        return await ctx.send(f'{ctx.author.mention} You used 1 bait! You have a higher chance to catch fish for 2 hours')
 
     @commands.max_concurrency(1, per=commands.BucketType.user) #pylint: disable=no-member
     @commands.command(name='harvest')
@@ -896,7 +898,7 @@ class AnimalGame(commands.Cog):
                 await ctx.guild.get_member(invoked).add_roles(self.eventRole)
 
             else:
-                member = await ctx.guild.fetch_member()
+                member = await ctx.guild.fetch_member(invoked)
                 await member.add_roles(self.eventRole)
             
             mention = f'<@{invoked}>'
