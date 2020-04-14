@@ -250,8 +250,11 @@ class AnimalGame(commands.Cog):
             # Advance saplings and regrow fruit
             newTrees = {}
             availableFruit = {}
+            runTrees = False
             for treeType, saplings in user['saplings'].items():
                 newTrees[treeType] = saplings
+                if saplings:
+                    runTrees = True
 
             for treeType, trees in user['trees'].items():
                 availableFruit[treeType] = trees * 3
@@ -259,11 +262,13 @@ class AnimalGame(commands.Cog):
             unpickedFruit = {'unpickedFruit.' + x: availableFruit[x] for x in availableFruit.keys()}
             unpickedFruit['saplings'] = {}
             db.update_one({'_id': user['_id']}, {
-                '$inc': {
-                    'trees.' + x: newTrees[x] for x in newTrees.keys()
-                },
                 '$set': unpickedFruit
             })
+            if runTrees:
+                db.update_one({'_id': user['_id']}, {
+                    '$inc': {
+                        'trees.' + x: newTrees[x] for x in newTrees.keys()
+                    }})
 
         # Reset quests
         self._roll_quests()
