@@ -1061,6 +1061,41 @@ class AnimalGame(commands.Cog):
         self.durabilities[invoked if invoked else ctx.author.id] = {'fishrod': {'value': 25, 'regenAt': None}, 'shovel': {'value': 20, 'regenAt': None}, 'bait': {'value': 1, 'regenAt': None}, 'gift': {'value': 1, 'regenAt': None}}
         return await ctx.send(f'{mention} Thanks for signing up for your Nook Inc. Island Getaway Package, to get you started you\'ve been given some **{homeFruit}** trees! We recommend that you check <#674357224176615455> for more information on how best to enjoy your time', delete_after=15)
 
+    @commands.is_owner()
+    @commands.command(name='spawn')
+    async def _spawn(self, ctx, catch):
+        await ctx.message.delete()
+        db = mclient.bowser.animalEvent
+        message = ctx.message
+
+        embed = discord.Embed(title='Catch the bug!', description=f'**{self.rarity[self.bugs[catch]["weight"]]} {self.bugs[catch]["name"]}** has appeared! React <:net:694945150681481286> quick before it gets away!')
+        embed.set_thumbnail(url=self.bugs[catch]['image'])
+        gameMessage = await message.channel.send(embed=embed)
+        await gameMessage.add_reaction('<:net:694945150681481286>')
+
+        await asyncio.sleep(20)
+        gameMessage = await message.channel.fetch_message(gameMessage.id)
+        userList = []
+        for reaction in gameMessage.reactions:
+            if str(reaction) == '<:net:694945150681481286>':
+                users = await reaction.users().flatten()
+                for user in users:
+                    if user.bot: continue
+                    if not db.find_one({'_id': user.id}):
+                        await self._signup.__call__(message.channel, user.id) #pylint: disable=not-callable
+
+                    db.update_one({'_id': user.id}, {'$inc': {'bugs.' + catch: 1}})
+                    userList.append(user)
+
+        if userList:
+            embed.description = ', '.join([x.mention for x in userList]) + f'{" all" if len(userList) > 1 else ""} caught one **{self.rarity[self.bugs[catch]["weight"]]} {self.bugs[catch]["name"]}**! {self.bugs[catch]["pun"]}'
+
+        else:
+            embed.description = f'No one caught the **{self.rarity[self.bugs[catch]["weight"]]} {self.bugs[catch]["name"]}** in time, it got away!'
+
+        await gameMessage.edit(embed=embed)
+
+    @_donate.error
     @_pay.error
     @_sell.error
     @_quests.error
