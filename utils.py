@@ -428,9 +428,11 @@ def humanize_duration(duration):
     for x in range(0, 5):
         if units[x] == 0:
             continue
+
         else:
-            if units[x] > 1:
+            if units[x] < -1 or units[x] > 1:
                 expires.append('{} {}s'.format(units[x], unit_strs[x]))
+
             else:
                 expires.append('{} {}'.format(units[x], unit_strs[x]))
     
