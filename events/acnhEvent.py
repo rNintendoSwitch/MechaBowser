@@ -324,6 +324,128 @@ class AnimalGame(commands.Cog):
         return await ctx.send(f'Success! You made a payment of **{amount}** bells towards your loan!')
 
     @commands.max_concurrency(1, per=commands.BucketType.user) #pylint: disable=no-member
+    @commands.command(name='donate')
+    async def _donate(self, ctx, *, item: typing.Optional[str] = ''):
+        db = mclient.bowser.animalEvent
+        user = db.find_one({'_id': ctx.author.id})
+        await ctx.message.delete()
+
+        if not user:
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package', delete_after=10)
+
+        if not user['finished']:
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} Thanks for stopping by! It looks like you have some outstanding debt, why not come back after you are all set?', delete_after=10)
+
+        if user['townhall'] == 0:
+            db.update_one({'_id': ctx.author.id}, {'$set': {'debt': 200000, 'townhall': 1}})
+            return await ctx.send(f'{ctx.author.mention} Thanks for stopping by! So Tom Nook sent you? Great! I could some use some capital to help build the island museum.\nSpecifically, I need **200,000** bells to construct the new building -- come back and see me with `!donate` after you\'ve got it!')
+
+        if user['townhall'] == 1 and user['bells'] < 200000:
+            return await ctx.send(f'{ctx.author.mention} Thanks for stopping by! Thanks again for helping out with building the museum, come back and see me with `!donate` when you have the **200,000** bells on hand!')
+
+        if user['townhall'] == 1 and user['bells'] >= 200000:
+            bellsOwed = 0
+            for fish, value in user['fish'].items():
+                if value <= 0: continue
+                bellsOwed += self.fish[fish]['value'] * value
+
+            for bug, value in user['bugs'].items():
+                if value <= 0: continue
+                bellsOwed += self.bugs[bug]['value'] * value
+
+            for fruit, value in user['fruit'].items():
+                if value <= 0: continue
+                if fruit == user['homeFruit']:
+                    bellsOwed += 400 * value
+
+                else:
+                    bellsOwed += 600 * value
+
+            for misc, value in user['items'].items():
+                if value <= 0: continue
+                bellsOwed += self.items[misc]['value'] * value       
+
+            db.update_one({'_id': ctx.author.id}, {
+                '$set': {'fish': {}, 'bugs': {}, 'fruit': {}, 'items': {}, 'debt': 0, 'bells': (user['bells'] + bellsOwed) - 200000},
+                '$inc': {'lifetimeBells': bellsOwed, 'townhall': 1}
+            })
+            return await ctx.send(f'{ctx.author.mention} Thanks for stopping by! Awesome, you have the bells and items we need for the project! Oh, the items? I\'ve gone ahead and emptied your backback out since we could use anything on hand! Timmy and Tommy will compensate you **{bellsOwed}** bells for the trouble. Go out and catch **two of every fish and bug** for the museum! When you\'ve got something stop by and `!donate` it.')
+
+        saniItem = item.lower().strip().replace(' ', '-')
+        print(saniItem)
+        if user['townhall'] == 2 and saniItem:
+            if user['museum'].count(saniItem) >= 2:
+                return await ctx.send(f'{ctx.author.mention} Why thanks for bringing by **{item.lower()}**, but we do not need any for our collection! If you need to know what we still need checkout `!donate`')
+
+            if saniItem not in list(self.fish.keys()) + list(self.bugs.keys()):
+                return await ctx.send(f'{ctx.author.mention} Why thanks for bringing by **{item.lower()}**, but we do not need any for our collection! If you need to know what we still need checkout `!donate`')
+
+            if saniItem in user['fish'].keys() and user['fish'][saniItem] >= 1:
+                db.update_one({'_id': ctx.author.id}, {
+                    '$inc': {'fish.' + saniItem: -1},
+                    '$push': {'museum': saniItem}
+                })
+                return await ctx.send(f'{ctx.author.mention} Why thanks for bringing by a **{item.lower()}**! I can take that wonderful sea faring creature off your hands for our collection at once!')
+
+            elif saniItem in user['bugs'].keys() and user['bugs'][saniItem] >= 1:
+                db.update_one({'_id': ctx.author.id}, {
+                    '$inc': {'bugs.' + saniItem: -1},
+                    '$push': {'museum': saniItem}
+                })
+                return await ctx.send(f'{ctx.author.mention} Why thanks for bringing by a **{item.lower()}**! I can take that wretched creature off your hands for our collection at once!') 
+
+            else:
+                return await ctx.send(f'{ctx.author.mention} Oh deary, it looks like you have no **{item.lower()}** that I can take! Why not drop by after a bit once you\'ve got one?')
+
+    
+        if user['townhall'] == 2 and not saniItem:
+            embed = discord.Embed(title='Island Museum', color=0x194499)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_thumbnail(url='https://cdn.mattbsg.xyz/rns/Blathers-01.png')
+            description = 'Heyo, hoot hoot! Thanks for swinging by, here is our collection and a list of creatures we still need! You can donate an item by using `!donate item` replacing "item" with the name of the creature!\n\n__Fish__\n'
+            missingItem = 0
+            for fish in self.fish.keys():
+                if fish not in user['museum']:
+                    description += '･ ' + self.fish[fish]['name'] + ' [0/2]\n'
+                    missingItem += 1
+                    continue
+
+                if user['museum'].count(fish) >= 2:
+                    description += '･ ' + self.fish[fish]['name'] + f' **[COMPLETE]**\n'
+
+                else:
+                    missingItem += 1
+                    description += '･ ' + self.fish[fish]['name'] + f' [{user["museum"].count(fish)}/2]\n'
+
+            description += '\n\n__Bugs__\n'
+
+            for bug in self.bugs.keys():
+                if bug not in user['museum']:
+                    description += '･ ' + self.bugs[bug]['name'] + ' [0/2]\n'
+                    missingItem += 1
+                    continue
+
+                elif user['museum'].count(bug) >= 2:
+                    description += '･ ' + self.bugs[bug]['name'] + f' **[COMPLETE]**\n'
+
+                else:
+                    missingItem += 1
+                    description += '･ ' + self.bugs[bug]['name'] + f' [{user["museum"].count(bug)}/2]\n'
+
+            if missingItem == 0:
+                description = 'Heyo, hoot hoot! Thanks for swinging by, here is our collection! We are very thankful that **you\'ve donated two of every creature on the island**.\n:tada: I couldn\'t have done it without your help!\n\n__Fish__\n'
+                for data in self.fish.values():
+                    description += '･ ' + data['name'] + '\n'
+
+                description += '\n\n__Bugs__\n'
+
+                for data in self.bugs.values():
+                    description += '･ ' + data['name'] + '\n'
+
+            embed.description = description
+            await ctx.send(ctx.author.mention, embed=embed)
+
+    @commands.max_concurrency(1, per=commands.BucketType.user) #pylint: disable=no-member
     @commands.command(name='sell')
     async def _sell(self, ctx, quantity: typing.Optional[int] = 1, *, item):
         db = mclient.bowser.animalEvent
@@ -916,7 +1038,9 @@ class AnimalGame(commands.Cog):
             'homeFruit': homeFruit,
             'hasRole': False,
             'hasBackground': False,
-            '_type': 'user'
+            '_type': 'user',
+            'finished': False,
+            'lifetimeBells': 0
             })
 
         if not invoked:
