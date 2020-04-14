@@ -208,6 +208,7 @@ class AnimalGame(commands.Cog):
 
         await self.leaderboard.send(embed=embed)
 
+
     @tasks.loop(seconds=30)
     async def _regen_tools(self):
         logging.debug('[ACEvent] Running regen tools')
@@ -475,7 +476,7 @@ class AnimalGame(commands.Cog):
 
             db.update_one({'_id': ctx.author.id}, {
                 '$set': {'fish': {}},
-                '$inc': {'bells': bellsOwed}
+                '$inc': {'bells': bellsOwed, 'lifetimeBells': bellsOwed}
             })
             return await ctx.send(f'{ctx.author.mention} Success! You sold all your fish items for a total of **{bellsOwed}** bells!', delete_after=10)
 
@@ -490,7 +491,7 @@ class AnimalGame(commands.Cog):
 
             db.update_one({'_id': ctx.author.id}, {
                 '$set': {'bugs': {}},
-                '$inc': {'bells': bellsOwed}
+                '$inc': {'bells': bellsOwed, 'lifetimeBells': bellsOwed}
             })
             return await ctx.send(f'{ctx.author.mention} Success! You sold all your bug items for a total of **{bellsOwed}** bells!', delete_after=10)
 
@@ -499,17 +500,17 @@ class AnimalGame(commands.Cog):
                 if value <= 0: continue
                 itemCnt += 1
                 if fruit == user['homeFruit']:
-                    bellsOwed += 200 * value
+                    bellsOwed += 400 * value
 
                 else:
-                    bellsOwed += 400 * value
+                    bellsOwed += 600 * value
 
             if not itemCnt:
                 return await ctx.send(f'{config.redTick} {ctx.author.mention} You don\'t have any fruit to sell!', delete_after=10)
 
             db.update_one({'_id': ctx.author.id}, {
                 '$set': {'fruit': {}},
-                '$inc': {'bells': bellsOwed}
+                '$inc': {'bells': bellsOwed, 'lifetimeBells': bellsOwed}
             })
             return await ctx.send(f'{ctx.author.mention} Success! You sold all your fruit items for a total of **{bellsOwed}** bells!', delete_after=10)
 
@@ -524,7 +525,7 @@ class AnimalGame(commands.Cog):
 
             db.update_one({'_id': ctx.author.id}, {
                 '$set': {'items': {}},
-                '$inc': {'bells': bellsOwed}
+                '$inc': {'bells': bellsOwed, 'lifetimeBells': bellsOwed}
             })
             return await ctx.send(f'{ctx.author.mention} Success! You sold all your misc items for a total of **{bellsOwed}** bells!', delete_after=10)
 
@@ -535,7 +536,7 @@ class AnimalGame(commands.Cog):
                     sellAmt = value if quantity > value else quantity
                     bellsOwed = sellAmt * self.fish[saniItem]['value']
                     db.update_one({'_id': ctx.author.id}, {
-                        '$inc': {'fish.' + saniItem: -1 * sellAmt, 'bells': bellsOwed}
+                        '$inc': {'fish.' + saniItem: -1 * sellAmt, 'bells': bellsOwed, 'lifetimeBells': bellsOwed}
                     })
 
                     return await ctx.send(f'{ctx.author.mention} Success! You sold **{sellAmt}x {item.lower()}** for a total of **{bellsOwed}** bells!', delete_after=10)
@@ -546,7 +547,7 @@ class AnimalGame(commands.Cog):
                     sellAmt = value if quantity > value else quantity
                     bellsOwed = sellAmt * self.bugs[saniItem]['value']
                     db.update_one({'_id': ctx.author.id}, {
-                        '$inc': {'bugs.' + saniItem: -1 * sellAmt, 'bells': bellsOwed}
+                        '$inc': {'bugs.' + saniItem: -1 * sellAmt, 'bells': bellsOwed, 'lifetimeBells': bellsOwed}
                     })
 
                     return await ctx.send(f'{ctx.author.mention} Success! You sold **{sellAmt}x {item.lower()}** for a total of **{bellsOwed}** bells!', delete_after=10)
@@ -557,7 +558,7 @@ class AnimalGame(commands.Cog):
                     sellAmt = value if quantity > value else quantity
                     bellsOwed = sellAmt * self.items[saniItem]['value']
                     db.update_one({'_id': ctx.author.id}, {
-                        '$inc': {'items.' + saniItem: -1 * sellAmt, 'bells': bellsOwed}
+                        '$inc': {'items.' + saniItem: -1 * sellAmt, 'bells': bellsOwed, 'lifetimeBells': bellsOwed}
                     })
 
                     return await ctx.send(f'{ctx.author.mention} Success! You sold **{sellAmt}x {item.lower()}** for a total of **{bellsOwed}** bells!', delete_after=10)
@@ -567,10 +568,10 @@ class AnimalGame(commands.Cog):
                 sellAmt = value if quantity > value else quantity
                 if name == saniItem:
                     if saniItem == user['homeFruit']:
-                        bellsOwed += 200 * sellAmt
+                        bellsOwed += 400 * sellAmt
 
                     else:
-                        bellsOwed += 400 * sellAmt
+                        bellsOwed += 600 * sellAmt
                     
                     db.update_one({'_id': ctx.author.id}, {
                         '$inc': {'fruit.' + saniItem: -1 * sellAmt, 'bells': bellsOwed}
@@ -622,7 +623,7 @@ class AnimalGame(commands.Cog):
             if animalList:
                 description += '\n'.join(animalList) + '\n\nTo talk to one of your fellow residents, simply run `!quest Name` command, replacing "Name" with who you would like to speak to or give items'
             embed = discord.Embed(title='Quests', description=description)
-            embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
             embed.set_thumbnail(url=self.items['bells']['image'])
 
             return await ctx.send(ctx.author.mention, embed=embed)
@@ -641,7 +642,7 @@ class AnimalGame(commands.Cog):
             cat = questInfo['catID']
             description = questInfo['text']
             embed = discord.Embed(title='Quests - ' + realName)
-            embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
             embed.set_thumbnail(url=self.animals[realName]['image'])
 
             itemCost = int(questInfo['itemCost'])
@@ -678,7 +679,7 @@ class AnimalGame(commands.Cog):
                 if ctx.author.id not in self.completedQuests.keys():
                     self.completedQuests[ctx.author.id] = [realName]
                     bellInc = questInfo['value'] * itemCost
-                    db.update_one({'_id': ctx.author.id}, {'$inc': {catVal: -1 * questInfo['value'], 'bells': bellInc}, '$push': {'quests': realName}})
+                    db.update_one({'_id': ctx.author.id}, {'$inc': {catVal: -1 * questInfo['value'], 'bells': bellInc, 'lifetimeBells': bellInc}, '$push': {'quests': realName}})
                     description = '__[COMPLETED]__\n' + description + f'\n\nOh! Thanks for bringing that stuff by! Here is **{bellInc}** bells for the help'
                     embed.description = description
                     return await ctx.send(ctx.author.mention, embed=embed)
@@ -691,7 +692,7 @@ class AnimalGame(commands.Cog):
                 else:
                     self.completedQuests[ctx.author.id].append(realName)
                     bellInc = questInfo['value'] * itemCost
-                    db.update_one({'_id': ctx.author.id}, {'$inc': {catVal: -1 * questInfo['value'], 'bells': bellInc}, '$push': {'quests': realName}})
+                    db.update_one({'_id': ctx.author.id}, {'$inc': {catVal: -1 * questInfo['value'], 'bells': bellInc, 'lifetimeBells': bellInc}, '$push': {'quests': realName}})
                     description = '__[COMPLETED]__\n' + description + f'\n\nOh! Thanks for bringing that stuff by! Here is **{bellInc}** bells for the help'
                     embed.description = description
                     return await ctx.send(ctx.author.mention, embed=embed)
@@ -722,7 +723,7 @@ class AnimalGame(commands.Cog):
 
         catch = random.choices(list(self.fish.keys()), weights=[self.fish[x]['weight'] for x in list(self.fish.keys())], k=1)[0]
         embed = discord.Embed(title='You put your fishing line in the water...', description='And you patiently wait for a bite...')
-        embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         message = await ctx.send(ctx.author.mention, embed=embed)
 
         await asyncio.sleep(16)
@@ -772,7 +773,7 @@ class AnimalGame(commands.Cog):
 
         catch = random.choice(['bait', 'stick', 'iron-nugget', 'clay', 'stone', 'shell', 'conch', 'cowrie', 'coral', 'sand-dollar'])
         embed = discord.Embed(title='You used your shovel to dig up some sand...', description='And you found...')
-        embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         message = await ctx.send(ctx.author.mention, embed=embed)
 
         await asyncio.sleep(11)
@@ -848,12 +849,15 @@ class AnimalGame(commands.Cog):
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You don\'t have any **{fruit}** to harvest!', delete_after=10)
 
         embed = discord.Embed(title='You harvest one of your trees...', description=f'You reach up to the **{fruit}** tree...')
-        embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         message = await ctx.send(ctx.author.mention, embed=embed)
-        db.update_one({'_id': ctx.author.id}, {'$inc': {'unpickedFruit.' + fruit: -1, 'fruit.' + fruit: 1}})
 
+        quantity = -1 if not user['finished'] else -3
+        if user['unpickedFruit'][fruit] - abs(quantity) <= 0: quantity = user['unpickedFruit'][fruit] * -1
+        db.update_one({'_id': ctx.author.id}, {'$inc': {'unpickedFruit.' + fruit: quantity, 'fruit.' + fruit: abs(quantity)}})
         await asyncio.sleep(4)
-        embed.description = f'You reach up to the **{fruit}** tree and pull down a **{fruit}**! There are __{user["unpickedFruit"][fruit] - 1}__ fruit of this type still ready to be harvested'
+
+        embed.description = f'You reach up to the **{fruit}** tree and pull down **{abs(quantity)}x {fruit}**! There are __{user["unpickedFruit"][fruit] - abs(quantity)}__ fruit of this type still ready to be harvested'
         await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user) #pylint: disable=no-member
@@ -879,7 +883,7 @@ class AnimalGame(commands.Cog):
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You have the maximum amount of {fruit} trees already. Try planting another type of fruit?', delete_after=10)
 
         embed = discord.Embed(title='You begin to plant a fruit...', description=f'You put a **{fruit}** in the ground...')
-        embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         message = await ctx.send(ctx.author.mention, embed=embed)
         db.update_one({'_id': ctx.author.id}, {'$inc': {'saplings.' + fruit: 1, 'fruit.' + fruit: -1}})
 
@@ -902,7 +906,7 @@ class AnimalGame(commands.Cog):
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You can not send a gift to yourself!')
 
         if self.durabilities[ctx.author.id]['gift']['value'] <= 0:
-            return await ctx.send(f'{config.redTick} {ctx.author.mention} You can make a gift once per day. Check back in tomorrow!')
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} You can make 3 gifts per day. Check back in tomorrow!')
 
         if not targetUser:
             return await ctx.send(f'{config.redTick} {ctx.author.mention} The user you are trying to gift to has not started their island yet! They must run the `!play` command')
@@ -911,7 +915,7 @@ class AnimalGame(commands.Cog):
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You haven\'t started your island yet! Use the `!play` command to start your vacation getaway package')
 
         if self.durabilities[ctx.author.id]['gift']['value'] == 0:
-            return await ctx.send(f'{config.redTick} {ctx.author.mention} You can make a give once per day. Check back in tomorrow!')
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} You can make 3 gifts per day. Check back in tomorrow!')
 
         items = {}
         saniItem = item.lower().strip().replace(' ', '-')
@@ -943,7 +947,7 @@ class AnimalGame(commands.Cog):
         self.durabilities[ctx.author.id]['gift']['regenAt'] = time.time() + 86400
         self.durabilities[ctx.author.id]['gift']['value'] -= 1
 
-        await ctx.send(f'Success! You have given 1 **{item.lower()}** to {target.mention}. You can only send one gift per day, if you would like to send more try again tomorrow')
+        await ctx.send(f'Success! You have given 1 **{item.lower()}** to {target.mention}. You can only send 3 gifts per day, if you would like to send more try again tomorrow')
 
     @commands.command(name='island')
     async def _island(self, ctx):
@@ -963,7 +967,7 @@ class AnimalGame(commands.Cog):
             f'<:bells:695408455799930991> {user["bells"]} Bells in pocket | {user["debt"]} Bells in debt'
 
         embed.description = description
-        embed.set_author(name=ctx.author, url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         embed.set_thumbnail(url=self.fruits[user['homeFruit']])
         treeDesc = ''
         treeCnt = 0
@@ -1058,7 +1062,7 @@ class AnimalGame(commands.Cog):
             
             mention = f'<@{invoked}>'
 
-        self.durabilities[invoked if invoked else ctx.author.id] = {'fishrod': {'value': 25, 'regenAt': None}, 'shovel': {'value': 20, 'regenAt': None}, 'bait': {'value': 1, 'regenAt': None}, 'gift': {'value': 1, 'regenAt': None}}
+        self.durabilities[invoked if invoked else ctx.author.id] = {'fishrod': {'value': 25, 'regenAt': None}, 'shovel': {'value': 20, 'regenAt': None}, 'bait': {'value': 1, 'regenAt': None}, 'gift': {'value': 3, 'regenAt': None}}
         return await ctx.send(f'{mention} Thanks for signing up for your Nook Inc. Island Getaway Package, to get you started you\'ve been given some **{homeFruit}** trees! We recommend that you check <#674357224176615455> for more information on how best to enjoy your time', delete_after=15)
 
     @commands.is_owner()
@@ -1116,6 +1120,9 @@ class AnimalGame(commands.Cog):
         elif isinstance(error, commands.UserInputError):
             await ctx.send(f'{config.redTick} {ctx.author.mention} That is the incorrect usage of the command. Check <#674357224176615455> command usage', delete_after=10)
             return await ctx.message.delete()
+
+        else:
+            raise error
 
     @commands.Cog.listener()
     async def on_message(self, message):
