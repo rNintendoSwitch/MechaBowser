@@ -200,7 +200,8 @@ class NintenDeals(commands.Cog):
             embed.add_field(name='Game Details', value=strDetails)
             embed.add_field(name='🌐 Release Schedule', value=regions, inline=False)
             embed.url = gameDetails['image']
-            await self.releaseChannel.send(embed=embed)
+            gameAnnouncement = await self.releaseChannel.send(embed=embed)
+            await gameAnnouncement.publish()
 
             db.update_one({'_id': game['_id']}, {'$set': {'released': True}})
 
