@@ -170,7 +170,7 @@ class AnimalGame(commands.Cog):
             elif requestedItem in self.fruits.keys():
                 itemName = requestedItem
                 itemImage = self.fruits[requestedItem]
-                itemCost = 400
+                itemCost = 600
                 catID = 'fruit'
 
             else:
