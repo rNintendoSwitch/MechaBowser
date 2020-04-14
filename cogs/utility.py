@@ -89,7 +89,7 @@ class NintenDeals(commands.Cog):
 
         games = ndealsDB.find({'system': 'Switch'})
         for game in games:
-            #await asyncio.sleep(0.01)
+            await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
             scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
             gameEntry = {
                     '_id': game['_id'],
@@ -134,8 +134,7 @@ class NintenDeals(commands.Cog):
         for localGame in gameDB.find({}):
             await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
             if not ndealsDB.find_one({'_id': localGame['_id']}):
-                print(localGame['_id'])
-                #gameDM.delete_one({'_id': localGame['_id']})
+                gameDB.delete_one({'_id': localGame['_id']})
 
         self.gamesReady = True
         logging.info('[Deals] Finished game fetch')
@@ -147,7 +146,7 @@ class NintenDeals(commands.Cog):
 
         logging.info('[Deals] Starting new releases check')
         for game in db.find({'released': False}):
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
             nowReleased = False
             regionalDates = {}
             for key, value in game['release_dates'].items():
@@ -177,7 +176,6 @@ class NintenDeals(commands.Cog):
 
             except (KeyError, RuntimeError):
                 continue
-            print(game['_id'])
             strDetails = ':book: **Genre:** {}\n'.format(gameDetails['category']) if gameDetails['category'] else ':book: **Genre:** *Genre not known*\n'
             strDetails += ':postal_horn: **Publisher:** {}\n'.format(gameDetails['publisher']) if gameDetails['publisher'] else ':postal_horn: **Publisher:** *Publisher not known*\n'
             strDetails += ':thought_balloon: **Developer:** {}\n'.format(gameDetails['developer']) if gameDetails['developer'] else ':thought_balloon: **Developer:** *Developer not known*\n'
@@ -266,6 +264,7 @@ class NintenDeals(commands.Cog):
 
             sortedScores = sorted(gameScore.items(), key=lambda kv: kv[1], reverse=True)
             for y in sortedScores:
+                await asyncio.sleep(0.01)
                 if maxAmt <= 0: break
                 x = gameInfo[y[0]]
 
@@ -319,7 +318,7 @@ class NintenDeals(commands.Cog):
             self.dealMessages.append(await self.dealChannel.send(chunk))
             logging.info('[Deals] Finished deals check')
 
-    @commands.group(name='games', invoke_without_command=True)
+    @commands.group(name='games', aliases=['game'], invoke_without_command=True)
     async def _games(self, ctx):
         return
 
