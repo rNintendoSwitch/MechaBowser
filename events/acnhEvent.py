@@ -305,6 +305,9 @@ class AnimalGame(commands.Cog):
         if not user:
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package', delete_after=10)
 
+        if user['finished']:
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} You don\'t owe Nook Inc. any bells! Did you mean to visit Blathers with `!donate`?', delete_after=10)
+
         if amount <= 0:
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You must provide a number greater than or equal to 1', delete_after=10)
 
@@ -313,8 +316,9 @@ class AnimalGame(commands.Cog):
 
         if amount >= user['debt']:
             amount = user['debt']
-            db.update_one({'_id': ctx.author.id}, {'$inc': {'bells': -1 * amount}, '$set': {'debt': 0}})
-            return await ctx.send(f'🎉 Success! You made a payment of **{amount}** bells towards your loan and paid it off in full! Woop! 🎉')
+            db.update_one({'_id': ctx.author.id}, {'$inc': {'bells': -1 * amount}, '$set': {'debt': 0, 'finished': True}})
+            mclient.bowser.users.update_one({'_id': ctx.author.id}, {'$push': {'backgrounds': 'animalcrossing'}})
+            return await ctx.send(f'🎉 Success! You made a payment of **{amount}** bells towards your loan and paid it off in full! Woop! You got the **Animal Crossing: New Horizons profile background** -- to equip it use `!profile edit` 🎉\nAdditionally, you now have access to the `!donate` command, why not try it out?')
 
         db.update_one({'_id': ctx.author.id}, {'$inc': {'bells': -1 * amount, 'debt': -1 * amount}})
         return await ctx.send(f'Success! You made a payment of **{amount}** bells towards your loan!')
