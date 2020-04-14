@@ -36,7 +36,16 @@ class StatCommands(commands.Cog):
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_server(self, ctx, start_date=None, end_date=None):
-        msg = await ctx.send('One moment, crunching the numbers...')
+        msg = await ctx.send('One moment, crunching message and channel data...')
+
+        try:
+            searchDate = datetime.datetime.utcnow() if not start_date else datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            searchDate = searchDate.replace(hour=0, minute=0, second=0)
+            endDate = searchDate + datetime.timedelta(days=30) if not end_date else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            endDate = endDate.replace(hour=23, minute=59, second=59)
+
+        except ValueError:
+            return await msg.edit(content=f'{config.redTick} Invalid date provided. Please make sure it is in the format of `yyyy-mm-dd`')
 
         if not start_date:
             messages = mclient.bowser.messages.find({
@@ -44,18 +53,8 @@ class StatCommands(commands.Cog):
                 })
 
         else:
-            try:
-                searchDate = datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
-                endDate = searchDate + datetime.timedelta(days=30) if not end_date else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
-                endDate = endDate.replace(hour=23, minute=59, second=59)
-
-            except ValueError:
-                return await msg.edit(content=f'{config.redTick} Invalid date provided. Please make sure it is in the format of `yyyy-mm-dd`')
-
             if endDate <= searchDate:
                 return await msg.edit(content=f'{config.redTick} Invalid dates provided. The end date is before the starting date. `{ctx.prefix}stats server [starting date] [ending date]`')
-
-            endDate
 
             messages = mclient.bowser.messages.find({
                         'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
@@ -94,14 +93,34 @@ class StatCommands(commands.Cog):
         for x in topChannels:
             topChannelsList.append(f'{self.bot.get_channel(x[0]).mention} ({x[1]})')
 
+        await msg.edit(content='One moment, crunching member data...')
+        netJoins = 0
+        netLeaves = 0
+        for member in mclient.bowser.users.find({'joins': {'$ne': []}}):
+            for join in member['joins']:
+                if not start_date and (searchDate.timestamp() - (60 * 60 * 24 * 30)) <= join <= endDate.timestamp():
+                    netJoins += 1
+
+                elif start_date and searchDate.timestamp() <= join <= endDate.timestamp():
+                    netJoins += 1
+
+            for leave in member['leaves']:
+                if not start_date and (searchDate.timestamp() - (60 * 60 * 24 * 30)) <= leave <= endDate.timestamp():
+                    netLeaves += 1
+
+                elif start_date and searchDate.timestamp() <= leave <= endDate.timestamp():
+                    netLeaves += 1
+
         activeChannels = ', '.join(topChannelsList)
         premiumTier = 'No tier' if ctx.guild.premium_tier == 0 else f'Tier {ctx.guild.premium_tier}'
 
         dayStr = 'In the last 30 days' if not start_date else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
+        netMembers = netJoins - netLeaves
+        netMemberStr = f':chart_with_upwards_trend: **+{netMembers}** net new members\n' if netMembers >= 0 else f':chart_with_downwards_trend: **{netMembers}** net new members\n'
 
         embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__{dayStr}...__*\n\n' \
-            f':incoming_envelope:**{msgCount}** messages have been sent\n:information_desk_person:**{len(userCounts)}** members were active\n' \
-            f':hammer:**{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
+            f':incoming_envelope: **{msgCount}** messages have been sent\n:information_desk_person: **{len(userCounts)}** members were active\n' \
+            f'{netMemberStr}:hammer: **{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
         embed.set_thumbnail(url=ctx.guild.icon_url)
         embed.add_field(name='Guild features', value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n' \
             f'**Boost level:** {premiumTier}\n**Number of boosters:** {ctx.guild.premium_subscription_count}')
