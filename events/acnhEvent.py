@@ -22,6 +22,7 @@ class AnimalGame(commands.Cog):
         self.bot = bot
         self.eventRole = self.bot.get_guild(238080556708003851).get_role(690332112464642069)
         self.shopChannel = self.bot.get_channel(674357716252098599)
+        self.leaderboard = self.bot.get_channel(695407680566722600)
 
         self.animals = {
             'Apollo': {'image': 'https://cdn.mattbsg.xyz/rns/Apollo-01.png', 'dialog1': 'I feel like I just can’t stop doing the same things all the time. But I don’t care, PAH! So get me **{0}**.', 'dialog2': 'Oh my-don’t bother me! What? I’m supposed to tell you to get me something? Fine, whatever, get me **{0}**, pah!'},
@@ -133,6 +134,7 @@ class AnimalGame(commands.Cog):
                 }
 
         self._regen_tools.start() #pylint: disable=no-member
+        self._leaderboard_update.start() #pylint: disable=no-member
 
     def cog_unload(self):
         db = mclient.bowser.animalEvent
@@ -140,6 +142,7 @@ class AnimalGame(commands.Cog):
         newCom = {str(x): y for x, y in self.completedQuests.items()}
         db.update_one({'_id': 'server'}, {'$set': {'quests': self.todaysQuests, 'durabilities': newDura, 'completedQuests': newCom}})
         self._regen_tools.cancel() #pylint: disable=no-member
+        self._leaderboard_update.cancel() #pylint: disable=no-member
 
     def _roll_quests(self):
         """
@@ -185,6 +188,25 @@ class AnimalGame(commands.Cog):
                 'itemCost': itemCost,
                 'image': itemImage
             }
+
+    @tasks.loop(minutes=5)
+    async def _leaderboard_update(self):
+        db = mclient.bowser.animalEvent
+        users = db.find({'_type': 'user'}).sort([('bells', -1)])
+        desc = 'The current event standings for players with the most amount of bells are:\n\n'
+        for x in range(1, 26):
+            user = users[x - 1]
+            desc += '**#{}** - {:,} bells <@{}>\n'.format(x, user['bells'], user['_id'])
+
+        embed = discord.Embed(title="Event Leaderboard", color=0x83d632, url="https://discordapp.com/channels/238080556708003851/674357224176615455/695539952443850793", description=desc)
+
+        embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/276036563866091521/697431380103266354/unknown.png")
+        embed.set_author(name="/r/NintendoSwitch", icon_url="https://cdn.discordapp.com/attachments/276036563866091521/698093488910237757/snoo.png")
+        embed.set_footer(text="These standings are updated frequently")
+        async for message in self.leaderboard.history(limit=1):
+            return await message.edit(embed=embed)
+
+        await self.leaderboard.send(embed=embed)
 
     @tasks.loop(seconds=30)
     async def _regen_tools(self):
