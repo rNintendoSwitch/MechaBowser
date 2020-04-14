@@ -127,7 +127,7 @@ class AnimalGame(commands.Cog):
                         'regenAt': None
                     },
                     'gift': {
-                        'value': 1,
+                        'value': 3,
                         'regenAt': None
                     }
                 }
@@ -205,7 +205,7 @@ class AnimalGame(commands.Cog):
 
             if tools['gift']['regenAt'] and tools['gift']['regenAt'] < time.time():
                 localDurabilities[user]['gift']['regenAt'] = None
-                localDurabilities[user]['gift']['value'] = 1
+                localDurabilities[user]['gift']['value'] = 3
 
         localActiveBait = self.activeBait.copy()
         for user, expiry in localActiveBait.items():
@@ -223,7 +223,7 @@ class AnimalGame(commands.Cog):
         self.completedQuests = {}
 
         for user in db.find({'_type': 'user'}):
-            self.durabilities[user['_id']] = {'fishrod': {'value': 25, 'regenAt': None}, 'shovel': {'value': 20, 'regenAt': None}, 'bait': {'value': 1, 'regenAt': None}, 'gift': {'value': 1, 'regenAt': None}}
+            self.durabilities[user['_id']] = {'fishrod': {'value': 25, 'regenAt': None}, 'shovel': {'value': 20, 'regenAt': None}, 'bait': {'value': 1, 'regenAt': None}, 'gift': {'value': 3, 'regenAt': None}}
 
             # Advance saplings and regrow fruit
             newTrees = {}
