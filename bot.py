@@ -95,6 +95,7 @@ if __name__ == '__main__':
     print('\033[94mFils-A-Mech python by MattBSG#8888 2019\033[0m')
     parser = argparse.ArgumentParser()
     parser.add_argument('--web-only', action='store_true')
+    parser.add_argument('--bot-only', action='store_true')
     args = parser.parse_args()
 
     logging.info('Initializing web framework')
@@ -102,13 +103,19 @@ if __name__ == '__main__':
         (r'/api/archive/([0-9]+-[0-9]+)', MainHandler)
     ], xheader=True)
 
-    app.listen(8880)
+    if args.bot_only:
+        logging.info('[Bot] Running in bot only mode, web will not initalize')
+        bot.add_cog(BotCache(bot))
+        bot.load_extension('jishaku')
+        bot.run(config.token)
 
-    if not args.web_only:
-        logging.info('Initializing discord')
-        tornado.ioloop.IOLoop.current().run_sync(setup_discord)
+    elif args.web_only:
+        logging.info('[Web] Running in web only mode, discord will not initialize')
+        app.listen(8880)
+        tornado.ioloop.IOLoop.current().start()
 
     else:
-        logging.info('[Web] Running in web only mode, discord will not initialize')
-
-    tornado.ioloop.IOLoop.current().start()
+        logging.info('[Bot] Running in hybrid mode, initializing bot and web')
+        app.listen(8880)
+        tornado.ioloop.IOLoop.current().run_sync(setup_discord)
+        tornado.ioloop.IOLoop.current().start()
