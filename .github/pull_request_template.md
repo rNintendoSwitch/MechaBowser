@@ -6,7 +6,7 @@ Please indicate all that apply with a checkmark. To make a check, convert bracke
 * [ ] **Feature implementation**
 * [ ] **Bug fix**
 * [ ] **Code change/improvement**
-* [ ] **String change (i.e. grammer/spelling error or an addition)**
+* [ ] **String change (i.e. grammar/spelling error or an addition)**
 
 ***
 
