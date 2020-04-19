@@ -25,9 +25,12 @@ class MainEvents(commands.Cog):
         try:
             self.bot.load_extension('cogs.moderation')
             self.bot.load_extension('cogs.utility')
-            #self.bot.load_extension('cogs.statistics')
+            self.bot.load_extension('cogs.statistics')
+            self.bot.load_extension('cogs.social')
             #self.bot.load_extension('cogs.filter')
             self.bot.load_extension('utils')
+
+            self.sanitize_eud.start() #pylint: disable=no-member
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
@@ -37,6 +40,17 @@ class MainEvents(commands.Cog):
         self.debugChannel = self.bot.get_channel(config.debugChannel)
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.invites = {}
+
+    def cog_unload(self):
+        self.sanitize_eud.cancel() #pylint: disable=no-member
+
+    @tasks.loop(hours=1)
+    async def sanitize_eud(self):
+        logging.debug('[Core] Starting sanitzation of old EUD')
+        msgDB = mclient.bowser.messages
+        msgDB.update_many({'timestamp': {"$lte": time.time() - (86400 * 30)}, 'content': {"$ne": None}}, {"$set": {'content': None}})
+
+        logging.debug('[Core] Finished sanitzation of old EUD')
 
     @tasks.loop(seconds=15)
     async def fetch_invites(self):
@@ -78,6 +92,7 @@ class MainEvents(commands.Cog):
             await utils.store_user(member)
 
         else:
+            db.update_one({'_id': member.id}, {'$push': {'joins': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
             if doc['roles']:
                 for x in doc['roles']:
                     if x == member.guild.id:
@@ -97,7 +112,7 @@ class MainEvents(commands.Cog):
         embed = discord.Embed(color=0x417505, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
         created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
-        created_at += '' if not new else ' (account created less than 14 days ago)'
+        created_at += '' if not new else '\n' + utils.humanize_duration(member.created_at).replace('-', '') + ' ago'
         embed.add_field(name='Created at', value=created_at)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
 
@@ -120,6 +135,9 @@ class MainEvents(commands.Cog):
                 for x in puns:
                     if x['type'] == 'blacklist':
                         restoredPuns.append(punTypes[x['type']].format(x['context']))
+
+                    elif x['type'] in ['kick', 'ban']:
+                        continue # These are not punishments being "restored", instead only status is being tracked
 
                     else:
                         restoredPuns.append(punTypes[x['type']])
@@ -147,6 +165,8 @@ class MainEvents(commands.Cog):
                 }
             }
         )
+
+        mclient.bowser.users.update_one({'_id': member.id}, {'$push': {'leaves': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
         if puns.count():
             embed = discord.Embed(description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:', color=0xD62E44, timestamp=datetime.datetime.utcnow())
             punishments = []
@@ -172,6 +192,7 @@ class MainEvents(commands.Cog):
             return
 
         db = mclient.bowser.puns
+        await asyncio.sleep(10) # Wait 10 seconds to allow audit log to update
         if not db.find_one({'user': user.id, 'type': 'ban', 'active': True, 'timestamp': {'$gt': time.time() - 60}}):
             # Manual ban
             audited = False
@@ -182,10 +203,11 @@ class MainEvents(commands.Cog):
 
             if audited:
                 reason = '-No reason specified-' if not audited.reason else audited.reason
-                await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
+                docID = await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 
                 embed = discord.Embed(description='User was manually banned through Discord', color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
                 embed.set_author(name=f'Ban | {audited.target}')
+                embed.set_footer(text=docID)
                 embed.add_field(name='User', value=audited.target.mention, inline=True)
                 embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
                 embed.add_field(name='Reason', value=reason)
@@ -214,13 +236,14 @@ class MainEvents(commands.Cog):
 
             if audited:
                 reason = '-No reason specified-' if not audited.reason else audited.reason
-                await utils.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
+                docID = await utils.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
                 db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set':{
                     'active': False
                 }})
 
                 embed = discord.Embed(description='User was manually unbanned through Discord', color=discord.Color(0x4A90E2), timestamp=datetime.datetime.utcnow())
                 embed.set_author(name=f'Unban | {audited.target}')
+                embed.set_footer(text=docID)
                 embed.add_field(name='User', value=audited.target.mention, inline=True)
                 embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
                 embed.add_field(name='Reason', value=reason)
@@ -239,7 +262,7 @@ class MainEvents(commands.Cog):
             return
     
         if message.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
-            logging.error(f'Discarding bad message {message.channel.type}')
+            logging.debug(f'Discarding bad message {message.channel.type}')
             return
 
         db = mclient.bowser.messages
@@ -249,6 +272,7 @@ class MainEvents(commands.Cog):
             'author': message.author.id,
             'guild': message.guild.id,
             'channel': message.channel.id,
+            'content': message.content,
             'timestamp': timestamp
         })
 
@@ -288,6 +312,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
+        if message.channel.id in [637351107999301633, 638872378545274900]: return
         if message.type != discord.MessageType.default or message.author.bot:
             return # No system messages
 
@@ -307,7 +332,8 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
-        if before.content == after.content:
+        if before.channel.id in [637351107999301633, 638872378545274900]: return
+        if before.content == after.content or before.author.bot:
             return
 
         if before.type != discord.MessageType.default:
@@ -344,7 +370,11 @@ class MainEvents(commands.Cog):
             else:
                 before_name = discord.utils.escape_markdown(before.nick)
 
-            after_name = discord.utils.escape_markdown(after.nick)
+            if not after.nick:
+                after_name = after.name
+
+            else:
+                after_name = discord.utils.escape_markdown(after.nick)
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
             embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
@@ -362,7 +392,7 @@ class MainEvents(commands.Cog):
                 if x.id == before.guild.id:
                     continue
 
-                roleList.append(x.id)
+                if not x.managed: roleList.append(x.id)
                 roleStr.append(x.name)
 
             for n in before.roles:
@@ -383,6 +413,20 @@ class MainEvents(commands.Cog):
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
             await self.serverLogs.send(':closed_lock_with_key: User\'s roles updated', embed=embed)
+
+        if before.status != after.status:
+            statuses = {
+                discord.Status.online: 'online',
+                discord.Status.idle: 'away',
+                discord.Status.dnd: 'dnd',
+                discord.Status.offline: 'offline'
+            }
+            statsCol = mclient.bowser.stats
+            statsUser = statsCol.find({'author': before.id, 'type': 'status'}).sort('timestamp', pymongo.DESCENDING)
+            if statsUser.count() and statsUser[0]['status'] != statuses[after.status]:
+                statsCol.update_one({'_id': statsUser[0]['_id']}, {'$set': {'ended': int(time.time())}})
+
+            statsCol.insert_one({'type': 'status', 'status': statuses[after.status], 'ended': None, 'author': before.id, 'guild': before.guild.id, 'timestamp': int(time.time())})
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):

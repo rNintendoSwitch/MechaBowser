@@ -2,8 +2,10 @@ import asyncio
 import logging
 import time
 import typing
+import datetime
 
 import pymongo
+import pytz
 import discord
 from discord.ext import commands, tasks
 
@@ -25,16 +27,39 @@ class StatCommands(commands.Cog):
     async def _stats(self, ctx):
         return await ctx.send("Valid subcommands:```\n" \
         "stats server\n    -Returns server activity statistics\n\n" \
-        "stats users\n    -Returns most active users in the last 30 days\n\n" \
+        "stats users\n    -Returns most active users\n\n" \
         "stats roles\n    -Returns statistics on the ownership of roles\n\n" \
-        "stats emoji\n    -Returns stats on emoji usage\n```")
+        "stats emoji\n    -Returns stats on emoji usage\n\n" \
+        "stats channels\n    -Returns most active channels" \
+        "stats statuses\n    -Returns user statuses over the last 24 hours```")
 
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _stats_server(self, ctx):
-        messages = mclient.bowser.messages.find({
-                    'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
-            })
+    async def _stats_server(self, ctx, start_date=None, end_date=None):
+        msg = await ctx.send('One moment, crunching message and channel data...')
+
+        try:
+            searchDate = datetime.datetime.utcnow() if not start_date else datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            searchDate = searchDate.replace(hour=0, minute=0, second=0)
+            endDate = searchDate + datetime.timedelta(days=30) if not end_date else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            endDate = endDate.replace(hour=23, minute=59, second=59)
+
+        except ValueError:
+            return await msg.edit(content=f'{config.redTick} Invalid date provided. Please make sure it is in the format of `yyyy-mm-dd`')
+
+        if not start_date:
+            messages = mclient.bowser.messages.find({
+                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
+                })
+
+        else:
+            if endDate <= searchDate:
+                return await msg.edit(content=f'{config.redTick} Invalid dates provided. The end date is before the starting date. `{ctx.prefix}stats server [starting date] [ending date]`')
+
+            messages = mclient.bowser.messages.find({
+                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
+                })
+
         msgCount = messages.count()
         channelCounts = {}
         userCounts = {}
@@ -51,29 +76,61 @@ class StatCommands(commands.Cog):
             else:
                 userCounts[message['author']] += 1
 
-        puns = mclient.bowser.puns.find({
-                    'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
-            }).count()
+
+
+        if not start_date:
+            puns = mclient.bowser.puns.find({
+                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
+                }).count()
+
+        else:
+            puns = mclient.bowser.puns.find({
+                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
+                }).count()
+
         topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[0:5] # Get a list of tuple sorting by most active channel to least, and only include top 5
         topChannelsList = []
         for x in topChannels:
             topChannelsList.append(f'{self.bot.get_channel(x[0]).mention} ({x[1]})')
 
+        await msg.edit(content='One moment, crunching member data...')
+        netJoins = 0
+        netLeaves = 0
+        for member in mclient.bowser.users.find({'joins': {'$ne': []}}):
+            for join in member['joins']:
+                if not start_date and (searchDate.timestamp() - (60 * 60 * 24 * 30)) <= join <= endDate.timestamp():
+                    netJoins += 1
+
+                elif start_date and searchDate.timestamp() <= join <= endDate.timestamp():
+                    netJoins += 1
+
+            for leave in member['leaves']:
+                if not start_date and (searchDate.timestamp() - (60 * 60 * 24 * 30)) <= leave <= endDate.timestamp():
+                    netLeaves += 1
+
+                elif start_date and searchDate.timestamp() <= leave <= endDate.timestamp():
+                    netLeaves += 1
+
         activeChannels = ', '.join(topChannelsList)
         premiumTier = 'No tier' if ctx.guild.premium_tier == 0 else f'Tier {ctx.guild.premium_tier}'
 
-        embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__In the last 30 days...__*\n\n' \
-            f':incoming_envelope:**{msgCount}** messages have been sent\n:information_desk_person:**{len(userCounts)}** members were active\n' \
-            f':hammer:**{puns}** punishment actions were handed down\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
+        dayStr = 'In the last 30 days' if not start_date else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
+        netMembers = netJoins - netLeaves
+        netMemberStr = f':chart_with_upwards_trend: **+{netMembers}** net new members\n' if netMembers >= 0 else f':chart_with_downwards_trend: **{netMembers}** net new members\n'
+
+        embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__{dayStr}...__*\n\n' \
+            f':incoming_envelope: **{msgCount}** messages have been sent\n:information_desk_person: **{len(userCounts)}** members were active\n' \
+            f'{netMemberStr}:hammer: **{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
         embed.set_thumbnail(url=ctx.guild.icon_url)
         embed.add_field(name='Guild features', value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n' \
             f'**Boost level:** {premiumTier}\n**Number of boosters:** {ctx.guild.premium_subscription_count}')
 
-        return await ctx.send(embed=embed)
+        return await msg.edit(content=None, embed=embed)
 
     @_stats.command(name='users')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_users(self, ctx):
+        msg = await ctx.send('One moment, crunching the numbers...')
         messages = mclient.bowser.messages.find({
                     'timestamp': {'$gt': (int(time.time()) - (60 * 60 * 24 * 30))}
             })
@@ -94,11 +151,12 @@ class StatCommands(commands.Cog):
 
             embed.add_field(name=str(msgUser), value=str(x[1]))
 
-        return await ctx.send(embed=embed)
+        return await msg.edit(content=None, embed=embed)
 
     @_stats.command(name='roles', aliases=['role'])
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_roles(self, ctx, *, role: typing.Optional[typing.Union[discord.Role, int, str]]): # TODO: create and pull role add/remove data from events
+        msg = await ctx.send('One moment, crunching the numbers...')
         if role:
             if type(role) is int:
                 role = ctx.guild.get_role(role)
@@ -119,16 +177,16 @@ class StatCommands(commands.Cog):
             embed.add_field(name='Instructions', value='Use :arrow_right: and :arrow_left: to scroll between pages. :stop_button: To end')
             newPage, pages = await utils.embed_paginate(chunks, header=header)
             embed.description = newPage
-            message = await ctx.send(embed=embed)
+            await msg.edit(content=None, embed=embed)
             page = 1 # pylint: disable=unused-variable
             stop = time.time() + 1800
 
-            await message.add_reaction('⬅')
-            await message.add_reaction('➡')
-            await message.add_reaction('⏹')
+            await msg.add_reaction('⬅')
+            await msg.add_reaction('➡')
+            await msg.add_reaction('⏹')
 
             def check(reaction, user):
-                if user.id != ctx.author.id or reaction.message.id != message.id:
+                if user.id != ctx.author.id or reaction.message.id != msg.id:
                     return False
 
                 return True
@@ -162,12 +220,12 @@ class StatCommands(commands.Cog):
 
                     newPage, pages = await utils.embed_paginate(chunks, header=header, page=page)
                     embed.description = newPage
-                    await message.edit(embed=embed)
+                    await msg.edit(embed=embed)
 
                 except asyncio.TimeoutError:
                     pass
 
-            await message.clear_reactions()
+            await msg.clear_reactions()
 
         else:
             roleCounts = []
@@ -177,21 +235,22 @@ class StatCommands(commands.Cog):
             roleList = '\n'.join(roleCounts)
             embed = discord.Embed(title=f'{ctx.guild.name} Role Statistics', description=f'Server role list and respective member count\n\n{roleList}', color=0xD267BA)
 
-            return await ctx.send(embed=embed)
+        return await msg.edit(content=None, embed=embed)
 
     @_stats.command(name='channels')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_channels(self, ctx):
-        pass
+        return await ctx.send(f'{config.redTick} Channel statistics are not ready for use')
 
     @_stats.command(name='emoji')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_emoji(self, ctx):
-        pass
+        return await ctx.send(f'{config.redTick} Emoji statistics are not ready for use')
 
     @_stats.command(name='statuses')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_statuses(self, ctx):
+        return await ctx.send(f'{config.redTick} Status statistics are not ready for use')
 
 def setup(bot):
     bot.add_cog(StatCommands(bot))
