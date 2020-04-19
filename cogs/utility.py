@@ -1129,6 +1129,7 @@ class ChatControl(commands.Cog):
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
     async def _roles_set(self, ctx, member: discord.Member, channel: typing.Union[discord.TextChannel, discord.CategoryChannel], *, reason='-No reason specified-'):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Blacklist reason is too long, reduce it by at least {len(reason) - 990} characters')
         statusText = ''
         event = False
         if channel.id == config.suggestions:
