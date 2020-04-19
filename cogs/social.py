@@ -579,11 +579,12 @@ class SocialFeatures(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        code = re.search(self.friendcodeRe, message.clean_content)
-        if not code: return
+        content = re.sub(r'(<@!?\d+>)', '', message.content)
+        code = re.search(r'(?:sw)?-?(\d{4})[ -](\d{4})[ -](\d{4})', content)
 
-        if message.channel.id == 278544122661306369: # friend-code-bot
-            pass
+        if not code: return
+        if message.channel.id not in [670999043740270602, 656595937195589673]: # command-central, voice-chat
+            await message.channel.send(f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#670999043740270602>. You can even see the profiles of other users with `!profile @user`')
 
 def setup(bot):
     bot.add_cog(SocialFeatures(bot))
