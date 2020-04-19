@@ -50,6 +50,7 @@ class Moderation(commands.Cog):
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
     async def _banning(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters')
         if not users: return await ctx.send(f'{config.redTick} An invalid user was provided')
         banCount = 0
         failedBans = 0
@@ -93,7 +94,8 @@ class Moderation(commands.Cog):
                 failedBans += 1
                 continue
 
-            await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            docID = await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            embed.set_footer(text=docID)
             await self.modLogs.send(embed=embed)
             banCount += 1
 
@@ -111,6 +113,7 @@ class Moderation(commands.Cog):
     @commands.command(name='unban')
     @commands.has_any_role(config.moderator, config.eh)
     async def _unbanning(self, ctx, user: int, *, reason='-No reason specified-'):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Unban reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
         userObj = discord.Object(id=user)
         try:
@@ -122,11 +125,12 @@ class Moderation(commands.Cog):
         db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
-        await utils.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
+        docID = await utils.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
         await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Unban | {user}')
+        embed.set_footer(text=docID)
         embed.add_field(name='User', value=f'<@{user}>', inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
@@ -140,7 +144,8 @@ class Moderation(commands.Cog):
     @commands.command(name='kick')
     @commands.has_any_role(config.moderator, config.eh)
     async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
-        await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters')
+        docID = await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
         try:
             await member.send(utils.format_pundm('kick', reason, {ctx.author}))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
@@ -149,6 +154,7 @@ class Moderation(commands.Cog):
 
         embed = discord.Embed(color=0xD18407, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Kick | {member} ({member.id})')
+        embed.set_footer(text=docID)
         embed.add_field(name='User', value=member.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
@@ -162,6 +168,7 @@ class Moderation(commands.Cog):
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
     async def _muting(self, ctx, member: discord.Member, duration, *, reason='-No reason specified-'):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
         if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
             return await ctx.send(f'{config.redTick} {member} ({member.id}) is already muted')
@@ -178,7 +185,7 @@ class Moderation(commands.Cog):
         except ValueError:
             pass
 
-        await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
+        docID = await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.add_roles(muteRole, reason='Mute action performed by moderator')
         try:
             await member.send(utils.format_pundm('mute', reason, ctx.author, utils.humanize_duration(_duration)))
@@ -187,6 +194,7 @@ class Moderation(commands.Cog):
 
         embed = discord.Embed(color=0xB4A6EF, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Mute | {member} ({member.id})')
+        embed.set_footer(text=docID)
         embed.add_field(name='User', value=member.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Expires', value=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', inline=True)
@@ -201,6 +209,7 @@ class Moderation(commands.Cog):
     @commands.command(name='unmute')
     @commands.has_any_role(config.moderator, config.eh)
     async def _unmuting(self, ctx, member: discord.Member, *, reason='-No reason specified-'): # TODO: Allow IDs to be unmuted (in the case of not being in the guild)
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
         muteRole = ctx.guild.get_role(config.mute)
         action = db.find_one_and_update({'user': member.id, 'type': 'mute', 'active': True}, {'$set':{
@@ -209,7 +218,7 @@ class Moderation(commands.Cog):
         if not action:
             return await ctx.send(f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted')
 
-        await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
+        docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
         try:
             await member.send(utils.format_pundm('unmute', reason, ctx.author))
@@ -219,6 +228,7 @@ class Moderation(commands.Cog):
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Unmute | {member} ({member.id})')
+        embed.set_footer(text=docID)
         embed.add_field(name='User', value=member.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
@@ -232,6 +242,7 @@ class Moderation(commands.Cog):
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning(self, ctx, member: discord.Member, *, reason):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
         warnLevel = 0
         tierLevel = {
@@ -287,12 +298,13 @@ class Moderation(commands.Cog):
                 await member.remove_roles(role, reason='Warn action performed by moderator')
 
         await member.add_roles(tierLevel[warnLevel], reason='Warn action performed by moderator')
-        await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason, int(utils.resolve_duration('30d').timestamp()))
+        docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason, int(utils.resolve_duration('30d').timestamp()))
         try:
             await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {warnLevel + 1}'))
         except discord.Forbidden: # User has DMs off
             pass
 
+        embed.set_footer(text=docID)
         await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
@@ -302,6 +314,7 @@ class Moderation(commands.Cog):
     @_warning.command(name='clear')
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning_clear(self, ctx, member: discord.Member, *, reason):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn clear reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
         tierLevel = {
             1: ctx.guild.get_role(config.warnTier1),
@@ -334,7 +347,8 @@ class Moderation(commands.Cog):
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
 
-        await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
+        docID = await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
+        embed.set_footer(text=docID)
         await self.modLogs.send(embed=embed)
         try:
             await member.send(utils.format_pundm('warnclear', reason, ctx.author))
@@ -349,6 +363,7 @@ class Moderation(commands.Cog):
     @_warning.command(name='level')
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning_setlevel(self, ctx, member: discord.Member, tier: int, *, reason):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
         if tier not in [1, 2, 3]:
             return await ctx.send(f'{config.redTick} Invalid tier number provided')
     
@@ -409,7 +424,8 @@ class Moderation(commands.Cog):
         embed.add_field(name='Reason', value=reason)
 
         await member.add_roles(tierLevel[tier])
-        await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, int(utils.resolve_duration('30d').timestamp()), context='level_set')
+        docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, int(utils.resolve_duration('30d').timestamp()), context='level_set')
+        embed.set_footer(text=docID)
         await self.modLogs.send(embed=embed)
         try:
             await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {tier}'))
@@ -512,6 +528,7 @@ class Moderation(commands.Cog):
 
                     embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
                     embed.set_author(name=f'Warning reduced | {member} ({member.id})')
+                    embed.set_footer(text=warnPun['_id'])
                     embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
                     embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
@@ -525,7 +542,7 @@ class Moderation(commands.Cog):
                     await member.add_roles(tierLevel[newTier])
 
                     db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
-                    await utils.issue_pun(member.id, self.bot.user.id, newTier, 'Moderator vote', int(utils.resolve_duration('30d').timestamp()), context='vote')
+                    docID = await utils.issue_pun(member.id, self.bot.user.id, newTier, 'Moderator vote', int(utils.resolve_duration('30d').timestamp()), context='vote')
 
                     try:
                         await member.send(utils.format_pundm('warndown', 'A moderator has reviewed your warning', None, newTier, True))
@@ -535,6 +552,7 @@ class Moderation(commands.Cog):
 
                     embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
                     embed.set_author(name=f'Warning reduced | {member} ({member.id})')
+                    embed.set_footer(text=docID)
                     embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value=config.punStrs[newTier][:-8], inline=True) # Shave off "warning" str from const
                     embed.add_field(name='Reason', value='Moderator decision to reduce level')
@@ -547,6 +565,7 @@ class Moderation(commands.Cog):
 
                 embed = discord.Embed(color=0xD0021B, timestamp=datetime.datetime.utcnow())
                 embed.set_author(name=f'Warning made permanent | {member} ({member.id})')
+                embed.set_footer(text=warnPun['_id'])
                 embed.add_field(name='User', value=member.mention, inline=True)
                 embed.add_field(name='Reason', value='Moderator decision to make warning permanent')
                 await self.modLogs.send(embed=embed)
@@ -565,6 +584,7 @@ class Moderation(commands.Cog):
     @commands.has_any_role(config.moderator, config.eh)
     @commands.command(name='note')
     async def _note(self, ctx, user: discord.User, *, content):
+        if len(content) > 990: return await ctx.send(f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters')
         await utils.issue_pun(user.id, ctx.author.id, 'note', content, active=False)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
@@ -641,7 +661,7 @@ class LoopTasks(commands.Cog):
                 newPun = db.find_one_and_update({'_id': pun['_id']}, {'$set': {
                     'active': False
                 }})
-                await utils.issue_pun(member.id, self.bot.user.id, 'unmute', 'auto', active=False, context=pun['_id'])
+                docID = await utils.issue_pun(member.id, self.bot.user.id, 'unmute', 'auto', active=False, context=pun['_id'])
 
                 if not newPun: # There is near zero reason this would ever hit, but in case...
                     logging.error(f'[expiry_check] Database failed to update user on pun expiration of {pun["_id"]}')
@@ -656,6 +676,7 @@ class LoopTasks(commands.Cog):
 
                 embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
                 embed.set_author(name=f'Unmute | {member} ({member.id})')
+                embed.set_footer(text=docID)
                 embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
                 embed.add_field(name='Moderator', value='Automatic', inline=True)
                 embed.add_field(name='Reason', value='Mute expired', inline=True)

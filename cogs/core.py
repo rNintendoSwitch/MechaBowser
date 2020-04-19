@@ -192,6 +192,7 @@ class MainEvents(commands.Cog):
             return
 
         db = mclient.bowser.puns
+        await asyncio.sleep(10) # Wait 10 seconds to allow audit log to update
         if not db.find_one({'user': user.id, 'type': 'ban', 'active': True, 'timestamp': {'$gt': time.time() - 60}}):
             # Manual ban
             audited = False
@@ -202,10 +203,11 @@ class MainEvents(commands.Cog):
 
             if audited:
                 reason = '-No reason specified-' if not audited.reason else audited.reason
-                await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
+                docID = await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 
                 embed = discord.Embed(description='User was manually banned through Discord', color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
                 embed.set_author(name=f'Ban | {audited.target}')
+                embed.set_footer(text=docID)
                 embed.add_field(name='User', value=audited.target.mention, inline=True)
                 embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
                 embed.add_field(name='Reason', value=reason)
@@ -234,13 +236,14 @@ class MainEvents(commands.Cog):
 
             if audited:
                 reason = '-No reason specified-' if not audited.reason else audited.reason
-                await utils.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
+                docID = await utils.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
                 db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set':{
                     'active': False
                 }})
 
                 embed = discord.Embed(description='User was manually unbanned through Discord', color=discord.Color(0x4A90E2), timestamp=datetime.datetime.utcnow())
                 embed.set_author(name=f'Unban | {audited.target}')
+                embed.set_footer(text=docID)
                 embed.add_field(name='User', value=audited.target.mention, inline=True)
                 embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
                 embed.add_field(name='Reason', value=reason)

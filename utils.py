@@ -129,6 +129,7 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'context': context,
         'active': active
     })
+    return docID
 
 async def _request_noa(nsuid):
     infoDict = {}

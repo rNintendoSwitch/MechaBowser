@@ -60,8 +60,7 @@ class NintenDeals(commands.Cog):
             'CH': '\U0001f1e8\U0001f1ed',
             'AU': '\U0001f1e6\U0001f1fa',
             'NZ': '\U0001f1f3\U0001f1ff',
-            'JP': '\U0001f1ef\U0001f1f5',
-            'CZ': '\U0001F1E8\U0001F1FF'
+            'JP': '\U0001f1ef\U0001f1f5'
         }
         self.query_deals.start() #pylint: disable=no-member
         self.update_game_info.start() #pylint: disable=no-member
@@ -1168,16 +1167,17 @@ class ChatControl(commands.Cog):
 
         db = mclient.bowser.puns
         if statusText.lower() == 'blacklisted':
-            await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=channel.name if not event else 'events')
+            docID = await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=channel.name if not event else 'events')
 
         else:
             db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True, 'context': channel.name if not event else 'events'}, {'$set':{
             'active': False
             }})
-            await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=channel.name if not event else 'events')
+            docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=channel.name if not event else 'events')
 
         embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{statusText} | {str(member)}')
+        embed.set_footer(text=docID)
         embed.add_field(name='User', value=member.mention, inline=True)
         embed.add_field(name='Moderator', value=ctx.author.mention, inline=True)
         embed.add_field(name='Channel', value=channel.mention if not event else 'events')
