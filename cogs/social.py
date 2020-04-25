@@ -156,7 +156,9 @@ class SocialFeatures(commands.Cog):
         if member.id == ctx.guild.owner.id: # Server owner
             trophies.append('owner')
 
-        if member.id == await self.bot.application_info().owner.id: # App owner
+        app_info = await self.bot.application_info()
+
+        if member.id == app_info.owner.id: # App owner
             trophies.append('developer')
 
         if ctx.guild.get_role(config.chatmod) in member.roles: # Chat-mod role
