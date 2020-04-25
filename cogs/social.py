@@ -168,7 +168,7 @@ class SocialFeatures(commands.Cog):
         if ctx.guild.get_role(config.modemeritus) in member.roles: # Mod emeritus
             trophies.append('mod-emeritus')
 
-        if ctx.guild.get_role(self.booster) in member.roles: # Booster role
+        if ctx.guild.get_role(config.boostRole) in member.roles: # Booster role
             trophies.append('booster')
 
         if len(trophies) < 15: # Check for additional non-prefered trophies
