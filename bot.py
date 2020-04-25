@@ -19,7 +19,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 activityStatus = discord.Activity(type=discord.ActivityType.watching, name='over the server')
-bot = commands.Bot(['!', ','], max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
+bot = commands.Bot(['!', ',', '.'], max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -38,7 +38,7 @@ class BotCache(commands.Cog):
             #return
             logging.info('[Cache] Performing initial database synchronization')
             db = mclient.bowser.users
-            NS = bot.get_guild(238080556708003851)
+            NS = bot.get_guild(config.nintendoswitch)
 
             guildCount = len(NS.members)
             userCount = 0

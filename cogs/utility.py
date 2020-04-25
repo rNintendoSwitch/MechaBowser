@@ -40,8 +40,8 @@ class NintenDeals(commands.Cog):
         self.dealMessages = []
         self.gamesReady = False
         self.saleData = None
-        self.dealChannel = self.bot.get_channel(613785143059939338)
-        self.releaseChannel = self.bot.get_channel(613785177830981635)
+        self.dealChannel = self.bot.get_channel(config.dealChannel)
+        self.releaseChannel = self.bot.get_channel(config.releaseChannel)
         self.session = aiohttp.ClientSession()
         self.creds = {'api_key': config.dealsAPIKey}
         self.codepoints = {
@@ -277,7 +277,7 @@ class NintenDeals(commands.Cog):
                 if not title and 'EU' in x['titles'].keys():
                     title = x['titles']['EU'] if x['titles']['EU'] else None
 
-                gameText += f'**{title}**\n<:barchart:612724385505083392> ___Metascore:___ *{MS}* ___Userscore:___ *{US}*\n'
+                gameText += f'**{title}**\n{config.barChart} ___Metascore:___ *{MS}* ___Userscore:___ *{US}*\n'
 
                 entry = 0
                 for key, value in x['price'].items():
@@ -585,7 +585,7 @@ class ChatControl(commands.Cog):
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.boostChannel = self.bot.get_channel(config.boostChannel)
         self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
-        self.voiceTextAccess = self.bot.get_guild(238080556708003851).get_role(config.voiceTextAccess)
+        self.voiceTextAccess = self.bot.get_guild(config.nintendoswitch).get_role(config.voiceTextAccess)
         self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
@@ -673,20 +673,20 @@ class ChatControl(commands.Cog):
                 await webhook.send(content=re.sub(self.affiliateLinks, r'\1', message.content), username=name, avatar_url=message.author.avatar_url)
 
         #Filter for #mario
-        if message.channel.id == 325430144993067049: # #mario
+        if message.channel.id == config.marioluigiChannel: # #mario
             if re.search(self.SMM2LevelID, message.content):
                 if re.search(self.linkRe, message.content):
                     return # TODO: Check if SMM2LevelID found in linkRe to correct edge case
 
                 await message.delete()
-                response = await message.channel.send(f'<:redTick:402505117733224448> <@{message.author.id}> Please do not post Super Mario Maker 2 level codes '\
-                    'here. Post in <#595203237108252672> with the pinned template instead.')
+                response = await message.channel.send(f'{config.redTick} <@{message.author.id}> Please do not post Super Mario Maker 2 level codes ' \
+                    f'here. Post in <#{config.smm2Channel}> with the pinned template instead.')
 
                 await response.delete(delay=20)
             return
 
         #Filter for #smm2-levels
-        if message.channel.id == 595203237108252672:
+        if message.channel.id == config.smm2Channel:
             if not re.search(self.SMM2LevelID, message.content):
                 # We only want to filter posts with a level id
                 return
@@ -694,7 +694,7 @@ class ChatControl(commands.Cog):
             block = re.search(self.SMM2LevelPost, message.content)
             if not block:
                 # No match for a properly formatted level post
-                response = await message.channel.send(f'<:redTick:402505117733224448> <@{message.author.id}> Your level is formatted incorrectly, please see the pinned messages for the format. A copy '\
+                response = await message.channel.send(f'{config.redTick} <@{message.author.id}> Your level is formatted incorrectly, please see the pinned messages for the format. A copy '\
                     f'of your message is included and will be deleted shortly. You can resubmit your level at any time.\n\n```{message.content}```')
                 await message.delete()
                 return await response.delete(delay=25)
@@ -1057,7 +1057,7 @@ class ChatControl(commands.Cog):
             return await ctx.send(embed=embed)
 
     @_tag.command(name='edit')
-    @commands.has_any_role(config.moderator, 584016937663594529)
+    @commands.has_any_role(config.moderator, config.helpfulUser)
     async def _tag_create(self, ctx, name, *, content):
         db = mclient.bowser.tags
         name = name.lower()
@@ -1080,7 +1080,7 @@ class ChatControl(commands.Cog):
             return await ctx.send(f'{config.greenTick} The **{name}** tag has been created', delete_after=10)
 
     @_tag.command(name='delete')
-    @commands.has_any_role(config.moderator, 584016937663594529)
+    @commands.has_any_role(config.moderator, config.helpfulUser)
     async def _tag_delete(self, ctx, *, name):
         db = mclient.bowser.tags
         name = name.lower()
@@ -1112,7 +1112,7 @@ class ChatControl(commands.Cog):
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
     @_tag.command(name='source')
-    @commands.has_any_role(config.moderator, 584016937663594529)
+    @commands.has_any_role(config.moderator, config.helpfulUser)
     async def _tag_source(self, ctx, *, name):
         db = mclient.bowser.tags
         name = name.lower()
@@ -1152,7 +1152,7 @@ class ChatControl(commands.Cog):
                 await member.add_roles(spoilersRole)
                 statusText = 'Blacklisted'         
 
-        elif channel.category_id == 637350886020087838:
+        elif channel.category_id == config.eventCat:
             event = True
             eventsRole = ctx.guild.get_role(config.noEvents)
             if eventsRole in member.roles: # Toggle role off
@@ -1201,7 +1201,7 @@ class AntiRaid(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.adminChannel = self.bot.get_channel(config.adminChannel)
-        self.muteRole = self.bot.get_guild(314857672585248768).get_role(594377818700251136)
+        self.muteRole = self.bot.get_guild(config.nintendoswitch).get_role(config.mute)
         self.messages = {}
 
     @commands.Cog.listener()

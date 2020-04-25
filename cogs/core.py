@@ -188,7 +188,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, user): # TODO: make all guild ID mentions to config instead
-        if guild.id != 238080556708003851:
+        if guild.id != config.nintendoswitch:
             return
 
         db = mclient.bowser.puns
@@ -222,7 +222,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild, user):
-        if guild.id != 238080556708003851:
+        if guild.id != config.nintendoswitch:
             return
 
         db = mclient.bowser.puns
@@ -312,7 +312,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
-        if message.channel.id in [637351107999301633, 638872378545274900]: return
         if message.type != discord.MessageType.default or message.author.bot:
             return # No system messages
 
@@ -332,7 +331,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
-        if before.channel.id in [637351107999301633, 638872378545274900]: return
         if before.content == after.content or before.author.bot:
             return
 

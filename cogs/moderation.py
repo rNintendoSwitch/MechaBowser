@@ -609,7 +609,7 @@ class Moderation(commands.Cog):
 class LoopTasks(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.NS = self.bot.get_guild(238080556708003851)
+        self.NS = self.bot.get_guild(config.nintendoswitch)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.expiryWarnNotified = {}

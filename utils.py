@@ -503,7 +503,12 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
     punDM += f'Reason:```{reason}```'
     punDM += f'Responsible moderator: {mod}\n\n'
-    punDM += 'If you have questions concerning this matter, please feel free to contact the respective moderator that took this action or another member of the moderation team.\n'
+    if _type == 'ban':
+        punDM += 'If you have questions concerning this matter, please feel free to contact the moderator that took this action.\n'
+
+    else:
+        punDM += f'If you have questions concerning this matter you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>).\n'
+
     punDM += 'Please do not respond to this message, I cannot reply.'
 
     return punDM

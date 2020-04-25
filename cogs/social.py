@@ -153,22 +153,22 @@ class SocialFeatures(commands.Cog):
                 trophies.append(x)
 
         # Hardcoding IDs like a genius
-        if member.id == 115840403458097161: # FlapSnapple - Server owner
+        if member.id == ctx.guild.owner.id: # Server owner
             trophies.append('owner')
 
-        if member.id == 125233822760566784: # MattBSG -  Developer
+        if member.id == await self.bot.application_info().owner.id: # App owner
             trophies.append('developer')
 
-        if ctx.guild.get_role(263762796875874304) in member.roles: # Chat-mod role
+        if ctx.guild.get_role(config.chatmod) in member.roles: # Chat-mod role
             trophies.append('chat-mod')
 
-        if ctx.guild.get_role(238082857313107978) in member.roles: # Sub-mod role
+        if ctx.guild.get_role(config.submod) in member.roles: # Sub-mod role
             trophies.append('sub-mod')
 
-        if ctx.guild.get_role(625679906071642118) in member.roles: # Mod emeritus
+        if ctx.guild.get_role(config.modemeritus) in member.roles: # Mod emeritus
             trophies.append('mod-emeritus')
 
-        if ctx.guild.get_role(585536225725775893) in member.roles: # Booster role
+        if ctx.guild.get_role(self.booster) in member.roles: # Booster role
             trophies.append('booster')
 
         if len(trophies) < 15: # Check for additional non-prefered trophies
@@ -251,9 +251,9 @@ class SocialFeatures(commands.Cog):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': ctx.author.id})
         mainMsg = None
-        if ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != 670999043740270602: # commands
+        if ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != config.commandsChannel: # commands
             await ctx.message.delete()
-            return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use bot commands in <#670999043740270602>, not {ctx.channel.mention}', delete_after=15)
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use bot commands in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
         if ctx.author.id in self.inprogressEdits.keys() and (time.time() - self.inprogressEdits[ctx.author.id]) < 300:
             await ctx.message.delete()
@@ -583,8 +583,8 @@ class SocialFeatures(commands.Cog):
         code = re.search(r'(?:sw)?-?(\d{4})[ -](\d{4})[ -](\d{4})', content)
 
         if not code: return
-        if message.channel.id not in [670999043740270602, 656595937195589673]: # command-central, voice-chat
-            await message.channel.send(f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#670999043740270602>. You can even see the profiles of other users with `!profile @user`')
+        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
+            await message.channel.send(f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`')
 
 def setup(bot):
     bot.add_cog(SocialFeatures(bot))
