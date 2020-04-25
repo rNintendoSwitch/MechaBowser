@@ -33,7 +33,7 @@ mclient = pymongo.MongoClient(
 class SocialFeatures(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.friendcodeRe = re.compile(r'(?:sw)?-?(\d{4})[ -]?(\d{4})[ -]?(\d{4})', re.I)
+        self.friendcodeRe = re.compile(r'(?:sw)?[ -\u2014]?(\d{4})[ -\u2014]?(\d{4})[ -\u2014]?(\d{4})', re.I) # \u2014 = em dash
         self.inprogressEdits = {}
         self.letterCodepoints = ['1f1e6', '1f1e7', '1f1e8', '1f1e9', '1f1ea', '1f1eb', '1f1ec', '1f1ed', '1f1ee', '1f1ef', '1f1f0', '1f1f1', '1f1f2', '1f1f3', '1f1f4', '1f1f5', '1f1f6', '1f1f7', '1f1f8', '1f1f9', '1f1fa', '1f1fb', '1f1fc', '1f1fd', '1f1fe', '1f1ff']
 
@@ -582,7 +582,7 @@ class SocialFeatures(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         content = re.sub(r'(<@!?\d+>)', '', message.content)
-        code = re.search(r'(?:sw)?-?(\d{4})[ -](\d{4})[ -](\d{4})', content)
+        code = re.search(r'(?:sw)?[ -\u2014]?(\d{4})[ -\u2014](\d{4})[ -\u2014](\d{4})', content) # \u2014 = em dash
 
         if not code: return
         if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
