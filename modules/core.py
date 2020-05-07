@@ -23,11 +23,11 @@ class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         try:
-            self.bot.load_extension('cogs.moderation')
-            self.bot.load_extension('cogs.utility')
-            self.bot.load_extension('cogs.statistics')
-            self.bot.load_extension('cogs.social')
-            #self.bot.load_extension('cogs.filter')
+            self.bot.load_extension('modules.moderation')
+            self.bot.load_extension('modules.utility')
+            self.bot.load_extension('modules.statistics')
+            self.bot.load_extension('modules.social')
+            #self.bot.load_extension('modules.filter')
             self.bot.load_extension('utils')
 
             self.sanitize_eud.start() #pylint: disable=no-member
@@ -187,7 +187,7 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':outbox_tray: User left', embed=embed)
 
     @commands.Cog.listener()
-    async def on_member_ban(self, guild, user): # TODO: make all guild ID mentions to config instead
+    async def on_member_ban(self, guild, user):
         if guild.id != config.nintendoswitch:
             return
 

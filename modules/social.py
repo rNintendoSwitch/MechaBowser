@@ -33,9 +33,12 @@ mclient = pymongo.MongoClient(
 class SocialFeatures(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.friendcodeRe = re.compile(r'(?:sw)?-?(\d{4})[ -]?(\d{4})[ -]?(\d{4})', re.I)
         self.inprogressEdits = {}
         self.letterCodepoints = ['1f1e6', '1f1e7', '1f1e8', '1f1e9', '1f1ea', '1f1eb', '1f1ec', '1f1ed', '1f1ee', '1f1ef', '1f1f0', '1f1f1', '1f1f2', '1f1f3', '1f1f4', '1f1f5', '1f1f6', '1f1f7', '1f1f8', '1f1f9', '1f1fa', '1f1fb', '1f1fc', '1f1fd', '1f1fe', '1f1ff']
+
+        # Friendcode regex for profile editor (lenient) and chat filter (matches separators between digits), \u2014 = em-dash
+        self.friendcodeProfileRe = re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I)
+        self.friendcodeFilterRe = re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I)
 
     @commands.group(name='profile', invoke_without_command=True)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
@@ -212,16 +215,21 @@ class SocialFeatures(commands.Cog):
                     card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 else:
-                    try:
-                        await utils.game_data(game)
-                        # Image should have been put in storage after scrape
-                        fs.get(game)
-                        gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-                        card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
+                    missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
+                    card.paste(missingImage, gameIconLocations[gameCount], missingImage)
 
-                    except:
-                        missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-                        card.paste(missingImage, gameIconLocations[gameCount], missingImage)
+                    # NintenDeals decommissioned on 4/25/2020 - Features unavailable
+
+                    #try:
+                    #    await utils.game_data(game)
+                    #    # Image should have been put in storage after scrape
+                    #    fs.get(game)
+                    #    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+                    #    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
+
+                    #except:
+                    #    missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
+                    #    card.paste(missingImage, gameIconLocations[gameCount], missingImage)
 
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
@@ -287,7 +295,7 @@ class SocialFeatures(commands.Cog):
                 await message.channel.send('I\'ve gone ahead and reset your setting for **friend code**')
                 return True
 
-            code = re.search(self.friendcodeRe, content)
+            code = re.search(self.friendcodeProfileRe, content)
             if code: # re match
                 friendcode = f'SW-{code.group(1)}-{code.group(2)}-{code.group(3)}'
                 db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': friendcode}})
@@ -582,7 +590,7 @@ class SocialFeatures(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         content = re.sub(r'(<@!?\d+>)', '', message.content)
-        code = re.search(r'(?:sw)?-?(\d{4})[ -](\d{4})[ -](\d{4})', content)
+        code = re.search(self.friendcodeFilterRe, content) 
 
         if not code: return
         if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:

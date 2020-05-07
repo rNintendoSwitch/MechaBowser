@@ -33,7 +33,7 @@ class BotCache(commands.Cog):
     async def on_ready(self):
         logging.info('[Bot] on_ready')
         if not self.READY:
-            self.bot.load_extension('cogs.core')
+            self.bot.load_extension('modules.core')
             #self.READY = True
             #return
             logging.info('[Cache] Performing initial database synchronization')

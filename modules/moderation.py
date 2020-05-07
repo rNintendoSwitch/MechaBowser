@@ -531,6 +531,7 @@ class Moderation(commands.Cog):
                     embed.set_footer(text=warnPun['_id'])
                     embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
+                    embed.add_field(name='Moderator', value=ctx.author.mention, inline=False)
                     embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
                     await self.modLogs.send(embed=embed)
                     await resp.delete()
@@ -542,7 +543,8 @@ class Moderation(commands.Cog):
                     await member.add_roles(tierLevel[newTier])
 
                     db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
-                    docID = await utils.issue_pun(member.id, self.bot.user.id, newTier, 'Moderator vote', int(utils.resolve_duration('30d').timestamp()), context='vote')
+                    convertStr = '(T' + str(int(newTier[-1] + 1)) + '->T' + newTier[-1] + ') ' # Example return: "(T3->T2) "
+                    docID = await utils.issue_pun(member.id, ctx.author.id, newTier, convertStr + warnPun['reason'], int(utils.resolve_duration('30d').timestamp()), context='vote')
 
                     try:
                         await member.send(utils.format_pundm('warndown', 'A moderator has reviewed your warning', None, newTier, True))
@@ -555,7 +557,8 @@ class Moderation(commands.Cog):
                     embed.set_footer(text=docID)
                     embed.add_field(name='User', value=member.mention, inline=True)
                     embed.add_field(name='New tier', value=config.punStrs[newTier][:-8], inline=True) # Shave off "warning" str from const
-                    embed.add_field(name='Reason', value='Moderator decision to reduce level')
+                    embed.add_field(name='Moderator', value=ctx.author.mention, inline=False)
+                    embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
                     await self.modLogs.send(embed=embed)
                     await resp.delete()
                     return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')

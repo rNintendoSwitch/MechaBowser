@@ -62,16 +62,19 @@ class NintenDeals(commands.Cog):
             'NZ': '\U0001f1f3\U0001f1ff',
             'JP': '\U0001f1ef\U0001f1f5'
         }
-        self.query_deals.start() #pylint: disable=no-member
+
+        # NintenDeals decommissioned on 4/25/2020 - Features unavailable
+
+        #self.query_deals.start() #pylint: disable=no-member
         self.update_game_info.start() #pylint: disable=no-member
-        self.new_release_posting.start() #pylint: disable=no-member
+        #self.new_release_posting.start() #pylint: disable=no-member
         logging.info('[Deals] NintenDeals task cogs loaded')
 
     def cog_unload(self):
         logging.info('[Deals] Attempting to cancel tasks...')
-        self.query_deals.cancel() #pylint: disable=no-member
+        #self.query_deals.cancel() #pylint: disable=no-member
         self.update_game_info.cancel() #pylint: disable=no-member
-        self.new_release_posting.cancel() #pylint: disable=no-member
+        #self.new_release_posting.cancel() #pylint: disable=no-member
         logging.info('[Deals] Tasks exited')
         asyncio.get_event_loop().run_until_complete(self.session.close())
         #self.session.close()
@@ -84,9 +87,9 @@ class NintenDeals(commands.Cog):
     async def update_game_info(self):
         logging.info('[Deals] Starting game fetch')
         gameDB = mclient.bowser.games
-        ndealsDB = self.dealsMongo.nintendeals.games
 
-        games = ndealsDB.find({'system': 'Switch'})
+
+        games = gameDB.find({})
         for game in games:
             await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
             scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
@@ -100,40 +103,59 @@ class NintenDeals(commands.Cog):
                     'scores': scores,
                     'free_to_play': game['free_to_play']
                 }
-            ourGame = gameDB.find_one({'_id': game['_id']})
             self.games[game['_id']] = gameEntry
 
-            if not ourGame:
-                gameEntry['released'] = False # New game. Force new_release_posting to check if it's released, and if so post it
-                gameEntry['description'] = None
-                gameEntry['publisher'] = None
-                gameEntry['developer'] = None
-                gameEntry['category'] = None
-                gameEntry['size'] = None
-                gameEntry['cacheUpdate'] = int(time.time())
 
-                gameDB.insert_one(gameEntry)
+        # NintenDeals decommissioned on 4/25/2020 - Features unavailable
 
-            else:
-                comparison = {
-                    '_id': ourGame['_id'],
-                    'nsuids': ourGame['nsuids'],
-                    'titles': ourGame['titles'],
-                    'release_dates': ourGame['release_dates'],
-                    'categories': ourGame['categories'],
-                    'websites': ourGame['websites'],
-                    'scores': ourGame['scores'],
-                    'free_to_play': ourGame['free_to_play']
-                }
-                if comparison != gameEntry:
-                    logging.debug(f'[Deals] Updating out of date game entry {ourGame["_id"]}')
-                    gameEntry['cacheUpdate'] = int(time.time())
-                    gameDB.update_one({'_id': gameEntry['_id']}, {'$set': gameEntry})
+        #games = ndealsDB.find({'system': 'Switch'})
+        #for game in games:
+        #    await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
+        #    scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
+        #    gameEntry = {
+        #            '_id': game['_id'],
+        #            'nsuids': game['nsuids'],
+        #            'titles': game['titles'],
+        #            'release_dates': game['release_dates'],
+        #            'categories': game['categories'],
+        #            'websites': game['websites'],
+        #            'scores': scores,
+        #            'free_to_play': game['free_to_play']
+        #        }
+        #    ourGame = gameDB.find_one({'_id': game['_id']})
+        #    self.games[game['_id']] = gameEntry
 
-        for localGame in gameDB.find({}):
-            await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
-            if not ndealsDB.find_one({'_id': localGame['_id']}):
-                gameDB.delete_one({'_id': localGame['_id']})
+        #    if not ourGame:
+        #        gameEntry['released'] = False # New game. Force new_release_posting to check if it's released, and if so post it
+        #        gameEntry['description'] = None
+        #        gameEntry['publisher'] = None
+        #        gameEntry['developer'] = None
+        #        gameEntry['category'] = None
+        #        gameEntry['size'] = None
+        #        gameEntry['cacheUpdate'] = int(time.time())
+
+        #        gameDB.insert_one(gameEntry)
+
+        #    else:
+        #        comparison = {
+        #            '_id': ourGame['_id'],
+        #            'nsuids': ourGame['nsuids'],
+        #            'titles': ourGame['titles'],
+        #            'release_dates': ourGame['release_dates'],
+        #            'categories': ourGame['categories'],
+        #            'websites': ourGame['websites'],
+        #            'scores': ourGame['scores'],
+        #            'free_to_play': ourGame['free_to_play']
+        #        }
+        #        if comparison != gameEntry:
+        #            logging.debug(f'[Deals] Updating out of date game entry {ourGame["_id"]}')
+        #            gameEntry['cacheUpdate'] = int(time.time())
+        #            gameDB.update_one({'_id': gameEntry['_id']}, {'$set': gameEntry})
+
+        #for localGame in gameDB.find({}):
+        #    await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
+        #    if not ndealsDB.find_one({'_id': localGame['_id']}):
+        #        gameDB.delete_one({'_id': localGame['_id']})
 
         self.gamesReady = True
         logging.info('[Deals] Finished game fetch')
@@ -323,7 +345,11 @@ class NintenDeals(commands.Cog):
 
     @commands.cooldown(1, 15, type=commands.cooldowns.BucketType.member)
     @_games.command(name='search')
-    async def _games_search(self, ctx, *, game):
+    async def _games_search(self, ctx):#, *, game):
+        return await ctx.send(f'{ctx.author.mention} {config.redTick} Game searching is temporarily disabled. For more information see https://www.reddit.com/r/NintendoSwitch/comments/g7w97x/')
+
+
+        # NintenDeals decommissioned on 4/25/2020 - Features unavailable
         db = mclient.bowser.games
         dealprices = self.dealsMongo.nintendeals.prices
         if not self.gamesReady:

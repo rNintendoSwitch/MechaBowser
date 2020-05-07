@@ -91,7 +91,12 @@ class StatCommands(commands.Cog):
         topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[0:5] # Get a list of tuple sorting by most active channel to least, and only include top 5
         topChannelsList = []
         for x in topChannels:
-            topChannelsList.append(f'{self.bot.get_channel(x[0]).mention} ({x[1]})')
+            channelObj = self.bot.get_channel(x[0])
+            if channelObj:
+                topChannelsList.append(f'{self.bot.get_channel(x[0]).mention} ({x[1]})')
+
+            else:
+                topChannelsList.append(f'*Deleted channel* ({x[1]})')
 
         await msg.edit(content='One moment, crunching member data...')
         netJoins = 0
@@ -116,7 +121,7 @@ class StatCommands(commands.Cog):
 
         dayStr = 'In the last 30 days' if not start_date else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
         netMembers = netJoins - netLeaves
-        netMemberStr = f':chart_with_upwards_trend: **+{netMembers}** net new members\n' if netMembers >= 0 else f':chart_with_downwards_trend: **{netMembers}** net new members\n'
+        netMemberStr = f':chart_with_upwards_trend: **+{netMembers}** net members joined\n' if netMembers >= 0 else f':chart_with_downwards_trend: **{netMembers}** net members left\n'
 
         embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__{dayStr}...__*\n\n' \
             f':incoming_envelope: **{msgCount}** messages have been sent\n:information_desk_person: **{len(userCounts)}** members were active\n' \
