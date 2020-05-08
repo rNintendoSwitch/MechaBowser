@@ -27,7 +27,6 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('modules.utility')
             self.bot.load_extension('modules.statistics')
             self.bot.load_extension('modules.social')
-            #self.bot.load_extension('modules.filter')
             self.bot.load_extension('utils')
 
             self.sanitize_eud.start() #pylint: disable=no-member
@@ -44,7 +43,7 @@ class MainEvents(commands.Cog):
     def cog_unload(self):
         self.sanitize_eud.cancel() #pylint: disable=no-member
 
-    @tasks.loop(hours=1)
+    @tasks.loop(hours=24)
     async def sanitize_eud(self):
         logging.debug('[Core] Starting sanitzation of old EUD')
         msgDB = mclient.bowser.messages
