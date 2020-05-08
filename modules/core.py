@@ -322,9 +322,13 @@ class MainEvents(commands.Cog):
         #    f'view at {config.baseUrl}/archive/{await utils.message_archive(message)}'
         #log += content
 
-        embed = discord.Embed(description=f'**Content:**\n\n{message.content}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(description=f'[Jump to message]({message.jump_url})\n{message.content}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
         embed.add_field(name='Mention', value=f'<@{message.author.id}>')
+
+        if len(message.content) > 1950: # Too long to safely add jump to message in desc, use field
+            embed.description = message.content
+            embed.add_field(name='Jump', value=f'[Jump to message]({message.jump_url})')
         
         await self.serverLogs.send(f':wastebasket: Message deleted in <#{message.channel.id}>', embed=embed)
 
@@ -345,12 +349,12 @@ class MainEvents(commands.Cog):
         #    f'view at {config.baseUrl}/archive/{await utils.message_archive([before, after], True)}'
 
         if len(before.content) <= 1024 and len(after.content) <= 1024:
-            embed = discord.Embed(color=0xF8E71C, timestamp=datetime.datetime.utcnow())
+            embed = discord.Embed(description=f'[Jump to message]({before.jump_url})', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
             embed.add_field(name='Before', value=before.content, inline=False)
             embed.add_field(name='After', value=after.content, inline=False)
 
         else:
-            embed = discord.Embed(description=f'Message diff exceeds character limit, view at {config.baseUrl}/archive/{await utils.message_archive([before, after], True)}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
+            embed = discord.Embed(description=f'[Jump to message]({before.jump_url})\nMessage diff exceeds character limit, view at {config.baseUrl}/archive/{await utils.message_archive([before, after], True)}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
         
         embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar_url)
         embed.add_field(name='Mention', value=f'<@{before.author.id}>')
