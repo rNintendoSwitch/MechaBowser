@@ -15,3 +15,4 @@ pytz
 cchardet
 aiodns
 nintendeals
+dpytest
