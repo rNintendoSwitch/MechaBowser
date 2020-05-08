@@ -543,7 +543,7 @@ class Moderation(commands.Cog):
                     await member.add_roles(tierLevel[newTier])
 
                     db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
-                    convertStr = '(T' + str(int(newTier[-1] + 1)) + '->T' + newTier[-1] + ') ' # Example return: "(T3->T2) "
+                    convertStr = f'(T{int(newTier[-1]) + 1}->T{newTier[-1]}) ' # Example return: "(T3->T2) "
                     docID = await utils.issue_pun(member.id, ctx.author.id, newTier, convertStr + warnPun['reason'], int(utils.resolve_duration('30d').timestamp()), context='vote')
 
                     try:
