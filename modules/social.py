@@ -593,6 +593,9 @@ class SocialFeatures(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if message.channel.type != discord.ChannelType.text:
+            return
+
         content = re.sub(r'(<@!?\d+>)', '', message.content)
         code = re.search(self.friendcodeFilterRe, content) 
 
