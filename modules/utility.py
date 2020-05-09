@@ -636,18 +636,12 @@ class ChatControl(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if before.channel == after.channel: # If other info than channel (such as mute status), ignore
-            #print(f'Same state: b/a\n{before}\n{after}')
             return
 
-        if not before.channel and after.afk: # Joined direct to afk
-            #print('Joined AFK direct')
-            return
-
-        if not before.channel or before.afk and after.channel: # User just joined a channel or moved from AFK
-            #print('Joined a channel')
+        if not before.channel: # User just joined a channel
             await member.add_roles(self.voiceTextAccess)
 
-        elif not after.channel or after.afk: # User just left a channel or moved to AFK
+        elif not after.channel: # User just left a channel or moved to AFK
             try:
                 await member.remove_roles(self.voiceTextAccess)
 
