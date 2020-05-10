@@ -1148,11 +1148,31 @@ class ChatControl(commands.Cog):
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _roles_set(self, ctx, member: discord.Member, channel: typing.Union[discord.TextChannel, discord.CategoryChannel], *, reason='-No reason specified-'):
+    async def _roles_set(self, ctx, member: discord.Member, channel: typing.Union[discord.TextChannel, discord.CategoryChannel, str], *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Blacklist reason is too long, reduce it by at least {len(reason) - 990} characters')
         statusText = ''
-        event = False
-        if channel.id == config.suggestions:
+        if type(channel) == str:
+            # Arg blacklist
+            if channel in ['mail', 'modmail']:
+                context = 'modmail'
+                mention = context
+                users = mclient.bowser.users
+                dbUser = users.find_one({'_id': member.id})
+
+                if dbUser['modmail']:
+                    users.update_one({'_id': member.id}, {'$set': {'modmail': False}})
+                    statusText = 'Blacklisted'
+
+                else:
+                    users.update_one({'_id': member.id}, {'$set': {'modmail': True}})
+                    statusText = 'Unblacklisted'
+
+            else:
+                return await ctx.send(f'{config.redTick} You cannot blacklist a user from that function')
+
+        elif channel.id == config.suggestions:
+            context = channel.name
+            mention = channel.mention
             suggestionsRole = ctx.guild.get_role(config.noSuggestions)
             if suggestionsRole in member.roles: # Toggle role off
                 await member.remove_roles(suggestionsRole)
@@ -1163,6 +1183,8 @@ class ChatControl(commands.Cog):
                 statusText = 'Blacklisted'
 
         elif channel.id == config.spoilers:
+            context = channel.name
+            mention = channel.mention
             spoilersRole = ctx.guild.get_role(config.noSpoilers)
             if spoilersRole in member.roles: # Toggle role off
                 await member.remove_roles(spoilersRole)
@@ -1173,7 +1195,8 @@ class ChatControl(commands.Cog):
                 statusText = 'Blacklisted'         
 
         elif channel.category_id == config.eventCat:
-            event = True
+            context = 'events'
+            mention = context
             eventsRole = ctx.guild.get_role(config.noEvents)
             if eventsRole in member.roles: # Toggle role off
                 await member.remove_roles(eventsRole)
@@ -1188,34 +1211,35 @@ class ChatControl(commands.Cog):
 
         db = mclient.bowser.puns
         if statusText.lower() == 'blacklisted':
-            docID = await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=channel.name if not event else 'events')
+            docID = await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=context)
 
         else:
-            db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True, 'context': channel.name if not event else 'events'}, {'$set':{
+            db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True, 'context': context}, {'$set':{
             'active': False
             }})
-            docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=channel.name if not event else 'events')
+            docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
 
         embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{statusText} | {str(member)}')
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=member.mention, inline=True)
         embed.add_field(name='Moderator', value=ctx.author.mention, inline=True)
-        embed.add_field(name='Channel', value=channel.mention if not event else 'events')
+        embed.add_field(name='Channel', value=mention)
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
 
         try:
             statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
-            await member.send(utils.format_pundm(statusText, reason, ctx.author, channel.mention if not event else 'events'))
+            await member.send(utils.format_pundm(statusText, reason, ctx.author, mention))
+
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {channel.mention if not event else "events"}')
+        await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
 
 class AntiRaid(commands.Cog):
     def __init__(self, bot):

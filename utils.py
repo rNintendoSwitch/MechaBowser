@@ -101,6 +101,7 @@ async def store_user(member, messages=0):
         'jailed': False,
         'friendcode': None,
         'timezone': None,
+        'modmail': True,
         'trophies': [],
         'trophyPreference': [],
         'favgames': [],
@@ -503,8 +504,8 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
     punDM += f'Reason:```{reason}```'
     punDM += f'Responsible moderator: {mod}\n\n'
-    if _type == 'ban':
-        punDM += 'If you have questions concerning this matter, please feel free to contact the moderator that took this action.\n'
+    if _type == 'ban' or details == 'modmail':
+        punDM += 'If you have questions concerning this matter, please feel free to contact the moderator that took this action or another member of the moderation team.\n'
 
     else:
         punDM += f'If you have questions concerning this matter you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>).\n'
