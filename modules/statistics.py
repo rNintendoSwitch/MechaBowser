@@ -80,12 +80,14 @@ class StatCommands(commands.Cog):
 
         if not start_date:
             puns = mclient.bowser.puns.find({
-                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
+                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))},
+                        'type': {'$nin': ['unmute', 'unblacklist', 'note']}
                 }).count()
 
         else:
             puns = mclient.bowser.puns.find({
-                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
+                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()},
+                        'type': {'$nin': ['unmute', 'unblacklist', 'note']}
                 }).count()
 
         topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[0:5] # Get a list of tuple sorting by most active channel to least, and only include top 5
