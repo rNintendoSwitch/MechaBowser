@@ -1,4 +1,4 @@
-git+git://github.com/falconry/token-bucket.git
+git+git://github.com/MattBSG/token-bucket.git
 discord.py
 pymongo
 jishaku
