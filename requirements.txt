@@ -1,4 +1,5 @@
-discord
+git+git://github.com/falconry/token-bucket.git
+discord.py
 pymongo
 jishaku
 pylint
