@@ -165,7 +165,7 @@ class SocialFeatures(commands.Cog):
 
         app_info = await self.bot.application_info()
 
-        if member.id == app_info.owner.id: # App owner
+        if member.id in [app_info.owner.id, 123879073972748290]: # Developer
             trophies.append('developer')
 
         if ctx.guild.get_role(config.chatmod) in member.roles: # Chat-mod role
@@ -176,6 +176,9 @@ class SocialFeatures(commands.Cog):
 
         if ctx.guild.get_role(config.modemeritus) in member.roles: # Mod emeritus
             trophies.append('mod-emeritus')
+
+        if ctx.guild.get_role(config.helpfulUser) in member.roles: # Helpful user
+            trophies.append('helpful-user')
 
         if ctx.guild.get_role(config.boostRole) in member.roles: # Booster role
             trophies.append('booster')
