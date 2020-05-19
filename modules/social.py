@@ -36,13 +36,13 @@ class SocialFeatures(commands.Cog):
         self.inprogressEdits = {}
         self.letterCodepoints = ['1f1e6', '1f1e7', '1f1e8', '1f1e9', '1f1ea', '1f1eb', '1f1ec', '1f1ed', '1f1ee', '1f1ef', '1f1f0', '1f1f1', '1f1f2', '1f1f3', '1f1f4', '1f1f5', '1f1f6', '1f1f7', '1f1f8', '1f1f9', '1f1fa', '1f1fb', '1f1fc', '1f1fd', '1f1fe', '1f1ff']
         
-        # Friendcode regex for profile editor (lenient) and chat filter (matches separators between digits), \u2014 = em-dash
-        self.friendcodeProfileRe = re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I)
-        self.friendcodeFilterRe = re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I)
-
-        # Friendcode regex for profile editor (lenient) and chat filter (matches separators between digits), \u2014 = em-dash
-        self.friendcodeProfileRe = re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I)
-        self.friendcodeFilterRe = re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I)
+        self.friendCodeRegex = { # Friend Code Regexs (\u2014 = em-dash)
+            # Profile setup/editor (lenient)
+            "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
+            # Chat filter, "It appears you've sent a friend code." Requires separators and discards AC designer prefixes.
+            # Discards Animal Crossing's MA & MO designer codes. Thanks to Jade for pointing out alternation and negated sets.
+            "chatFilter": re.compile(r'(?:sw|m[^ao]|[^M][\w]|^\w|^)[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
+        }
 
     @commands.group(name='profile', invoke_without_command=True)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
@@ -299,7 +299,7 @@ class SocialFeatures(commands.Cog):
                 await message.channel.send('I\'ve gone ahead and reset your setting for **friend code**')
                 return True
 
-            code = re.search(self.friendcodeProfileRe, content)
+            code = re.search(self.friendCodeRegex['profile'], content)
             if code: # re match
                 friendcode = f'SW-{code.group(1)}-{code.group(2)}-{code.group(3)}'
                 db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': friendcode}})
@@ -597,7 +597,7 @@ class SocialFeatures(commands.Cog):
             return
 
         content = re.sub(r'(<@!?\d+>)', '', message.content)
-        code = re.search(self.friendcodeFilterRe, content) 
+        code = re.search(self.friendCodeRegex['chatFilter'], content) 
 
         if not code: return
         if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
