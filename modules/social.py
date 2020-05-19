@@ -40,7 +40,7 @@ class SocialFeatures(commands.Cog):
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards AC designer prefixes.
-            # Discards Animal Crossing's MA & MO designer codes. Thanks to Jade for pointing out alterations and negated sets.
+            # Discards Animal Crossing's MA & MO designer codes. Thanks to Jade for pointing out alternation and negated sets.
             "chatFilter": re.compile(r'(?:sw|m[^ao]|[^M][\w]|^\w|^)[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
         }
 
