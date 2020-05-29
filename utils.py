@@ -34,48 +34,128 @@ timeUnits = {
 }
 
 async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
-    db = mclient.bowser.archive
+    db = mclient.modmail.logs
     if type(archive) != list:
         # Single message to archive
         archive = [archive]
 
-    channels = []
-    for msg in archive:
-        if f'#{msg.channel.name}' not in channels:
-            channels.append(f'#{msg.channel.name}')
-
-    body = archiveHeader.format(archive[0].guild, ', '.join(channels))
     archiveID = f'{archive[0].id}-{int(time.time() * 1000)}'
-    messageIDs = []
-
     if edit:
-        msgBefore = archive[0]
-        msgAfter = archive[1]
-
-        body += f'[{msgBefore.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msgBefore.author.id}/{msgBefore.id}/#{archive[0].channel.name}/{str(msgBefore.author)}): message edit:\n'
-        body += f'--- Before ---\n{msgBefore.content}\n\n--- After ---\n{msgAfter.content}'
-
+        db.insert_one({
+            '_id': archiveID,
+            'key': archiveID,
+            'open': False,
+            'created_at': str(archive[0].created_at),
+            'closed_at': str(archive[0].created_at),
+            'channel_id': str(archive[0].channel.id),
+            'guild_id': str(archive[0].guild.id),
+            'bot_id': str(config.parakarry),
+            'recipient': {
+                'id': str(archive[0].author.id),
+                'name': archive[0].author.name,
+                'discriminator': archive[0].author.discriminator,
+                'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
+                'mod': False
+            },
+            'creator': {
+                'id': str(archive[0].author.id),
+                'name': archive[0].author.name,
+                'discriminator': archive[0].author.discriminator,
+                'avatar_url': '',
+                'mod': False
+            },
+            'closer': {
+                'id': str(0),
+                'name': 'message edited',
+                'discriminator': 0,
+                'avatar_url': ''
+            },
+            'messages': [
+                {
+                    'timestamp': str(archive[0].created_at),
+                    'message_id': str(archive[0].id),
+                    'content': archive[0].content,
+                    'type': 'edit_before',
+                    'author': {
+                        'id': str(archive[0].author.id),
+                        'name': archive[0].author.name,
+                        'discriminator': archive[0].author.discriminator,
+                        'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
+                        'mod': False
+                    },
+                    'attachments': [x.url for x in archive[0].attachments]
+                },
+                {
+                    'timestamp': str(archive[1].created_at),
+                    'message_id': str(archive[1].id),
+                    'content': archive[1].content,
+                    'type': 'edit_after',
+                    'author': {
+                        'id': str(archive[1].author.id),
+                        'name': archive[1].author.name,
+                        'discriminator': archive[1].author.discriminator,
+                        'avatar_url': str(archive[1].author.avatar_url_as(static_format='png', size=1024)),
+                        'mod': False
+                    },
+                    'attachments': [x.url for x in archive[1].attachments]
+                }
+            ]
+        })
+        
     else:
+        messages = []
         for msg in archive: # TODO: attachment CDN urls should be posted as message
-            messageIDs.append(msg.id)
-            if not msg.content and msg.attachments:
-                content = ' '.join([x.url for x in msg.attachments])
+            messages.append({
+                'timestamp': str(msg.created_at),
+                'message_id': str(msg.id),
+                'content': msg.content if msg.content else '',
+                'type': 'thread_message',
+                'author': {
+                    'id': str(msg.author.id),
+                    'name': msg.author.name,
+                    'discriminator': msg.author.discriminator,
+                    'avatar_url': str(msg.author.avatar_url_as(static_format='png', size=1024)),
+                    'mod': False
+                },
+                'channel': {
+                    'id': str(msg.channel.id),
+                    'name': msg.channel.name
+                },
+                'attachments': [x.url for x in msg.attachments]
+            })
 
-            elif not msg.content and not msg.attachments:
-                content = '*No message content could be saved, could be embed*'
+        db.insert_one({
+            '_id': archiveID,
+            'key': archiveID,
+            'open': False,
+            'created_at': str(archive[0].created_at),
+            'closed_at': str(archive[0].created_at),
+            'channel_id': str(archive[0].channel.id),
+            'guild_id': str(archive[0].guild.id),
+            'bot_id': str(config.parakarry),
+            'recipient': {
+                'id': 0,
+                'name': '',
+                'discriminator': 0,
+                'avatar_url': 'https://cdn.discordapp.com/attachments/276036563866091521/695443024955834438/unknown.png',
+                'mod': False
+            },
+            'creator': {
+                'id': str(archive[0].author.id),
+                'name': archive[0].author.name,
+                'discriminator': archive[0].author.discriminator,
+                'avatar_url': '',
+                'mod': False
+            },
+            'closer': {
+                'id': str(0),
+                'name': 'message edited',
+                'discriminator': 0,
+                'avatar_url': ''
+            },
+            'messages': messages
+        })
 
-            else:
-                content = msg.content
-
-            body += f'[{msg.created_at.strftime("%Y/%m/%d %H:%M:%S UTC")}] ({msg.author.id}/{msg.id}/#{msg.channel.name}/{str(msg.author)}): {content}\n'
-
-    db.insert_one({
-        '_id': archiveID,
-        'body': body,
-        'messages': messageIDs,
-        'timestamp': int(time.time())
-
-    })
     return archiveID
 
 async def store_user(member, messages=0):

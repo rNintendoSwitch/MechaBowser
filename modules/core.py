@@ -306,7 +306,7 @@ class MainEvents(commands.Cog):
         archiveID = await utils.message_archive(messages)
 
         #log = f':printer: New message archive has been generated, view it at {config.baseUrl}/archive/{archiveID}'
-        embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/archive/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/logs/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
         return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
 
     @commands.Cog.listener()
