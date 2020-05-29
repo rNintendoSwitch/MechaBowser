@@ -670,6 +670,7 @@ class ChatControl(commands.Cog):
                         invite = await self.bot.fetch_invite(x)
                         if invite.guild.id in guildWhitelist: continue
                         if 'VERIFIED' in invite.guild.features: continue
+                        if 'PARTNERED' in invite.guild.features: continue
 
                         inviteInfos.append(invite)
 
@@ -767,33 +768,33 @@ class ChatControl(commands.Cog):
 #
 #            await message.author.add_roles(message.guild.get_role(newRole))
 
-#        # Splatoon splatfest event - ended 7/21/19
+#        # Splatoon splatfest event - ended 5/24/20
 #        if message.channel.id == 278557283019915274:
-#            pearl = re.compile(r'(<:pearl:332557519958310912>)+', re.I)
-#            marina = re.compile(r'(<:marina:332557579815485451>)+', re.I)
-#            orderRole = message.guild.get_role(601458524723216385)
-#            chaosRole = message.guild.get_role(601458570197860449)
-#            if re.search(pearl, message.content) and re.search(marina, message.content):
+#            mayo = re.compile(r'(<:mayonnaise:712323829510307850>)+', re.I)
+#            ketchup = re.compile(r'(<:ketchup:712323803325268029>)+', re.I)
+#            ketchupRole = message.guild.get_role(712318160006807654)
+#            mayoRole = message.guild.get_role(712318402504425493)
+#            if re.search(mayo, message.content) and re.search(ketchup, message.content):
 #                return
 #
 #            try:    
-#                if re.search(pearl, message.content):
-#                    if orderRole in message.author.roles:
-#                        await message.author.remove_roles(orderRole)
+#                if re.search(mayo, message.content):
+#                    if ketchupRole in message.author.roles:
+#                        await message.author.remove_roles(ketchupRole)
 #
-#                    if chaosRole not in message.author.roles:
-#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Chaos')
+#                    if mayoRole not in message.author.roles:
+#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Mayo', delete_after=10)
 #                        await msg.delete(delay=5.0)
-#                        await message.author.add_roles(chaosRole)
+#                        await message.author.add_roles(mayoRole)
 #
-#                elif re.search(marina, message.content):
-#                    if chaosRole in message.author.roles:
-#                        await message.author.remove_roles(chaosRole)
+#                elif re.search(ketchup, message.content):
+#                    if mayoRole in message.author.roles:
+#                        await message.author.remove_roles(mayoRole)
 #
-#                    if orderRole not in message.author.roles:
-#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Order')
+#                    if ketchupRole not in message.author.roles:
+#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Ketchup', delete_after=10)
 #                        await msg.delete(delay=5.0)
-#                        await message.author.add_roles(orderRole)
+#                        await message.author.add_roles(ketchupRole)
 #
 #            except (discord.Forbidden, discord.HTTPException):
 #                pass
