@@ -51,7 +51,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
             'guild_id': str(archive[0].guild.id),
             'bot_id': str(config.parakarry),
             'recipient': {
-                'id': str(archive[0].author.id),
+                'id': 0,
                 'name': archive[0].author.name,
                 'discriminator': archive[0].author.discriminator,
                 'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
