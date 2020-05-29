@@ -314,20 +314,30 @@ class MainEvents(commands.Cog):
         if message.type != discord.MessageType.default or message.author.bot:
             return # No system messages
 
-        if not message.content:
+        if not message.content and not message.attachments:
             return # Blank or null content (could be embed)
+
+        content = message.content if message.content else '-No message content-'
 
         #log = f':wastebasket: Message by **{str(message.author)}** ({message.author.id}) in <#{message.channel.id}> deleted:\n'
         #content = message.content if (len(log) + len(message.clean_content)) < 2000 else 'Message exceeds character limit, ' \
         #    f'view at {config.baseUrl}/archive/{await utils.message_archive(message)}'
         #log += content
 
-        embed = discord.Embed(description=f'[Jump to message]({message.jump_url})\n{message.content}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(description=f'[Jump to message]({message.jump_url})\n{content}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
         embed.add_field(name='Mention', value=f'<@{message.author.id}>')
+        if len(message.attachments) == 1:
+            embed.set_image(url=message.attachments[0].proxy_url)
 
-        if len(message.content) > 1950: # Too long to safely add jump to message in desc, use field
-            embed.description = message.content
+        elif len(message.attachments) > 1:
+            # More than one attachment, use fields
+            attachments = [x.proxy_url for x in message.attachments]
+            for a in range(len(attachments)):
+                embed.add_field(name=f'Attachment {a + 1}', value=attachments[a])
+
+        if len(content) > 1950: # Too long to safely add jump to message in desc, use field
+            embed.description = content
             embed.add_field(name='Jump', value=f'[Jump to message]({message.jump_url})')
         
         await self.serverLogs.send(f':wastebasket: Message deleted in <#{message.channel.id}>', embed=embed)
