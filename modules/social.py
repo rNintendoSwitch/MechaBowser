@@ -341,7 +341,7 @@ class SocialFeatures(commands.Cog):
             return True
 
         async def _phase3(message):
-            response = await self.bot.wait_for('message', timeout=180, check=check)
+            response = await self.bot.wait_for('message', timeout=300, check=check)
 
             content = response.content.lower().strip()
             if response.content.lower().strip() == 'skip': return True
