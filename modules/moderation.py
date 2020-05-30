@@ -594,19 +594,26 @@ class Moderation(commands.Cog):
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
 
+    @_banning.error
+    @_unbanning.error
+    @_kicking.error
+    @_muting.error
+    @_unmuting.error
     @_warning.error
     @_warning_clear.error
     @_warning_setlevel.error
+    @_warning_review.error
     @_note.error
     async def mod_error(self, ctx, error):
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(f'{config.redTick} Missing argument')
+            return await ctx.send(f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
 
         elif isinstance(error, commands.BadArgument):
-            return await ctx.send(f'{config.redTick} Invalid arguments')
+            return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
 
         else:
-            await ctx.send(f'{config.redTick} An unknown exception has occured. This has been logged.')
+            await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
             raise error
 
 class LoopTasks(commands.Cog):

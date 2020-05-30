@@ -259,6 +259,25 @@ class StatCommands(commands.Cog):
     async def _stats_statuses(self, ctx):
         return await ctx.send(f'{config.redTick} Status statistics are not ready for use')
 
+    @_stats.error
+    @_stats_channels.error
+    @_stats_emoji.error
+    @_stats_roles.error
+    @_stats_server.error
+    @_stats_statuses.error
+    @_stats_users.error
+    async def stat_error(self, ctx, error):
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
+
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
+
+        else:
+            await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
+            raise error
+
 def setup(bot):
     bot.add_cog(StatCommands(bot))
     logging.info('[Extension] Statistics module loaded')

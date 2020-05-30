@@ -591,17 +591,21 @@ class NintenDeals(commands.Cog):
 
     @_games.error
     @_games_search.error
-    async def mod_error(self, ctx, error):
+    async def games_error(self, ctx, error):
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.message.delete()
-            return await ctx.send(f'{config.redTick} Missing game name', delete_after=10)
+            return await ctx.send(f'{config.redTick} A game was not provided. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
 
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.message.delete()
-            return await ctx.send(f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=10)
+            return await ctx.send(f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=15)
+
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`')
 
         else:
-            await ctx.send(f'{config.redTick} An unknown error has occured. Try again later')
+            await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.')
             raise error
 
 class ChatControl(commands.Cog):
@@ -1241,6 +1245,30 @@ class ChatControl(commands.Cog):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
+
+    @_clean.error
+    @_info.error
+    @_history.error
+    @_roles.error
+    @_roles_set.error
+    @_tag.error
+    @_tag_create.error
+    @_tag_delete.error
+    @_tag_source.error
+    async def utility_error(self, ctx, error):
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
+
+        elif isinstance(error, commands.CommandOnCooldown):
+            return await ctx.send(f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=15)
+
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
+
+        else:
+            await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
+            raise error
 
 class AntiRaid(commands.Cog):
     def __init__(self, bot):
