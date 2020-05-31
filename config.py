@@ -46,6 +46,7 @@ chatmod =
 submod = 
 moderator = 
 modemeritus = 
+submodemeritus = 
 eh = 
 helpfulUser = 
 warnTier1 = 
