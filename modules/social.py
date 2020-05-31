@@ -174,7 +174,7 @@ class SocialFeatures(commands.Cog):
         if ctx.guild.get_role(config.submod) in member.roles: # Sub-mod role
             trophies.append('sub-mod')
 
-        if ctx.guild.get_role(config.modemeritus) in member.roles: # Mod emeritus
+        if ctx.guild.get_role(config.modemeritus) in member.roles or ctx.guild.get_role(config.submodemeritus) in member.roles: # Mod emeritus
             trophies.append('mod-emeritus')
 
         if ctx.guild.get_role(config.helpfulUser) in member.roles: # Helpful user
