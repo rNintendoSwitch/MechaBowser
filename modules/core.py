@@ -4,6 +4,7 @@ import logging
 import time
 import typing
 import re
+import collections
 
 import pymongo
 import discord
@@ -388,8 +389,8 @@ class MainEvents(commands.Cog):
                 after_name = discord.utils.escape_markdown(after.nick)
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{str(before)} ({before.id})', icon_url=before.avatar_url)
-            embed.add_field(name='Before', value=before_name if not before.nick else before.nick, inline=False)
+            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
+            embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
@@ -398,32 +399,35 @@ class MainEvents(commands.Cog):
         if before.roles != after.roles:
             roleList = []
             roleStr = []
-            oldRoleStr = []
-            for x in after.roles:
+            for x in after.roles: 
                 if x.id == before.guild.id:
                     continue
 
                 if not x.managed: roleList.append(x.id)
                 roleStr.append(x.name)
 
-            for n in before.roles:
-                if n.id == before.guild.id:
-                    continue
-
-                oldRoleStr.append(n.name)
-
-            roleStr = ['*No roles*'] if not roleStr else roleStr
-            oldRoleStr = ['*No roles*'] if not oldRoleStr else oldRoleStr
-
             userCol.update_one({'_id': before.id}, {'$set': {'roles': roleList}})
 
-            embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
-            embed.add_field(name='Before', value=', '.join(n for n in reversed(oldRoleStr)), inline=False)
-            embed.add_field(name='After', value=', '.join(n for n in reversed(roleStr)), inline=False)
-            embed.add_field(name='Mention', value=f'<@{before.id}>')
+            beforeCounter = collections.Counter(before.roles)
+            afterCounter = collections.Counter(after.roles)
 
-            await self.serverLogs.send(':closed_lock_with_key: User\'s roles updated', embed=embed)
+            rolesRemoved = list(map(lambda x: x.name, beforeCounter - afterCounter))
+            rolesAdded = list(map(lambda x: x.name, afterCounter - beforeCounter))
+            roleStr = ['*No roles*'] if not roleStr else roleStr
+
+            if rolesRemoved or rolesAdded: # nop if no change, e.g. role moves in list
+                embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
+                embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
+
+                if rolesRemoved:
+                    embed.add_field(name=f'Role{"" if len(rolesRemoved) == 1 else "s"} Removed (-)', value=', '.join(rolesRemoved))
+
+                if rolesAdded:
+                    embed.add_field(name=f'Role{"" if len(rolesAdded) == 1 else "s"} Added (+)', value=', '.join(rolesAdded))
+
+                embed.add_field(name=f'Current Role{"" if len(roleStr) == 1 else "s"}', value=', '.join(n for n in reversed(roleStr)), inline=False)
+                embed.add_field(name='Mention', value=f'<@{before.id}>')
+                await self.serverLogs.send(':closed_lock_with_key: User\'s roles updated', embed=embed)
 
         if before.status != after.status:
             statuses = {
