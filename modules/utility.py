@@ -632,8 +632,7 @@ class ChatControl(commands.Cog):
             "stacksocial.com": ["rid", "aid"],
             "tigerdirect.com": ["affiliateid", "srccode"],
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
-            "play-asia.com": ["tagid"],
-            "ref.example": ["foo", "bar", "test"] # TESTING: REMOVE IN PRODUCTION
+            "play-asia.com": ["tagid"]
             }
         self.inviteRe = re.compile(r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/[\da-z-]+)', re.I)
         self.thirtykEvent = {}
