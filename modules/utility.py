@@ -5,6 +5,8 @@ import typing
 import datetime
 import time
 import aiohttp
+import urllib
+import pathlib
 
 import pymongo
 import discord
@@ -616,11 +618,24 @@ class ChatControl(commands.Cog):
         self.boostChannel = self.bot.get_channel(config.boostChannel)
         self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
         self.voiceTextAccess = self.bot.get_guild(config.nintendoswitch).get_role(config.voiceTextAccess)
-        self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+        self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
-        self.affiliateLinks = re.compile(r'(https?:\/\/(?:.*\.)?(?:(?:amazon)|(?:bhphotovideo)|(?:bestbuy)|(?:gamestop)|(?:groupon)|(?:newegg(?:business)?)|(?:stacksocial)|(?:target)|(?:tigerdirect)|(?:walmart))\.[a-z\.]{2,7}\/.*)(?:\?.+)', re.I) # TODO: Proper ebay filtering that doesn't nuke normal links
-        self.inviteRe = re.compile(r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discordapp\.com\/invite)\/[\da-z-]+)', re.I)
+        self.affiliateTags = {
+            "amazon.*": ["tag", "colid", "coliid"],
+            "bhphotovideo.com": ["sid"],
+            "bestbuy.*": ["cjpid", "lid", "aid", "pid"], 
+            "ebay.*": ["afepn", "campid", "pid"],
+            "gamestop.com": ["affid", "cid", "sourceid", "utm_source", "utm_medium","utm_campaign"],
+            "groupon.*": ["affid"],
+            "newegg*.*": ["aid", "pid"],
+            "stacksocial.com": ["rid", "aid"],
+            "tigerdirect.com": ["affiliateid", "srccode"],
+            "walmart.*": ["sourceid", "veh", "wmlspartner"],
+            "play-asia.com": ["tagid"],
+            "ref.example": ["foo", "bar", "test"] # TESTING: REMOVE IN PRODUCTION
+            }
+        self.inviteRe = re.compile(r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/[\da-z-]+)', re.I)
         self.thirtykEvent = {}
         self.thirtykEventRoles = [
             616298509460701186,
@@ -686,16 +701,49 @@ class ChatControl(commands.Cog):
                 await message.channel.send(f':bangbang: {message.author.mention} please do not post invite links to other Discord servers. If you believe the linked server(s) should be whitelisted, contact a moderator', delete_after=10)
                 await self.adminChannel.send(f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}')
 
-        #Filter test for afiliate links
-        if re.search(self.affiliateLinks, message.content):
-            hooks = await message.channel.webhooks()
-            useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+        # Filter and clean affiliate links
+        links = re.finditer(self.linkRe, message.content)
+        if links: 
+            contentModified = False
+            content = message.content
+            for link in links:
+                linkModified = False
 
-            await message.delete()
-            async with aiohttp.ClientSession() as session:
-                name = message.author.name if not message.author.nick else message.author.nick
-                webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
-                await webhook.send(content=re.sub(self.affiliateLinks, r'\1', message.content), username=name, avatar_url=message.author.avatar_url)
+                urlParts = urllib.parse.urlsplit(link[0])
+                urlPartsList = list(urlParts)
+
+                query_raw = dict(urllib.parse.parse_qsl(urlPartsList[3]))
+                # Make all keynames lowercase in dict, this shouldn't break a website, I hope...
+                query = {k.lower(): v for k, v in query_raw.items()}
+
+                # For each domain level of hostname, eg. foo.bar.example => foo.bar.example, bar.example, example
+                labels = urlParts.hostname.split(".")
+                for i in range(0, len(labels)):
+                    domain = ".".join(labels[i - len(labels):])
+                    
+                    for glob, tags in self.affiliateTags.items():
+                        if pathlib.PurePath(domain).match(glob):
+                            for tag in tags:
+                                if tag in query:
+                                    linkModified = True
+                                    query.pop(tag, None)
+                
+                if linkModified:
+                    urlPartsList[3] = urllib.parse.urlencode(query)
+                    url = urllib.parse.urlunsplit(urlPartsList)
+
+                    contentModified = True
+                    content = content.replace(link[0], url)
+
+            if contentModified:
+                hooks = await message.channel.webhooks()
+                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+            
+                await message.delete()
+                async with aiohttp.ClientSession() as session:
+                    name = message.author.name if not message.author.nick else message.author.nick
+                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
+                    await webhook.send(content=content, username=name, avatar_url=message.author.avatar_url)
 
         #Filter for #mario
         if message.channel.id == config.marioluigiChannel: # #mario
