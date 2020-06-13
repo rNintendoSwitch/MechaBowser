@@ -35,10 +35,12 @@ releaseChannel =
 smm2Channel = 
 commandsChannel = 
 marioluigiChannel = 
-showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel]
 
 # Category IDs
 eventCat = 
+modmailCat = 
+
+showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel, modmailCat]
 
 # Role IDs
 boostRole = 
