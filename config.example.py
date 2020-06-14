@@ -38,7 +38,7 @@ marioluigiChannel = int: mario and luigi
 
 # Category IDs
 eventCat = int: server events
-modmailCat = int: modmail catagory
+modmailCat = int: modmail category
 
 showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel, modmailCat]
 
