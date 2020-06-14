@@ -231,7 +231,7 @@ class SocialFeatures(commands.Cog):
                     #try:
                     #    await utils.game_data(game)
                     #    # Image should have been put in storage after scrape
-                    #    fs.get(game)
+                    #    gameImg = fs.get(game)
                     #    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
                     #    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
