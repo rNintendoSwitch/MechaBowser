@@ -35,10 +35,12 @@ releaseChannel = int: new releases
 smm2Channel = int: smm2 
 commandsChannel = int: commands 
 marioluigiChannel = int: mario and luigi 
-showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel]
 
 # Category IDs
 eventCat = int: server events
+modmailCat = int: modmail category
+
+showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel, modmailCat]
 
 # Role IDs
 boostRole = int: nitro boosters
