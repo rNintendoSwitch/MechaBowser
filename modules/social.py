@@ -35,6 +35,7 @@ class SocialFeatures(commands.Cog):
         self.bot = bot
         self.inprogressEdits = {}
         self.letterCodepoints = ['1f1e6', '1f1e7', '1f1e8', '1f1e9', '1f1ea', '1f1eb', '1f1ec', '1f1ed', '1f1ee', '1f1ef', '1f1f0', '1f1f1', '1f1f2', '1f1f3', '1f1f4', '1f1f5', '1f1f6', '1f1f7', '1f1f8', '1f1f9', '1f1fa', '1f1fb', '1f1fc', '1f1fd', '1f1fe', '1f1ff']
+        self.twemojiPath = 'resources/twemoji/assets/72x72/'
         
         self.friendCodeRegex = { # Friend Code Regexs (\u2014 = em-dash)
             # Profile setup/editor (lenient)
@@ -104,7 +105,7 @@ class SocialFeatures(commands.Cog):
                     unicodePoint.append(hex(x)[2:])
 
                 unicodeChar = '-'.join(unicodePoint)
-                emojiPic = Image.open('resources/twemoji/' + unicodeChar + '.png').convert('RGBA').resize((40, 40))
+                emojiPic = Image.open(self.twemojiPath + unicodeChar + '.png').convert('RGBA').resize((40, 40))
                 card.paste(emojiPic, (nameW + 3, 228), emojiPic)
                 nameW += 46
 
@@ -114,7 +115,7 @@ class SocialFeatures(commands.Cog):
         draw.text((350, 275), '#' + member.discriminator, (126, 126, 126), font=subtextFont)
 
         if dbUser['regionFlag']:
-            regionImg = Image.open('resources/twemoji/' + dbUser['regionFlag'] + '.png').convert('RGBA')
+            regionImg = Image.open(self.twemojiPath + dbUser['regionFlag'] + '.png').convert('RGBA')
             card.paste(regionImg, (976, 50), regionImg)
 
         # Friend code
@@ -334,7 +335,7 @@ class SocialFeatures(commands.Cog):
                 points.append(str(hex(x)[2:]))
 
             pointStr = '-'.join(points)
-            if not Path(f'resources/twemoji/{pointStr}.png').is_file():
+            if not Path(f'{self.twemojiPath}{pointStr}.png').is_file():
                 return False
 
             db.update_one({'_id': ctx.author.id}, {'$set': {'regionFlag': pointStr}})

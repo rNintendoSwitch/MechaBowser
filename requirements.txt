@@ -17,3 +17,5 @@ cchardet
 aiodns
 nintendeals
 dpytest
+codepoints
+emoji
