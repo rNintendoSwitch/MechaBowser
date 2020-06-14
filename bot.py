@@ -10,8 +10,16 @@ import tornado
 import discord
 from discord.ext import commands
 
-import config
+LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
+logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
+
 import utils
+
+try:
+    import config
+
+except ImportError:
+    logging.critical('[Bot] config.py does not exist, you should make one from the example config')
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -19,10 +27,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 activityStatus = discord.Activity(type=discord.ActivityType.watching, name='over the server')
-bot = commands.Bot(['!', ',', '.'], max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
-
-LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
-logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
+bot = commands.Bot(config.command_prefixes, max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
 
 class BotCache(commands.Cog):
     def __init__(self, bot):
