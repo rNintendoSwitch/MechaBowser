@@ -622,17 +622,19 @@ class ChatControl(commands.Cog):
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateTags = {
-            "amazon.*": ["tag", "colid", "coliid"],
+            "*": ["awc"],
+            "amazon.*": ["colid", "coliid", "tag"],
+            "bestbuy.*": ["aid", "cjpid", "lid", "pid"], 
             "bhphotovideo.com": ["sid"],
-            "bestbuy.*": ["cjpid", "lid", "aid", "pid"], 
             "ebay.*": ["afepn", "campid", "pid"],
-            "gamestop.com": ["affid", "cid", "sourceid", "utm_source", "utm_medium","utm_campaign"],
+            "gamestop.com": ["affid", "cid", "sourceid"],
             "groupon.*": ["affid"],
             "newegg*.*": ["aid", "pid"],
-            "stacksocial.com": ["rid", "aid"],
+            "play-asia.com": ["tagid"],
+            "stacksocial.com": ["aid", "rid"],
+            "store.nintendo.co.uk": ["affil"],
             "tigerdirect.com": ["affiliateid", "srccode"],
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
-            "play-asia.com": ["tagid"]
             }
         self.inviteRe = re.compile(r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/[\da-z-]+)', re.I)
         self.thirtykEvent = {}
