@@ -499,9 +499,9 @@ def humanize_duration(duration):
     diff = int(diff_delta.total_seconds())
 	
     if diff < 0:
-      sign = "-"
       diff = -diff
-    else: sign = ""
+      ago = ' ago'
+    else: ago = ''
 	
     minutes, seconds = divmod(diff, 60)
     hours, minutes = divmod(minutes, 60)
@@ -524,7 +524,7 @@ def humanize_duration(duration):
                 expires.append('{} {}'.format(units[x], unit_strs[x]))
     
     if not expires: return '0 seconds'
-    return sign + ', '.join(expires)
+    return ', '.join(expires) + ago
 
 async def mod_cmd_invoke_delete(channel):
     if channel.id in config.showModCTX or channel.category_id in config.showModCTX:
