@@ -112,7 +112,7 @@ class MainEvents(commands.Cog):
         embed = discord.Embed(color=0x417505, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
         created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
-        created_at += '' if not new else '\n' + utils.humanize_duration(member.created_at).replace('-', '') + ' ago'
+        created_at += '' if not new else '\n' + utils.humanize_duration(member.created_at)
         embed.add_field(name='Created at', value=created_at)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
 
