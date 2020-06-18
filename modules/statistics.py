@@ -18,7 +18,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 
-class StatCommands(commands.Cog):
+class StatCommands(commands.Cog, name='Statistic Commands'):
     def __init__(self, bot):
         self.bot = bot
 

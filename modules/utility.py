@@ -26,7 +26,7 @@ mclient = pymongo.MongoClient(
 serverLogs = None
 modLogs = None
 
-class NintenDeals(commands.Cog):
+class Games(commands.Cog, name='Game Commands'):
     extGames = {}
     gamesReady = False
     def __init__(self, bot):
@@ -70,7 +70,7 @@ class NintenDeals(commands.Cog):
         #self.query_deals.start() #pylint: disable=no-member
         self.update_game_info.start() #pylint: disable=no-member
         #self.new_release_posting.start() #pylint: disable=no-member
-        logging.info('[Deals] NintenDeals task cogs loaded')
+        logging.info('[Deals] Games task cogs loaded')
 
     def cog_unload(self):
         logging.info('[Deals] Attempting to cancel tasks...')
@@ -80,7 +80,7 @@ class NintenDeals(commands.Cog):
         logging.info('[Deals] Tasks exited')
         asyncio.get_event_loop().run_until_complete(self.session.close())
         #self.session.close()
-        logging.info('[Deals] NintenDeals task cogs unloaded')
+        logging.info('[Deals] Games task cogs unloaded')
 
     async def _ready_status(self):
         return self.gamesReady
@@ -610,7 +610,7 @@ class NintenDeals(commands.Cog):
             await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.')
             raise error
 
-class ChatControl(commands.Cog):
+class ChatControl(commands.Cog, name='Utility Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.modLogs = self.bot.get_channel(config.modChannel)
@@ -1350,10 +1350,10 @@ def setup(bot):
     modLogs = bot.get_channel(config.modChannel)
 
     bot.add_cog(ChatControl(bot))
-    bot.add_cog(NintenDeals(bot))
+    bot.add_cog(Games(bot))
     logging.info('[Extension] Utility module loaded')
 
 def teardown(bot):
     bot.remove_cog('ChatControl')
-    bot.remove_cog('NintenDeals')
+    bot.remove_cog('Games')
     logging.info('[Extension] Utility module unloaded')

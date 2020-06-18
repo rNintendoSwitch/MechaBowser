@@ -41,7 +41,7 @@ class ResolveUser(commands.Converter):
         except discord.NotFound:
             raise commands.BadArgument
 
-class Moderation(commands.Cog):
+class Moderation(commands.Cog, name='Moderation Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.serverLogs = self.bot.get_channel(config.logChannel)

@@ -30,7 +30,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 
-class SocialFeatures(commands.Cog):
+class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
