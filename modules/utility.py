@@ -1020,7 +1020,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
                     break
 
-                noteList.append(f'{stamp}: {x["reason"]}')
+                noteList.append(noteContent)
 
             embed.add_field(name='User notes', value=fieldValue + '\n'.join(noteList), inline=False)
 
