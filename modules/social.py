@@ -41,7 +41,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators; discards AC designer prefixes and urls
-            "chatFilter": re.compile(r'(?!\s*https?:\/\/[^ "<>\\^`{|}]+)(?!\s*\S*m[ao])(?:(?:^|\s)\S*)(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
+            "chatFilter": re.compile(r'(?!\s*https?:\/\/)(?!\s*\S*m[ao][ \-\u2014])(?:(?:^|\s)\S*)(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
         }
 
     @commands.group(name='profile', invoke_without_command=True)
