@@ -40,8 +40,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.friendCodeRegex = { # Friend Code Regexs (\u2014 = em-dash)
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
-            # Chat filter, "It appears you've sent a friend code." Requires separators: discards AC designer prefixes and urls
-            "chatFilter": re.compile(r'(?!\s*https?:\/\/\S+)(?!\s*m[ao])(?:(?:^|\s)\S*)[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
+            # Chat filter, "It appears you've sent a friend code." Requires separators; discards AC designer prefixes and urls
+            "chatFilter": re.compile(r'(?!\s*https?:\/\/[^ "<>\\^`{|}]+)(?!\s*\S*m[ao])(?:(?:^|\s)\S*)[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
         }
 
     @commands.group(name='profile', invoke_without_command=True)
