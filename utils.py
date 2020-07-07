@@ -582,7 +582,8 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
         'blacklist': f'Your **posting permissions** have been **restricted** in {details} on',
         'unblacklist': f'Your **posting permissions** have been **restored** in {details} on',
         'kick': 'You have been **kicked** from',
-        'ban': 'You have been **banned** from'
+        'ban': 'You have been **banned** from',
+        'automod-word': 'You have violated the word filter on'
     }
     mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
 
