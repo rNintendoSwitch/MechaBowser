@@ -35,6 +35,7 @@ releaseChannel = int: new releases
 smm2Channel = int: smm2 
 commandsChannel = int: commands 
 marioluigiChannel = int: mario and luigi 
+automodChannel = int: automod alerts
 
 # Category IDs
 eventCat = int: server events
