@@ -376,7 +376,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 content = response.content.lower().strip()
 
-                NintenDeals = self.bot.get_cog('NintenDeals')
+                NintenDeals = self.bot.get_cog('Games Commands')
                 if not NintenDeals.gamesReady:
                     waitMsg = await message.channel.send(f'{config.loading} Please wait a few moments, getting info on that game')
                     while not NintenDeals.gamesReady:
