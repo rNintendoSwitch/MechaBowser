@@ -13,6 +13,7 @@ import discord
 from discord import Webhook, AsyncWebhookAdapter
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz, process
+from nintendeals import noa, noe, noj
 
 import config
 import utils
