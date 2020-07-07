@@ -218,7 +218,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if not action:
             return await ctx.send(f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted')
 
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, active=False)
+        docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
         try:
             await member.send(utils.format_pundm('unmute', reason, ctx.author))
