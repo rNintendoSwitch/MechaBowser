@@ -29,6 +29,11 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('modules.statistics')
             self.bot.load_extension('modules.social')
             self.bot.load_extension('utils')
+            try: # Private submodule extensions
+                self.bot.load_extension('private.automod')
+
+            except commands.errors.ExtensionNotFound:
+                logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
 
             self.sanitize_eud.start() #pylint: disable=no-member
 
