@@ -397,12 +397,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         oldTierInt = 0
         if puns:
             for x in puns:
+                if oldTierInt == tier:
+                    return await ctx.send(f'{config.redTick} User is already warned at that tier')
+
                 db.update_one({'_id': x['_id']}, {'$set': {
                     'active': False
                 }})
                 oldTierInt = int(x['type'][-1:])
-                if oldTierInt == tier:
-                    return await ctx.send(f'{config.redTick} User is already warned at that tier')
 
                 await member.remove_roles(tierLevel[oldTierInt])
                 if oldTierInt > tier:
