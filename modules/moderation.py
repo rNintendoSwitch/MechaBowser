@@ -49,6 +49,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _banning(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters')
         if not users: return await ctx.send(f'{config.redTick} An invalid user was provided')
@@ -112,6 +113,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.command(name='unban')
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _unbanning(self, ctx, user: int, *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Unban reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
@@ -143,6 +145,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.command(name='kick')
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters')
         docID = await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
@@ -167,6 +170,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _muting(self, ctx, member: discord.Member, duration, *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
@@ -208,6 +212,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.command(name='unmute')
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _unmuting(self, ctx, member: discord.Member, *, reason='-No reason specified-'): # TODO: Allow IDs to be unmuted (in the case of not being in the guild)
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
@@ -241,6 +246,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _warning(self, ctx, member: discord.Member, *, reason):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
@@ -313,6 +319,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @_warning.command(name='clear')
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _warning_clear(self, ctx, member: discord.Member, *, reason):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn clear reason is too long, reduce it by at least {len(reason) - 990} characters')
         db = mclient.bowser.puns
@@ -362,6 +369,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @_warning.command(name='level')
     @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _warning_setlevel(self, ctx, member: discord.Member, tier: int, *, reason):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
         if tier not in [1, 2, 3]:
