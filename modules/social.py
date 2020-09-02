@@ -46,11 +46,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
     @commands.group(name='profile', invoke_without_command=True)
+    @commands.cooldown(2, 60, commands.BucketType.channel)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member: member = ctx.author
         db = mclient.bowser.users
         fs = gridfs.GridFS(mclient.bowser)
         dbUser = db.find_one({'_id': member.id})
+
+        # If profile not setup, running on self, not a mod, and not in commands channel: disallow running profile command
+        if not dbUser['profileSetup'] and member == ctx.author and ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != config.commandsChannel: 
+            await ctx.message.delete()
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} You need to setup your profile to view it outside of <#{config.commandsChannel}>! To setup your profile, use `!profile edit` in <#{config.commandsChannel}>.', delete_after=15)
 
         metaFont = ImageFont.truetype('resources/OpenSans-Regular.ttf', 36)
         userFont = ImageFont.truetype('resources/OpenSans-Regular.ttf', 48)
@@ -606,6 +612,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not code: return
         if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
             await message.channel.send(f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`')
+
+    @_profile.error
+    async def social_error(self, ctx, error):
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+
+        if isinstance(error, commands.CommandOnCooldown):
+            if cmd_str == 'profile' and (ctx.message.channel.id in [config.commandsChannel, config.voiceTextChannel] or ctx.guild.get_role(config.moderator) in ctx.author.roles):
+                await self._profile.__call__(ctx, None if not ctx.args else ctx.args[0])
+            else:
+                return await ctx.send(f'{config.redTick} You are using that command too fast, try again in a few seconds.', delete_after=15)
+
+        else:
+            await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
+            raise error
 
 def setup(bot):
     bot.add_cog(SocialFeatures(bot))
