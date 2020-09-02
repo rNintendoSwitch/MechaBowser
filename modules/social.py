@@ -621,7 +621,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if cmd_str == 'profile' and (ctx.message.channel.id in [config.commandsChannel, config.voiceTextChannel] or ctx.guild.get_role(config.moderator) in ctx.author.roles):
                 await self._profile.__call__(ctx, None if not ctx.args else ctx.args[0])
             else:
-                return await ctx.send(f'{config.redTick} You are using that command too fast, try again in a few seconds.', delete_after=15)
+                return await ctx.send(f'{config.redTick} That command is being used too often, try again in a few seconds.', delete_after=15)
 
         else:
             await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
