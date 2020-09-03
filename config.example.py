@@ -102,5 +102,6 @@ punStrs = {
     'unban': 'Unban',
     'blacklist': 'Blacklist',
     'unblacklist': 'Unblacklist',
-    'note': 'Note'
+    'note': 'Note',
+    'appealdeny': 'Denied ban appeal'
 }
