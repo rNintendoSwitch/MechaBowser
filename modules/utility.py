@@ -1325,6 +1325,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         elif isinstance(error, commands.BadArgument):
             return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
 
+        elif isinstance(error, commands.MissingPermissions):
+            return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
+
         else:
             await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
             raise error
