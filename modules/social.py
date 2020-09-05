@@ -384,7 +384,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         async def _phase4(message):
             offerReset = dbUser['profileSetup'] and dbUser['favgames']
-            txt = '__Choosing favorite games is currently disabled.__ See <#238137363073728516> for more information.'
+            txt = 'Choosing favorite games is currently disabled while we freshen things up. Sorry about that!'
 
             if offerReset:
                 txt += '\n\nType `skip` to continue setting up your profile or `reset` to clear your currently set games *(You will not be able to set new games until game search is reenabled!)*'
