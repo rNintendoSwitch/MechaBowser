@@ -383,81 +383,63 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return False
 
         async def _phase4(message):
-            offerReset = dbUser['profileSetup'] and dbUser['favgames']
-            txt = 'Choosing favorite games is currently disabled while we freshen things up. Sorry about that!'
+            gameCnt = 0
+            failedFetch = False
+            userGames = []
+            while gameCnt < 3:
+                if failedFetch: await message.channel.send(f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase4.format(gameCnt))
+                else: await message.channel.send(phase4.format(gameCnt))
+                failedFetch = False
 
-            if offerReset:
-                txt += '\n\nType `skip` to continue setting up your profile or `reset` to clear your currently set games *(You will not be able to set new games until game search is reenabled!)*'
-            else: 
-                txt += ' We\'ll go ahead and skip this step for now'
+                response = await self.bot.wait_for('message', timeout=180, check=check)
+                if response.content.lower().strip() == 'skip': break
+                if response.content.lower().strip() == 'reset':
+                    db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+                    await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
+                    return True
 
-            await message.channel.send(txt)
-            if not offerReset: return True
+                content = response.content.lower().strip()
 
-            response = await self.bot.wait_for('message', timeout=180, check=check)
-            if response.content.lower().strip() == 'skip': return True
-            if response.content.lower().strip() == 'reset':
-                db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
-                await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
-                return True
+                NintenDeals = self.bot.get_cog('Game Commands')
+                if not NintenDeals.gamesReady:
+                    waitMsg = await message.channel.send(f'{config.loading} Please wait a few moments, getting info on that game')
+                    while not NintenDeals.gamesReady:
+                        await asyncio.sleep(0.5)
 
-            # gameCnt = 0
-            # failedFetch = False
-            # userGames = []
-            # while gameCnt < 3:
-            #     if failedFetch: await message.channel.send(f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase4.format(gameCnt))
-            #     else: await message.channel.send(phase4.format(gameCnt))
-            #     failedFetch = False
+                    await waitMsg.delete()
 
-            #     response = await self.bot.wait_for('message', timeout=180, check=check)
-            #     if response.content.lower().strip() == 'skip': break
-            #     if response.content.lower().strip() == 'reset':
-            #         db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
-            #         await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
-            #         return True
+                games = NintenDeals.games
 
-            #     content = response.content.lower().strip()
+                gameObj = None
+                titleList = {}
 
-            #     NintenDeals = self.bot.get_cog('Game Commands')
-            #     if not NintenDeals.gamesReady:
-            #         waitMsg = await message.channel.send(f'{config.loading} Please wait a few moments, getting info on that game')
-            #         while not NintenDeals.gamesReady:
-            #             await asyncio.sleep(0.5)
+                for gameEntry in games.values():
+                    for title in gameEntry['titles'].values():
+                        if not title or title in titleList.keys(): continue
+                        titleList[title] = gameEntry['_id']
 
-            #         await waitMsg.delete()
+                results = process.extract(content, titleList.keys(), limit=2)
+                if results[0][1] >= 86:
+                    if gameCnt == 0 and dbUser['favgames']: db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+                    while True:
+                        await message.channel.send(f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__')
+                        checkResp = await self.bot.wait_for('message', timeout=120, check=check)
+                        if checkResp.content.lower().strip() in ['yes', 'y']:
+                            gameObj = games[titleList[results[0][0]]]
+                            if gameObj['_id'] in userGames:
+                                failedFetch = True
+                                break
 
-            #     games = NintenDeals.games
+                            db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': gameObj['_id']}})
+                            gameCnt += 1
+                            userGames.append(gameObj['_id'])
+                            break
 
-            #     gameObj = None
-            #     titleList = {}
+                        elif checkResp.content.lower().strip() in ['no', 'n']:
+                            break
 
-            #     for gameEntry in games.values():
-            #         for title in gameEntry['titles'].values():
-            #             if not title or title in titleList.keys(): continue
-            #             titleList[title] = gameEntry['_id']
-
-            #     results = process.extract(content, titleList.keys(), limit=2)
-            #     if results[0][1] >= 86:
-            #         if gameCnt == 0 and dbUser['favgames']: db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
-            #         while True:
-            #             await message.channel.send(f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__')
-            #             checkResp = await self.bot.wait_for('message', timeout=120, check=check)
-            #             if checkResp.content.lower().strip() in ['yes', 'y']:
-            #                 gameObj = games[titleList[results[0][0]]]
-            #                 if gameObj['_id'] in userGames:
-            #                     failedFetch = True
-            #                     break
-
-            #                 db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': gameObj['_id']}})
-            #                 gameCnt += 1
-            #                 userGames.append(gameObj['_id'])
-            #                 break
-
-            #             elif checkResp.content.lower().strip() in ['no', 'n']:
-            #                 break
-
-            #     else:
-            #         failedFetch = True
+                else:
+                    failedFetch = True
 
         async def _phase5(message):
             backgrounds = list(dbUser['backgrounds'])
