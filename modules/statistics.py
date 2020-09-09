@@ -274,7 +274,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         elif isinstance(error, commands.BadArgument):
             return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
 
-        elif isinstance(error, commands.MissingPermissions):
+        elif isinstance(error, commands.CheckFailure):
             return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
 
         else:
