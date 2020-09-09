@@ -134,7 +134,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         joins = dbUser['joins']
         joins.sort()
         joinDate = datetime.datetime.utcfromtimestamp(joins[0])
-        draw.text((60, 505), joinDate.strftime('%b. %-d, %Y'), (80, 80, 80), font=mediumFont)
+        try: # -d doesn't work on all platforms, such as Windows
+            joinDateF = joinDate.strftime('%b. %-d, %Y')
+        except:
+            joinDateF = joinDate.strftime('%b. %d, %Y')
+        draw.text((60, 505), joinDateF, (80, 80, 80), font=mediumFont)
 
         if not dbUser['timezone']:
             draw.text((800, 505), 'Not specified', (126, 126, 126), font=mediumFont)
@@ -286,18 +290,32 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.inprogressEdits[ctx.author.id] = time.time()
         await ctx.message.add_reaction('📬')
 
-        header = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.\n\n'
-        reedit = header[:-2] + ' If you would like to instead reset a section of your profile that you have previously set, just respond `reset` to any prompt.\n\n'
+        headerBase = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.'
         phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
         phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
         phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
         phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
         phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
 
+        # Lookup tables of values dependant on if user has setup their profile
+        header = {
+            True: f'{headerBase} If you would like to instead reset a section of your profile that you have previously set, just respond `reset` to any prompt.\n\n',
+            False: f'{headerBase}\n\n'
+        }
+
+        embedText = { 
+            'title': {
+                True: 'Edit your user profile',
+                False: 'Setup your user profile'
+            },
+            'descBase': {
+                True: 'Welcome back to profile setup.',
+                False: 'It appears you have not setup your profile before, let\'s get that taken care of!'
+            }
+        }
+
         def check(m):
             return m.author.id == ctx.author.id and m.channel.id == mainMsg.channel.id
-
-        botMsg = None
 
         async def _phase1(message):
             response = await self.bot.wait_for('message', timeout=120, check=check)
@@ -454,152 +472,84 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     else:
                         break
 
-        if not dbUser['profileSetup']: # User has not set their profile up
-            embed = discord.Embed(title='Setup your user profile', description='It appears you have not setup your profile before, let\'s get that taken care of!' \
-                                    '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
-                                    '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
-                                    '\n\nWhen prompted, simply reply with what you would like to set the field as.')
-            embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+
+        profileSetup = dbUser['profileSetup']
+
+        embed = discord.Embed(title=embedText['title'][profileSetup], description=embedText["descBase"][profileSetup] + \
+                                '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
+                                '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
+                                '\n\nWhen prompted, simply reply with what you would like to set the field as.')
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+        
+        if not profileSetup:
             db.update_one({'_id': ctx.author.id}, {'$set': {'profileSetup': True}})
-            try:
-                mainMsg = await ctx.author.send(embed=embed)
-                private = True
 
-            except discord.Forbidden: # DMs not allowed, try in channel
-                private = False
-                return await ctx.send(f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you')
-                mainMsg = await ctx.send(ctx.author.mention, embed=embed)
+        try:
+            mainMsg = await ctx.author.send(embed=embed)
+            private = True
 
-            botMsg = await mainMsg.channel.send(header + phase1)
-            try:
-                # Phase 1
-                phaseStart = time.time()
-                phaseSuccess = False
-                while not phaseSuccess:
-                    if not await _phase1(botMsg):
-                        botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1)
+        except discord.Forbidden: # DMs not allowed, try in channel
+            private = False
+            return await ctx.send(f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you')
+            mainMsg = await ctx.send(ctx.author.mention, embed=embed)
 
-                    else:
-                        phaseSuccess = True
+        botMsg = await mainMsg.channel.send(header[profileSetup] + phase1)
+        try:
+            # Phase 1
+            phaseStart = time.time()
+            phaseSuccess = False
+            while not phaseSuccess:
+                if not await _phase1(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1)
 
-                # Phase 2
-                await botMsg.channel.send(phase2)
+                else:
+                    phaseSuccess = True
 
-                phaseStart = time.time()
-                phaseSuccess = False
-                while not phaseSuccess:
-                    if not await _phase2(botMsg):
-                        botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase2)
+            # Phase 2
+            await botMsg.channel.send(phase2)
 
-                    else:
-                        phaseSuccess = True
+            phaseStart = time.time()
+            phaseSuccess = False
+            while not phaseSuccess:
+                if not await _phase2(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase2)
 
-                # Phase 3
-                await botMsg.channel.send(phase3)
+                else:
+                    phaseSuccess = True
 
-                phaseStart = time.time()
-                phaseSuccess = False
-                while not phaseSuccess:
-                    if not await _phase3(botMsg):
-                        botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase3)
+            # Phase 3
+            await botMsg.channel.send(phase3)
 
-                    else:
-                        phaseSuccess = True
+            phaseStart = time.time()
+            phaseSuccess = False
+            while not phaseSuccess:
+                if not await _phase3(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase3)
 
-
-                phaseStart = time.time()
-                phaseSuccess = False
-
-                # Phase 4
-                phaseStart = time.time()
-                phaseSuccess = False
-                await _phase4(botMsg)
-
-                # Phase 5
-                phaseStart = time.time()
-                phaseSuccess = False
-                await _phase5(botMsg)
-
-                del self.inprogressEdits[ctx.author.id]
-                await mainMsg.channel.send('You are all set! Your profile has been edited')
-
-            except asyncio.TimeoutError:
-                await mainMsg.delete()
-                del self.inprogressEdits[ctx.author.id]
-                return await botMsg.edit(content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again')
-
-        else:
-            embed = discord.Embed(title='Edit your user profile', description='Welcome back to profile setup.' \
-                                    '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
-                                    '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
-                                    '\n\nWhen prompted, simply reply with what you would like to set the field as.')
-            embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
-            try:
-                mainMsg = await ctx.author.send(embed=embed)
-                private = True
-
-            except discord.Forbidden: # DMs not allowed, try in channel
-                private = False
-                return await ctx.send(f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you')
-                mainMsg = await ctx.send(ctx.author.mention, embed=embed)
-
-            botMsg = await mainMsg.channel.send(reedit + phase1)
-            try:
-                # Phase 1
-                phaseStart = time.time()
-                phaseSuccess = False
-                while not phaseSuccess:
-                    if not await _phase1(botMsg):
-                        botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1)
-
-                    else:
-                        phaseSuccess = True
-
-                # Phase 2
-                await botMsg.channel.send(phase2)
-
-                phaseStart = time.time()
-                phaseSuccess = False
-                while not phaseSuccess:
-                    if not await _phase2(botMsg):
-                        botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase2)
-
-                    else:
-                        phaseSuccess = True
-
-                # Phase 3
-                await botMsg.channel.send(phase3)
-
-                phaseStart = time.time()
-                phaseSuccess = False
-                while not phaseSuccess:
-                    if not await _phase3(botMsg):
-                        botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase3)
-
-                    else:
-                        phaseSuccess = True
+                else:
+                    phaseSuccess = True
 
 
-                phaseStart = time.time()
-                phaseSuccess = False
+            phaseStart = time.time()
+            phaseSuccess = False
 
-                # Phase 4
-                phaseStart = time.time()
-                phaseSuccess = False
-                await _phase4(botMsg)
+            # Phase 4
+            phaseStart = time.time()
+            phaseSuccess = False
+            await _phase4(botMsg)
 
-                # Phase 5
-                phaseStart = time.time()
-                phaseSuccess = False
-                await _phase5(botMsg)
+            # Phase 5
+            phaseStart = time.time()
+            phaseSuccess = False
+            await _phase5(botMsg)
 
-                del self.inprogressEdits[ctx.author.id]
-                await mainMsg.channel.send('You are all set! Your profile has been edited')
+            del self.inprogressEdits[ctx.author.id]
+            await mainMsg.channel.send('You are all set! Your profile has been edited')
 
-            except asyncio.TimeoutError:
-                await mainMsg.delete()
-                del self.inprogressEdits[ctx.author.id]
-                return await botMsg.edit(content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again')  
+        except asyncio.TimeoutError:
+            await mainMsg.delete()
+            del self.inprogressEdits[ctx.author.id]
+            return await botMsg.edit(content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again')
 
     @commands.Cog.listener()
     async def on_message(self, message):
