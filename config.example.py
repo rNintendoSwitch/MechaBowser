@@ -77,6 +77,9 @@ fastForward = '⏩'
 downTriangle = '🔻'
 stopSign = '🛑'
 
+# Invites
+banAppealInvite = str: invite to ban appeal server
+
 # Web
 baseUrl = 'https://example.com'
 dealsAPI = 'https://example.net/api/games/switch'
