@@ -150,7 +150,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters')
         docID = await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
         try:
-            await member.send(utils.format_pundm('kick', reason, {ctx.author}))
+            await member.send(utils.format_pundm('kick', reason, ctx.author))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
         await member.kick(reason='Kick action performed by moderator')
