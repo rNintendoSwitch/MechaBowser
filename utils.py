@@ -480,7 +480,7 @@ async def embed_paginate(chunks: list, page=1, header=None, codeblock=True):
 
     return requestedPage, pages
 
-async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=datetime.datetime.utcnow(), public=False, delay=5):
+async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=datetime.datetime.utcnow(), public=False, delay=300):
     if user: # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
         userid = user.id

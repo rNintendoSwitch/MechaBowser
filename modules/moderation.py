@@ -207,21 +207,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
 
-    @commands.is_owner()
-    @commands.command(name='modlog')
-    async def _modlog_debug(self, ctx, _type, public: bool):
-        if public:
-            channel = self.bot.get_channel(752224051153469594)
-
-        else:
-            channel = self.modLogs
-
-        if public:
-            await utils.send_modlog(self.bot, channel, _type, ctx.author, '5c89fa87-065c-4473-9b50-d1ec96eee382', 'Example #modlog', moderator=ctx.author, public=True)
-
-        else:
-            await utils.send_modlog(self.bot, channel, _type, ctx.author, '5c89fa87-065c-4473-9b50-d1ec96eee382', 'Public demo modlog', moderator=ctx.author, public=False)
-
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
