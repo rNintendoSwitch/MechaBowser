@@ -73,12 +73,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             except discord.NotFound:
                 pass
 
-            embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'Ban | {username} ({user.id})')
-            embed.add_field(name='User', value=f'<@{userid}>', inline=True)
-            embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-            embed.add_field(name='Reason', value=reason)
-
             try:
                 await user.send(utils.format_pundm('ban', reason, ctx.author))
             except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
@@ -96,8 +90,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 continue
 
             docID = await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
-            embed.set_footer(text=docID)
-            await self.modLogs.send(embed=embed)
+            await utils.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, username=username, userid=userid, moderator=ctx.author, public=True)
             banCount += 1
 
         if await utils.mod_cmd_invoke_delete(ctx.channel):
@@ -129,15 +122,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         }})
         docID = await utils.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
         await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
-
-        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Unban | {user}')
-        embed.set_footer(text=docID)
-        embed.add_field(name='User', value=f'<@{user}>', inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Reason', value=reason)
-
-        await self.modLogs.send(embed=embed)
+        await utils.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, username=str(user), userid=user, moderator=ctx.author, public=True)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
@@ -154,15 +139,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
         await member.kick(reason='Kick action performed by moderator')
-
-        embed = discord.Embed(color=0xD18407, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Kick | {member} ({member.id})')
-        embed.set_footer(text=docID)
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Reason', value=reason)
-
-        await self.modLogs.send(embed=embed)
+        await utils.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
@@ -191,20 +168,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         docID = await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.add_roles(muteRole, reason='Mute action performed by moderator')
+        await utils.send_modlog(self.bot, self.modLogs, 'mute', docID, reason, user=member, moderator=ctx.author, expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', public=True)
         try:
             await member.send(utils.format_pundm('mute', reason, ctx.author, utils.humanize_duration(_duration)))
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
-        embed = discord.Embed(color=0xB4A6EF, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Mute | {member} ({member.id})')
-        embed.set_footer(text=docID)
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Expires', value=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', inline=True)
-        embed.add_field(name='Reason', value=reason)
-
-        await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
@@ -225,24 +194,33 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
+        await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
             await member.send(utils.format_pundm('unmute', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
-        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Unmute | {member} ({member.id})')
-        embed.set_footer(text=docID)
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Reason', value=reason)
-
         await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
+
+    @commands.is_owner()
+    @commands.command(name='modlog')
+    async def _modlog_debug(self, ctx, _type, public: bool):
+        if public:
+            channel = self.bot.get_channel(752224051153469594)
+
+        else:
+            channel = self.modLogs
+
+        if public:
+            await utils.send_modlog(self.bot, channel, _type, ctx.author, '5c89fa87-065c-4473-9b50-d1ec96eee382', 'Example #modlog', moderator=ctx.author, public=True)
+
+        else:
+            await utils.send_modlog(self.bot, channel, _type, ctx.author, '5c89fa87-065c-4473-9b50-d1ec96eee382', 'Public demo modlog', moderator=ctx.author, public=False)
 
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
@@ -255,16 +233,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             0: ctx.guild.get_role(config.warnTier1),
             1: ctx.guild.get_role(config.warnTier2),
             2: ctx.guild.get_role(config.warnTier3)
-        }
-        embedColor = {
-            0: discord.Color(0xFFFA1C),
-            1: discord.Color(0xFF9000),
-            2: discord.Color(0xD0021B)
-        }
-        warnText = {
-            0: 'First warning',
-            1: 'Second warning',
-            2: 'Third warning'
         }
 
         puns = db.find_one({'user': member.id, 'active': True, 'type': {
@@ -287,17 +255,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             }})
             warnLevel = 2 if puns['type'] == 'tier2' else 1
 
-        if _warnType == 'warn':
-            embedWarnType = warnText[warnLevel]
-    
-        elif _warnType == 'warnup':
-            embedWarnType = f'{warnText[warnLevel]} (was Tier {warnLevel})'
-
-        embed = discord.Embed(color=embedColor[warnLevel], timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{embedWarnType} | {member} ({member.id})')
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Reason', value=reason)
+        embedWarnType = ''
+        if _warnType == 'warnup':
+            embedWarnType = f'was Tier {warnLevel}'
 
         for role in member.roles:
             if role in [tierLevel[0], tierLevel[1], tierLevel[2]]:
@@ -305,13 +265,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         await member.add_roles(tierLevel[warnLevel], reason='Warn action performed by moderator')
         docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason, int(utils.resolve_duration('30d').timestamp()))
+        await utils.send_modlog(self.bot, self.modLogs, f'tier{warnLevel+1}', docID, reason, user=member, moderator=ctx.author, extra_author=embedWarnType, public=True)
         try:
             await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {warnLevel + 1}'))
         except discord.Forbidden: # User has DMs off
             pass
 
-        embed.set_footer(text=docID)
-        await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
@@ -348,15 +307,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             tierInt = int(x['type'][-1:])
             await member.remove_roles(tierLevel[tierInt])
 
-        embed = discord.Embed(color=discord.Color(0x18EE1C), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'Warnings cleared | {member} ({member.id})')
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Reason', value=reason)
-
         docID = await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
-        embed.set_footer(text=docID)
-        await self.modLogs.send(embed=embed)
+        await utils.send_modlog(self.bot, self.modLogs, f'clear', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
             await member.send(utils.format_pundm('warnclear', reason, ctx.author))
         except discord.Forbidden: # User has DMs off
@@ -420,22 +372,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 else:
                     _warnType = 'warnup'
 
-        if _warnType == 'warn':
-            embedWarnType = warnText[tier]
-
-        elif _warnType in ['warnup', 'warndown']:
-            embedWarnType = f'{warnText[tier]} (was Tier {oldTierInt})'
-            
-        embed = discord.Embed(color=embedColor[tier], timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{embedWarnType} | {member} ({member.id})')
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Reason', value=reason)
+        embedWarnType = ''
+        if _warnType in ['warnup', 'warndown']:
+            embedWarnType = f'was Tier {oldTierInt}'
 
         await member.add_roles(tierLevel[tier])
         docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, int(utils.resolve_duration('30d').timestamp()), context='level_set')
-        embed.set_footer(text=docID)
-        await self.modLogs.send(embed=embed)
+        await utils.send_modlog(self.bot, self.modLogs, f'tier{tier}', docID, reason, user=member, moderator=ctx.author, extra_author=embedWarnType, public=True)
         try:
             await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {tier}'))
         except discord.Forbidden: # User has DMs off
@@ -535,6 +478,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     except (discord.Forbidden, discord.HTTPException):
                         pass
 
+                    # Because this does not generate a pun document, this will not be pushed to the pub modlog due to strike overhaul soon
                     embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
                     embed.set_author(name=f'Warning reduced | {member} ({member.id})')
                     embed.set_footer(text=warnPun['_id'])
@@ -554,6 +498,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
                     convertStr = f'(T{int(newTier[-1]) + 1}->T{newTier[-1]}) ' # Example return: "(T3->T2) "
                     docID = await utils.issue_pun(member.id, ctx.author.id, newTier, convertStr + warnPun['reason'], int(utils.resolve_duration('30d').timestamp()), context='vote')
+                    await utils.send_modlog(self.bot, self.modLogs, newTier, docID, 'Warning tier decayed', user=member, moderator=ctx.author, extra_author=convertStr[1:-2], public=True)
 
                     try:
                         await member.send(utils.format_pundm('warndown', 'A moderator has reviewed your warning', None, newTier, True))
@@ -561,14 +506,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     except (discord.Forbidden, discord.HTTPException):
                         pass
 
-                    embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
-                    embed.set_author(name=f'Warning reduced | {member} ({member.id})')
-                    embed.set_footer(text=docID)
-                    embed.add_field(name='User', value=member.mention, inline=True)
-                    embed.add_field(name='New tier', value=config.punStrs[newTier][:-8], inline=True) # Shave off "warning" str from const
-                    embed.add_field(name='Moderator', value=ctx.author.mention, inline=False)
-                    embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
-                    await self.modLogs.send(embed=embed)
                     await resp.delete()
                     return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')
 
@@ -683,7 +620,7 @@ class LoopTasks(commands.Cog):
                 newPun = db.find_one_and_update({'_id': pun['_id']}, {'$set': {
                     'active': False
                 }})
-                docID = await utils.issue_pun(member.id, self.bot.user.id, 'unmute', 'auto', active=False, context=pun['_id'])
+                docID = await utils.issue_pun(member.id, self.bot.user.id, 'unmute', 'Mute expired', active=False, context=pun['_id'])
 
                 if not newPun: # There is near zero reason this would ever hit, but in case...
                     logging.error(f'[expiry_check] Database failed to update user on pun expiration of {pun["_id"]}')
@@ -696,14 +633,7 @@ class LoopTasks(commands.Cog):
                 except discord.Forbidden: # User has DMs off
                     pass
 
-                embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Unmute | {member} ({member.id})')
-                embed.set_footer(text=docID)
-                embed.add_field(name='User', value=f'<@{member.id}>', inline=True)
-                embed.add_field(name='Moderator', value='Automatic', inline=True)
-                embed.add_field(name='Reason', value='Mute expired', inline=True)
-
-                await self.modLogs.send(embed=embed)
+                await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
 
             elif pun['type'] in warns and member:
                 if int(time.time()) < (pun['expiry']):

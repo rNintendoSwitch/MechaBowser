@@ -108,3 +108,18 @@ punStrs = {
     'note': 'Note',
     'appealdeny': 'Denied ban appeal'
 }
+
+punColors = {
+    'tier1': 0xFFFA1C,
+    'tier2': 0xFF9000,
+    'tier3': 0xD0021B,
+    'mute': 0xB4A6EF,
+    'unmute': 0x4A90E2,
+    'clear': 0x18EE1C,
+    'kick': 0xD18407,
+    'ban': 0xD0021B,
+    'unban': 0x4A90E2,
+    'blacklist': 0xF5A623,
+    'unblacklist': 0xF5A623,
+    'appealdeny': 0x4A90E2
+}

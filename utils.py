@@ -208,7 +208,10 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'reason': reason,
         'expiry': expiry,
         'context': context,
-        'active': active
+        'active': active,
+        'sensitive': False,
+        'public_log_message': None,
+        'public_log_channel': None
     })
     return docID
 
@@ -476,6 +479,54 @@ async def embed_paginate(chunks: list, page=1, header=None, codeblock=True):
         requestedPage = text if not codeblock else text + '```'
 
     return requestedPage, pages
+
+async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=datetime.datetime.utcnow(), public=False, delay=5):
+    if user: # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
+        username = str(user)
+        userid = user.id
+
+    author = f'{config.punStrs[_type]} '
+    if extra_author:
+        author += f'({extra_author}) '
+    author += f'| {username} ({userid})'
+
+    embed = discord.Embed(color=config.punColors[_type], timestamp=timestamp)
+    embed.set_author(name=author)
+    embed.set_footer(text=footer)
+    embed.add_field(name='User', value=f'<@!{userid}>', inline=True)
+    if moderator:
+        embed.add_field(name='Moderator', value=moderator.mention, inline=True)
+    if expires:
+        embed.add_field(name='Expires', value=expires)
+    embed.add_field(name='Reason', value=reason)
+
+    await channel.send(embed=embed)
+    if public:
+        event_loop = bot.loop
+        post_action = event_loop.call_later(delay, event_loop.create_task, send_public_modlog(bot, footer, bot.get_channel(752224051153469594), expires))
+        return post_action
+
+async def send_public_modlog(bot, id, channel, expires=None):
+    db = mclient.bowser.puns
+    doc = db.find_one({'_id': id})
+    user = await bot.fetch_user(doc["user"])
+
+    embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.datetime.utcfromtimestamp(doc['timestamp']))
+    embed.set_author(name=f'{config.punStrs[doc["type"]]} | {user} ({user.id})')
+    embed.set_footer(text=id)
+    embed.add_field(name='User', value=user.mention, inline=True)
+    if expires:
+        embed.add_field(name='Expires', value=expires)
+    embed.add_field(name='Reason', value=doc['reason'] if not doc['sensitive'] else 'This action\'s reason has been marked sensitive by the moderation team and is hidden. See <#671003325495509012> for more information on why logs are marked sensitive')
+
+    if doc['moderator'] == bot.user.id:
+        embed.description = 'This is an automatic action'
+
+    message = await channel.send(embed=embed)
+    db.update_one({'_id': id}, {'$set': {
+        'public_log_message': message.id,
+        'public_log_channel': channel.id
+    }})
 
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {

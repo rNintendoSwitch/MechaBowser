@@ -1292,6 +1292,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
+        await utils.send_modlog(self.bot, self.modLogs, statusText.lower(), docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
 
         try:
             statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
