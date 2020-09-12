@@ -4,6 +4,7 @@ import datetime
 import time
 import typing
 import re
+import copy
 
 import pymongo
 import discord
@@ -46,6 +47,64 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.bot = bot
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
+
+    @commands.command(name='hide', aliases=['unhide'])
+    @commands.has_any_role(config.moderator, config.eh)
+    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)    
+    async def _hide_modlog(self, ctx, uuid):
+        db = mclient.bowser.puns
+        doc = db.find_one({'_id': uuid})
+
+        if not doc:
+            return await ctx.send(f'{config.redTick} No punishment with that UUID exists')
+
+        sensitive = True if not doc['sensitive'] else False # Toggle sensitive value
+
+        if not doc['public_log_message']:
+            # Public log has not been posted yet
+            db.update_one({'_id': uuid}, {'$set': {
+                'sensitive': sensitive
+            }})
+            return await ctx.send(f'{config.greenTick} Successfully {"" if sensitive else "un"}marked modlog as sensitive')
+
+        else:
+            # public_mod_log has a set value, meaning the log has been posted. We need to edit both msg and db now
+            try:
+                channel = self.bot.get_channel(doc['public_log_channel'])
+                message = await channel.fetch_message(doc['public_log_message'])
+
+                if not channel: raise ValueError
+
+            except (ValueError, discord.NotFound, discord.Forbidden):
+                return await ctx.send(f'{config.redTick} There was an issue toggling that log\'s sensitive status; the message may have been deleted or I do not have permission to view the channel')
+
+            embed = message.embeds[0]
+            embedDict = embed.to_dict()
+            print(embedDict['fields'])
+            newEmbedDict = copy.deepcopy(embedDict)
+            listIndex = 0
+            for field in embedDict['fields']:
+                # We are working with the dict because some logs can have `reason` at different indexes and we should not assume index position
+                if field['name'] == 'Reason': # This is subject to a breaking change if `name` updated, but I'll take the risk
+                    if sensitive:
+                        newEmbedDict['fields'][listIndex]['value'] = 'This action\'s reason has been marked sensitive by the moderation team and is hidden. See <#671003325495509012> for more information on why logs are marked sensitive'
+
+                    else:
+                        newEmbedDict['fields'][listIndex]['value'] = doc['reason']
+
+                    break
+
+                listIndex += 1
+            print(embedDict['fields'][listIndex]['value'])
+            print(newEmbedDict['fields'][listIndex]['value'])
+            assert embedDict['fields'] != newEmbedDict['fields'] # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow
+            db.update_one({'_id': uuid}, {'$set': {
+                'sensitive': sensitive
+            }})
+            newEmbed = discord.Embed.from_dict(newEmbedDict)
+            await message.edit(embed=newEmbed)
+
+        await ctx.send(f'{config.greenTick} Successfully toggled the sensitive status for that infraction')
 
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
@@ -535,6 +594,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @_warning_setlevel.error
     @_warning_review.error
     @_note.error
+    @_hide_modlog.error
     async def mod_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
