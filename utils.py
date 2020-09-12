@@ -192,7 +192,7 @@ async def store_user(member, messages=0):
     }
     db.insert_one(userData)
 
-async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None):
+async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None, public=True):
     db = mclient.bowser.puns
     timestamp = time.time() if not _date else _date
     docID = str(uuid.uuid4())
@@ -210,6 +210,7 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'context': context,
         'active': active,
         'sensitive': False,
+        'public': public,
         'public_log_message': None,
         'public_log_channel': None
     })
@@ -503,7 +504,7 @@ async def send_modlog(bot, channel, _type, footer, reason, user=None, username=N
     await channel.send(embed=embed)
     if public:
         event_loop = bot.loop
-        post_action = event_loop.call_later(delay, event_loop.create_task, send_public_modlog(bot, footer, bot.get_channel(752224051153469594), expires))
+        post_action = event_loop.call_later(delay, event_loop.create_task, send_public_modlog(bot, footer, bot.get_channel(config.publicModChannel), expires))
         return post_action
 
 async def send_public_modlog(bot, id, channel, expires=None):

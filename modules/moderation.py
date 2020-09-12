@@ -47,6 +47,20 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.bot = bot
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
+        self.publicModLogs = self.bot.get_channel(config.publicModChannel)
+
+        # Publish all unposted/pending public modlogs on cog load
+        db = mclient.bowser.puns
+        pendingLogs = db.find({'public': True, 'public_log_message': None})
+        loop = bot.loop
+        for log in pendingLogs:
+            if log['type'] == 'mute':
+                expires = utils.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
+
+            else:
+                expires = None
+
+            loop.create_task(utils.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
 
     @commands.command(name='hide', aliases=['unhide'])
     @commands.has_any_role(config.moderator, config.eh)

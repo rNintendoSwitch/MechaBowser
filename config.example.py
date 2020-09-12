@@ -20,6 +20,7 @@ nintendoswitch = int: guild
 
 # Channel IDs
 modChannel = int: modlog
+publicModChannel = int: public modlog
 logChannel = int: loglog 
 debugChannel = int: testing 
 adminChannel = int: admin 
