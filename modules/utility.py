@@ -619,7 +619,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.boostChannel = self.bot.get_channel(config.boostChannel)
         self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
         self.voiceTextAccess = self.bot.get_guild(config.nintendoswitch).get_role(config.voiceTextAccess)
-        self.linkRe = r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateTags = {
@@ -704,7 +703,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 await self.adminChannel.send(f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}')
 
         # Filter and clean affiliate links
-        links = re.finditer(self.linkRe, message.content)
+        links = utils.linkRe.finditer(message.content)
         if links: 
             contentModified = False
             content = message.content
@@ -750,7 +749,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         #Filter for #mario
         if message.channel.id == config.marioluigiChannel: # #mario
             if re.search(self.SMM2LevelID, message.content):
-                if re.search(self.linkRe, message.content):
+                if utils.linkRe.search(message.content):
                     return # TODO: Check if SMM2LevelID found in linkRe to correct edge case
 
                 await message.delete()
