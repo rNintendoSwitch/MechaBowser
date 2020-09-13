@@ -564,7 +564,7 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
 
 def spans_overlap_link(string: str, spans: typing.List[typing.Tuple[int, int]]) -> typing.List[bool]:
     '''
-    Returns list of booleans for every character span passed (as `(start, end)`) if they overlap a link in given string
+    Returns list of booleans for every character span passed (as `(start, end)`) if they overlap a link in given string.
     '''
     START, END = (0, 1) # Consts for readablity of (start, end) tuples
 
@@ -585,8 +585,15 @@ def spans_overlap_link(string: str, spans: typing.List[typing.Tuple[int, int]]) 
 
     return overlaps
 
-def re_match_nonlink(pattern: typing.Pattern, string: str) -> bool:
-    '''Returns true if any regex match for given pattern in string does not overlap a link'''
+def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bool]:
+    '''
+    Returns if any regex match for given pattern in string does not overlap a link.
+
+    Returns:
+    True  - At least non link-overlapping match was found.
+    False - All matches overlapped a link.
+    None  - No match found, regardless of link overlap.
+    '''
     matches = list(re.finditer(pattern, string))
     spans = list(map(lambda m: m.span(), matches))
 
