@@ -590,7 +590,7 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     Returns if any regex match for given pattern in string does not overlap a link.
 
     Returns:
-    True  - At least non link-overlapping match was found.
+    True  - At least one non link-overlapping match was found.
     False - All matches overlapped a link.
     None  - No match found, regardless of link overlap.
     '''
