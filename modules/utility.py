@@ -748,10 +748,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         #Filter for #mario
         if message.channel.id == config.marioluigiChannel: # #mario
-            if re.search(self.SMM2LevelID, message.content):
-                if utils.linkRe.search(message.content):
-                    return # TODO: Check if SMM2LevelID found in linkRe to correct edge case
-
+            if utils.re_match_nonlink(self.SMM2LevelID, message.content):
                 await message.delete()
                 response = await message.channel.send(f'{config.redTick} <@{message.author.id}> Please do not post Super Mario Maker 2 level codes ' \
                     f'here. Post in <#{config.smm2Channel}> with the pinned template instead.')
