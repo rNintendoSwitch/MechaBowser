@@ -50,13 +50,21 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member: member = ctx.author
         db = mclient.bowser.users
-        fs = gridfs.GridFS(mclient.bowser)
         dbUser = db.find_one({'_id': member.id})
 
         # If profile not setup, running on self, not a mod, and not in commands channel: disallow running profile command
         if not dbUser['profileSetup'] and member == ctx.author and ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != config.commandsChannel: 
             await ctx.message.delete()
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You need to setup your profile to view it outside of <#{config.commandsChannel}>! To setup your profile, use `!profile edit` in <#{config.commandsChannel}>.', delete_after=15)
+
+        card = await self._generate_profile_card(member)
+        await ctx.send(file=card)
+
+    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
+        db = mclient.bowser.users
+        fs = gridfs.GridFS(mclient.bowser)
+        dbUser = db.find_one({'_id': member.id})
+        guild = member.guild
 
         metaFont = ImageFont.truetype('resources/OpenSans-Regular.ttf', 36)
         userFont = ImageFont.truetype('resources/OpenSans-Regular.ttf', 48)
@@ -171,7 +179,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 trophies.append(x)
 
         # Hardcoding IDs like a genius
-        if member.id == ctx.guild.owner.id: # Server owner
+        if member.id == guild.owner.id: # Server owner
             trophies.append('owner')
 
         app_info = await self.bot.application_info()
@@ -179,19 +187,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if member.id in [app_info.owner.id, 123879073972748290]: # Developer
             trophies.append('developer')
 
-        if ctx.guild.get_role(config.chatmod) in member.roles: # Chat-mod role
+        if guild.get_role(config.chatmod) in member.roles: # Chat-mod role
             trophies.append('chat-mod')
 
-        if ctx.guild.get_role(config.submod) in member.roles: # Sub-mod role
+        if guild.get_role(config.submod) in member.roles: # Sub-mod role
             trophies.append('sub-mod')
 
-        if ctx.guild.get_role(config.modemeritus) in member.roles or ctx.guild.get_role(config.submodemeritus) in member.roles: # Mod emeritus
+        if guild.get_role(config.modemeritus) in member.roles or guild.get_role(config.submodemeritus) in member.roles: # Mod emeritus
             trophies.append('mod-emeritus')
 
-        if ctx.guild.get_role(config.helpfulUser) in member.roles: # Helpful user
+        if guild.get_role(config.helpfulUser) in member.roles: # Helpful user
             trophies.append('helpful-user')
 
-        if ctx.guild.get_role(config.boostRole) in member.roles: # Booster role
+        if guild.get_role(config.boostRole) in member.roles: # Booster role
             trophies.append('booster')
 
         if len(trophies) < 15: # Check for additional non-prefered trophies
@@ -272,13 +280,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
-        await ctx.send(file=discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png'))
+        return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
     @_profile.command(name='edit')
     async def _profile_edit(self, ctx):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': ctx.author.id})
         mainMsg = None
+
         if ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != config.commandsChannel: # commands
             await ctx.message.delete()
             return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use bot commands in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
@@ -544,7 +553,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await _phase5(botMsg)
 
             del self.inprogressEdits[ctx.author.id]
-            await mainMsg.channel.send('You are all set! Your profile has been edited')
+            card = await self._generate_profile_card(ctx.author)
+            return await mainMsg.channel.send('You are all set! Your profile has been edited:', file=card)
 
         except asyncio.TimeoutError:
             await mainMsg.delete()
