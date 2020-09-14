@@ -1,4 +1,3 @@
-import asyncio
 import typing
 import datetime
 import time
@@ -23,6 +22,8 @@ mclient = pymongo.MongoClient(
 	username=config.mongoUser,
 	password=config.mongoPass
 )
+
+linkRe = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
 
 archiveHeader = '# Message archive for guild "{0.name}" ({0.id})\nIncluded channels: {1}\n# Format:\n[date + time] Member ID/Message ID/Channel/Username - Message content\n----------------\n'
 timeUnits = {
@@ -560,6 +561,46 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
     punDM += 'Please do not respond to this message, I cannot reply.'
 
     return punDM
+
+def spans_overlap_link(string: str, spans: typing.List[typing.Tuple[int, int]]) -> typing.List[bool]:
+    '''
+    Returns list of booleans for every character span passed (as `(start, end)`) if they overlap a link in given string.
+    '''
+    START, END = (0, 1) # Consts for readablity of (start, end) tuples
+
+    links = linkRe.finditer(string)
+
+    if not spans: return []
+    if not links: return [False] * len(spans)
+
+    link_spans = list(map(lambda m: m.span(), links))
+    overlaps = [False] * len(spans)
+
+    for i, span in enumerate(spans):
+        for link in link_spans:
+            # If span overlaps with link (https://nedbatchelder.com/blog/201310/range_overlap_in_two_compares.html)
+            if span[END] >= link[START] and link[END] >= span[START]:
+                overlaps[i] = True
+                break
+
+    return overlaps
+
+def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bool]:
+    '''
+    Returns if any regex match for given pattern in string does not overlap a link.
+
+    Returns:
+    True  - At least one non link-overlapping match was found.
+    False - All matches overlapped a link.
+    None  - No match found, regardless of link overlap.
+    '''
+    matches = list(re.finditer(pattern, string))
+    spans = list(map(lambda m: m.span(), matches))
+
+    if not matches: return None
+
+    overlaps = spans_overlap_link(string, spans)
+    return any(not overlap for overlap in overlaps)
 
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
