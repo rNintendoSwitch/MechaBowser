@@ -274,7 +274,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
-        await self.modLogs.send(embed=embed)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
