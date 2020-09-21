@@ -1075,6 +1075,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             'unban': 'Unban',
             'blacklist': 'Blacklist ({})',
             'unblacklist': 'Unblacklist ({})',
+            'appealdeny': 'Denied ban appeal (until {})',
             'note': 'User note'
         }
 
@@ -1095,6 +1096,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             if pun['type'] in ['blacklist', 'unblacklist']:
                 inf = punNames[pun['type']].format(pun['context'])
+
+            elif pun['type'] == 'appealdeny':
+                inf = punNames[pun['type']].format(datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
 
             else:
                 inf = punNames[pun['type']]
