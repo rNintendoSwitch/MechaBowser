@@ -497,7 +497,11 @@ async def send_modlog(bot, channel, _type, footer, reason, user=None, username=N
     embed.set_footer(text=footer)
     embed.add_field(name='User', value=f'<@!{userid}>', inline=True)
     if moderator:
+        if not isinstance(moderator, str): # Convert to str
+            moderator = moderator.mention
+
         embed.add_field(name='Moderator', value=moderator.mention, inline=True)
+
     if expires:
         embed.add_field(name='Expires', value=expires)
     embed.add_field(name='Reason', value=reason)
