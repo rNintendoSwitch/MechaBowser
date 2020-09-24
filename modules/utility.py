@@ -1106,7 +1106,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             embed.add_field(name=datestamp, value=f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}')
 
         return await ctx.send(embed=embed)
-            
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
@@ -1292,7 +1291,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.add_field(name='Reason', value=reason)
 
         await self.modLogs.send(embed=embed)
-        await utils.send_modlog(self.bot, self.modLogs, statusText.lower(), docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
+        await utils.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
 
         try:
             statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
