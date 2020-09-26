@@ -523,7 +523,10 @@ async def send_public_modlog(bot, id, channel, expires=None):
     embed.add_field(name='User', value=user.mention, inline=True)
     if expires:
         embed.add_field(name='Expires', value=expires)
-    embed.add_field(name='Reason', value=doc['reason'] if not doc['sensitive'] else 'This action\'s reason has been marked sensitive by the moderation team and is hidden. See <#671003325495509012> for more information on why logs are marked sensitive')
+    if doc['sensitive']:
+        embed.add_field(name='Reason', value='This action\'s reason has been marked sensitive by the moderation team and is hidden. See <#671003325495509012> for more information on why logs are marked sensitive')
+    elif doc['context'] == 'vote': # Warning review
+        embed.add_field(name='Reason', value='A moderator has reviewed a previous warning and reduced it by one level')
 
     if doc['moderator'] == bot.user.id:
         embed.description = 'This is an automatic action'
