@@ -591,7 +591,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.command(name='note')
     async def _note(self, ctx, user: discord.User, *, content):
         if len(content) > 900: return await ctx.send(f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters')
-        await utils.issue_pun(user.id, ctx.author.id, 'note', content, active=False)
+        await utils.issue_pun(user.id, ctx.author.id, 'note', content, active=False, public=False)
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
