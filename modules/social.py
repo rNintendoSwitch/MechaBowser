@@ -296,9 +296,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await ctx.message.delete()
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You are already editing your profile! Please finish or wait a few minutes before trying again', delete_after=15)
 
-        self.inprogressEdits[ctx.author.id] = time.time()
-        await ctx.message.add_reaction('📬')
-
         headerBase = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.'
         phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
         phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
@@ -489,18 +486,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                                 '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
                                 '\n\nWhen prompted, simply reply with what you would like to set the field as.')
         embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
-        
-        if not profileSetup:
-            db.update_one({'_id': ctx.author.id}, {'$set': {'profileSetup': True}})
 
         try:
             mainMsg = await ctx.author.send(embed=embed)
+            self.inprogressEdits[ctx.author.id] = time.time()
+            await ctx.message.add_reaction('📬')
             private = True
 
         except discord.Forbidden: # DMs not allowed, try in channel
             private = False
             return await ctx.send(f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you')
             mainMsg = await ctx.send(ctx.author.mention, embed=embed)
+
+        if not profileSetup:
+            db.update_one({'_id': ctx.author.id}, {'$set': {'profileSetup': True}})
 
         botMsg = await mainMsg.channel.send(header[profileSetup] + phase1)
         try:
