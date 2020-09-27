@@ -24,11 +24,11 @@ class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         try:
+            self.bot.load_extension('utils')
             self.bot.load_extension('modules.moderation')
             self.bot.load_extension('modules.utility')
             self.bot.load_extension('modules.statistics')
             self.bot.load_extension('modules.social')
-            self.bot.load_extension('utils')
             try: # Private submodule extensions
                 self.bot.load_extension('private.automod')
 
@@ -81,6 +81,12 @@ class MainEvents(commands.Cog):
             if value['guild'] != guild: continue # Not an applicable guild to this check
             invite = await self.bot.fetch_invite(url=key)
             #if 
+
+    @commands.command(name='ping')
+    async def _ping(self, ctx):
+        initiated = ctx.message.created_at
+        msg = await ctx.send('Evaluating...')
+        return await msg.edit(content=f'Pong! Roundtrip latency {(msg.created_at - initiated).total_seconds()} seconds')
 
     @commands.Cog.listener()
     async def on_resume(self):

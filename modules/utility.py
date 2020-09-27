@@ -94,7 +94,7 @@ class Games(commands.Cog, name='Game Commands'):
 
         games = gameDB.find({})
         for game in games:
-            await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
+            #await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
             scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
             gameEntry = {
                     '_id': game['_id'],
@@ -879,12 +879,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 #
 #            except (discord.Forbidden, discord.HTTPException):
 #                pass
-
-    @commands.command(name='ping')
-    async def _ping(self, ctx):
-        initiated = ctx.message.created_at
-        msg = await ctx.send('Evaluating...')
-        return await msg.edit(content=f'Pong! Roundtrip latency {(msg.created_at - initiated).total_seconds()} seconds')
 
 #    @commands.command(name='archive')
 #    async def _archive(self, ctx, members: commands.Greey[discord.Member], channels: commands.Greedy[discord.Channel], limit: typing.Optional[int] = 200, channel_limiter: typing.Greedy[discord.Channel]):
