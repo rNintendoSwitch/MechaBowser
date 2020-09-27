@@ -104,17 +104,6 @@ class MainEvents(commands.Cog):
 
         else:
             db.update_one({'_id': member.id}, {'$push': {'joins': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
-            if doc['roles']:
-                for x in doc['roles']:
-                    if x == member.guild.id:
-                        continue
-
-                    restored = True
-                    role = member.guild.get_role(x)
-                    if role:
-                        roleList.append(role)
-    
-                await member.edit(roles=roleList, reason='Automatic role restore action')
 
         new = ':new: ' if (datetime.datetime.utcnow() - member.created_at).total_seconds() <= 60 * 60 * 24 * 14 else '' # Two weeks
 
@@ -128,6 +117,18 @@ class MainEvents(commands.Cog):
         embed.add_field(name='Mention', value=f'<@{member.id}>')
 
         await self.serverLogs.send(':inbox_tray: User joined', embed=embed)
+
+        if doc['roles']:
+            for x in doc['roles']:
+                if x == member.guild.id:
+                    continue
+
+                restored = True
+                role = member.guild.get_role(x)
+                if role:
+                    roleList.append(role)
+
+            await member.edit(roles=roleList, reason='Automatic role restore action')
 
         if restored:
             #roleText = ', '.split(x.name for x in roleList)
