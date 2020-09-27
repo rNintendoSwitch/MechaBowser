@@ -51,11 +51,11 @@ class MainEvents(commands.Cog):
 
     @tasks.loop(hours=24)
     async def sanitize_eud(self):
-        logging.debug('[Core] Starting sanitzation of old EUD')
+        logging.info('[Core] Starting sanitzation of old EUD')
         msgDB = mclient.bowser.messages
-        msgDB.update_many({'timestamp': {"$lte": time.time() - (86400 * 30)}, 'content': {"$ne": None}}, {"$set": {'content': None}})
+        msgDB.update_many({'timestamp': {"$lte": time.time() - (86400 * 30)}, 'sanitized': False}, {"$set": {'content': None, 'sanitized': True}})
 
-        logging.debug('[Core] Finished sanitzation of old EUD')
+        logging.info('[Core] Finished sanitzation of old EUD')
 
     @tasks.loop(seconds=15)
     async def fetch_invites(self):
@@ -278,7 +278,8 @@ class MainEvents(commands.Cog):
             'guild': message.guild.id,
             'channel': message.channel.id,
             'content': message.content,
-            'timestamp': timestamp
+            'timestamp': timestamp,
+            'sanitized': False
         })
 
         if message.content and message.channel.type == discord.ChannelType.text:
