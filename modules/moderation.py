@@ -51,7 +51,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
-        pendingLogs = db.find({'public': True, 'public_log_message': None})
+        pendingLogs = db.find({'public': True, 'public_log_message': None, 'type': {'$ne': 'note'}})
         loop = bot.loop
         for log in pendingLogs:
             if log['type'] == 'mute':
