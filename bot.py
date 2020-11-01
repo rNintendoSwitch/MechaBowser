@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import argparse
+from sys import exit
 
 import pymongo
 import tornado.ioloop
@@ -20,6 +21,7 @@ try:
 
 except ImportError:
     logging.critical('[Bot] config.py does not exist, you should make one from the example config')
+    exit(1)
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
