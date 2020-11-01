@@ -28,8 +28,9 @@ mclient = pymongo.MongoClient(
 	username=config.mongoUser,
 	password=config.mongoPass
 )
+intents = discord.Intents(guilds=True, members=True, bans=True, emojis=True, voice_states=True, presences=True, messages=True, reactions=True)
 activityStatus = discord.Activity(type=discord.ActivityType.watching, name='over the server')
-bot = commands.Bot(config.command_prefixes, max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
+bot = commands.Bot(config.command_prefixes, intents=intents, max_messages=300000, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
 
 class BotCache(commands.Cog):
     def __init__(self, bot):
