@@ -669,7 +669,7 @@ class LoopTasks(commands.Cog):
                 moderator = await self.NS.fetch_member(pun['moderator'])
 
             except:
-                logging.warning(f'[expiry_check] Moderator not in server for pun {pun["_id"]}, fetching instead')
+                logging.debug(f'[expiry_check] Moderator not in server for pun {pun["_id"]}, fetching instead')
                 moderator = await self.bot.fetch_user(pun['moderator'])
 
             if pun['type'] == 'mute' and pun['expiry']: # A mute that has an expiry, for member in currently in guild
