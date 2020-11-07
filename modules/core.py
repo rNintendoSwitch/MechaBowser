@@ -24,6 +24,7 @@ class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         try:
+            self.bot.load_extension('events.extralife')
             self.bot.load_extension('utils')
             self.bot.load_extension('modules.moderation')
             self.bot.load_extension('modules.utility')
