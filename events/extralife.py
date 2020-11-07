@@ -11,7 +11,10 @@ class ExtraLife(commands.Cog):
         self.GUILD = 238080556708003851
 
         # Donation Alert Consts
-        self.ALERT_CHANNEL = 654018662860193830
+        self.EXTRA_LIFE_ADMIN = 772464126483890227
+        self.EXTRA_LIFE = 654018662860193830
+        self.GENERAL = 238081280632160257
+        self.DONATIONS = 774672505540968468
         self.DONATIONS_URL = 'https://extra-life.org/api/participants/409108/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
@@ -22,7 +25,10 @@ class ExtraLife(commands.Cog):
 
         self.bot = bot
         self.guild = self.bot.get_guild(self.GUILD)
-        self.alertChannel = self.guild.get_channel(self.ALERT_CHANNEL)
+        self.extra_life_admin = self.guild.get_channel(self.EXTRA_LIFE_ADMIN)
+        self.extra_life = self.guild.get_channel(self.EXTRA_LIFE)
+        self.general = self.guild.get_channel(self.GENERAL)
+        self.donations = self.guild.get_channel(self.DONATIONS)
         self.chatRole = self.guild.get_role(self.CHAT_ROLE)
         self.lastDonationID = None
 
@@ -47,15 +53,15 @@ class ExtraLife(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def donation_check(self):
-        print('Checking for donations...')
-        donations_request = requests.get(self.DONATIONS_URL)
+        donations_request = requests.get(self.DONATIONS_URL, timeout=8.0)
 
         try:
             donations_request.raise_for_status()
         except Exception as e:
-            raise RuntimeError(e)
+            logging.error(e)
 
         donations = donations_request.json()
+        donation_embeds = []
 
         for donation in donations:
             if donation['donationID'] == self.lastDonationID: break
@@ -76,9 +82,14 @@ class ExtraLife(commands.Cog):
                 embed.add_field(name="Message", value=donation['message'], inline=False)
 
             embed.add_field(name="\uFEFF", value=self.FOOTER_LINKS, inline=False) # ZERO WIDTH NO-BREAK SPACE (U+FEFF)
+            donation_embeds.append(embed)
+            logging.info(f'Sending donation {donation["donationID"]} from {donor_name}')
 
-            print(f'Sending donation {donation["donationID"]} from {donor_name}')
-            await self.alertChannel.send(embed=embed)
+        donation_embeds.reverse()
+        for embed in donation_embeds:
+            await self.extra_life.send(embed=embed)
+            await self.general.send(embed=embed)
+            await self.donations.send(embed=embed)
 
         self.lastDonationID = donations[0]['donationID']
 
