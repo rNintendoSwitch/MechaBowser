@@ -190,6 +190,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except discord.NotFound:
             return await ctx.send(f'{config.redTick} {user} is not currently banned')
 
+        openAppeal = mclient.modmail.logs.find_one({'open': True, 'ban_appeal': True, 'recipient.id': str(user)})
+        if openAppeal:
+            return await ctx.send(f'{config.redTick} You cannot use the unban command on {user} while a ban appeal is in-progress. You can accept the appeal in <#{int(openAppeal["channel_id"])}> with `!appeal accept [reason]`')
+
         db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
