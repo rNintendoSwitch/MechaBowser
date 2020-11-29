@@ -1,6 +1,7 @@
 [submodule "private"]
 	path = private
 	url = https://github.com/MattBSG/MechaBowser-Private-Modules
+	branch = master
 [submodule "resources/twemoji"]
 	path = resources/twemoji
 	url = https://github.com/twitter/twemoji
