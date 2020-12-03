@@ -432,7 +432,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if not puns.count():
             return await ctx.send(f'{config.redTick} User has no punishments on record')
 
-        # TODO: Should this be rathered fron config?
         punNames = {
             'tier1': 'T1 Warn',
             'tier2': 'T2 Warn',

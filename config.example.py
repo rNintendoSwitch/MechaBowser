@@ -1,3 +1,5 @@
+# type: ignore
+
 token = 'token'
 command_prefixes = ['!', ',', '.']
 
@@ -75,7 +77,6 @@ banAppealInvite = str: invite to ban appeal server
 
 # Web
 baseUrl = 'https://example.com'
-
 # Text constants
 punDM = 'You have received a moderation action on the /r/NintendoSwitch Discord server.\n' \
     'Action: **{}**\n' \
