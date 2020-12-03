@@ -1,6 +1,6 @@
 [submodule "private"]
 	path = private
-	url = https://github.com/MattBSG/MechaBowser-Private-Modules
+	url = https://github.com/rNintendoSwitch/MechaBowser-Private-Modules
 	branch = master
 [submodule "resources/twemoji"]
 	path = resources/twemoji
