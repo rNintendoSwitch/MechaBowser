@@ -11,7 +11,7 @@ import pathlib
 import pymongo
 import discord
 from discord import Webhook, AsyncWebhookAdapter
-orphanedfrom discord.ext import commands, tasks
+from discord.ext import commands, tasks
 
 import config
 import utils
@@ -25,6 +25,8 @@ mclient = pymongo.MongoClient(
 serverLogs = None
 modLogs = None
 
+# Most NintenDeals code (decommissioned 4/25/2020) was removed on 12/02/2020
+# https://github.com/rNintendoSwitch/MechaBowser/commit/3da2973f3b48548403c24d38c33cdd3a196ac409
 class Games(commands.Cog, name='Game Commands'):
     gamesReady = False
     def __init__(self, bot):
