@@ -19,7 +19,7 @@ from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
 from emoji import UNICODE_EMOJI
-from fuzzywuzzy import fuzz, process
+from fuzzywuzzy import process
 
 import config
 import utils

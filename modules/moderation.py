@@ -2,7 +2,6 @@ import asyncio
 import logging
 import datetime
 import time
-import typing
 import re
 import copy
 
