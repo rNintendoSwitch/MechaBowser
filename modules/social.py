@@ -412,7 +412,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         titleList[title] = gameEntry['_id']
 
                 results = process.extract(content, titleList.keys(), limit=2)
-                if results[0][1] >= 86:
+                if results and results[0][1] >= 86:
                     if gameCnt == 0 and dbUser['favgames']: db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
                     while True:
                         await message.channel.send(f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__')
