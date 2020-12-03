@@ -2,6 +2,7 @@
 	path = private
 	url = git@github.com:rNintendoSwitch/MechaBowser-Private-Modules.git
 	branch = master
+	ignore = dirty
 [submodule "resources/twemoji"]
 	path = resources/twemoji
 	url = https://github.com/twitter/twemoji
