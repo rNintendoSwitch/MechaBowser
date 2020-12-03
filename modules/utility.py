@@ -251,8 +251,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
 
-#        Large block of old event commented out code was removed on 12/02/2020
-#        Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
+# Large block of old event commented out code was removed on 12/02/2020
+# Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
+# https://github.com/rNintendoSwitch/MechaBowser/commit/373cef69aa5b9da7fe5945599b7dde387caf0700
 
 #    @commands.command(name='archive')
 #    async def _archive(self, ctx, members: commands.Greey[discord.Member], channels: commands.Greedy[discord.Channel], limit: typing.Optional[int] = 200, channel_limiter: typing.Greedy[discord.Channel]):
