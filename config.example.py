@@ -6,12 +6,6 @@ mongoUser = 'user'
 mongoPass = 'password'
 mongoHost = 'host'
 
-mongoDealsUser = 'user'
-mongoDealsPass = 'password'
-mongoDealsHost = 'host'
-mongoDealsPort = port
-mongoDealsAuth = ''
-
 # Users
 parakarry = int: bot
 
@@ -31,8 +25,6 @@ switchHelp = int: switch help
 spoilers = int: spoilers 
 suggestions = int: suggestions 
 voiceTextChannel = int: voice text 
-dealChannel = int: eshop deals 
-releaseChannel = int: new releases 
 smm2Channel = int: smm2 
 commandsChannel = int: commands 
 marioluigiChannel = int: mario and luigi 
@@ -83,8 +75,6 @@ banAppealInvite = str: invite to ban appeal server
 
 # Web
 baseUrl = 'https://example.com'
-dealsAPI = 'https://example.net/api/games/switch'
-dealsAPIKey = 'apikey'
 
 # Text constants
 punDM = 'You have received a moderation action on the /r/NintendoSwitch Discord server.\n' \

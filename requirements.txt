@@ -15,7 +15,6 @@ numpy
 pytz
 cchardet
 aiodns
-nintendeals
 dpytest
 codepoints
 emoji

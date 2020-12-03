@@ -244,19 +244,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
                     card.paste(missingImage, gameIconLocations[gameCount], missingImage)
 
-                    # NintenDeals decommissioned on 4/25/2020 - Features unavailable
-
-                    #try:
-                    #    await utils.game_data(game)
-                    #    # Image should have been put in storage after scrape
-                    #    gameImg = fs.get(game)
-                    #    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-                    #    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
-
-                    #except:
-                    #    missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-                    #    card.paste(missingImage, gameIconLocations[gameCount], missingImage)
-
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
 
