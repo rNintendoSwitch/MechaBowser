@@ -103,21 +103,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
             }
         self.inviteRe = re.compile(r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/[\da-z-]+)', re.I)
-        self.thirtykEvent = {}
-        self.thirtykEventRoles = [
-            616298509460701186,
-            616298665421701128,
-            616298689044152335,
-            616298709860220928,
-            616298733642186769,
-            616298767108407335,
-            616298787761291267,
-            616298809454100480,
-            616298829830160430,
-            616298851900456991
-            ]
-        #self.holidayJolly = self.bot.get_guild(238080556708003851).get_role(659400540849176637)
-        #self.holidayHolly = self.bot.get_guild(238080556708003851).get_role(659400610680143889)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -266,85 +251,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
 
-#        # Holiday season celebration - ended 1/2/20
-#        if self.holidayHolly not in message.author.roles and self.holidayJolly not in message.author.roles:
-#            import random
-
-#            newRole = random.choice([self.holidayJolly, self.holidayHolly])
-#            await message.author.add_roles(newRole)
-
-#        # 30k members celebration - ended 9/6/19
-#        if message.author.id not in self.thirtykEvent.keys() or (self.thirtykEvent[message.author.id] + 120) <= time.time():
-#            import random
-#            self.thirtykEvent[message.author.id] = time.time()
-#            newRole = random.choice(self.thirtykEventRoles)
-#            for role in message.author.roles:
-#                if role.id in self.thirtykEventRoles:
-#                    await message.author.remove_roles(role)
-#
-#            await message.author.add_roles(message.guild.get_role(newRole))
-
-#        # Splatoon splatfest event - ended 5/24/20
-#        if message.channel.id == 278557283019915274:
-#            mayo = re.compile(r'(<:mayonnaise:712323829510307850>)+', re.I)
-#            ketchup = re.compile(r'(<:ketchup:712323803325268029>)+', re.I)
-#            ketchupRole = message.guild.get_role(712318160006807654)
-#            mayoRole = message.guild.get_role(712318402504425493)
-#            if re.search(mayo, message.content) and re.search(ketchup, message.content):
-#                return
-#
-#            try:    
-#                if re.search(mayo, message.content):
-#                    if ketchupRole in message.author.roles:
-#                        await message.author.remove_roles(ketchupRole)
-#
-#                    if mayoRole not in message.author.roles:
-#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Mayo', delete_after=10)
-#                        await msg.delete(delay=5.0)
-#                        await message.author.add_roles(mayoRole)
-#
-#                elif re.search(ketchup, message.content):
-#                    if mayoRole in message.author.roles:
-#                        await message.author.remove_roles(mayoRole)
-#
-#                    if ketchupRole not in message.author.roles:
-#                        msg = await message.channel.send(f'<@{message.author.id}> You are now registered as a member of Team Ketchup', delete_after=10)
-#                        await msg.delete(delay=5.0)
-#                        await message.author.add_roles(ketchupRole)
-#
-#            except (discord.Forbidden, discord.HTTPException):
-#                pass
-
-#        # Pokemon sword/shield event -  ended 12/1/19
-#        if message.channel.id == 360767024059777027:
-#            sword = re.compile(r'(<:sword:643477122249392149>)+', re.I)
-#            shield = re.compile(r'(<:shield:643477137864785950>)+', re.I)
-#            swordRole = message.guild.get_role(643595841139114016)
-#            shieldRole = message.guild.get_role(643595961184026626)
-#            if re.search(sword, message.content) and re.search(shield, message.content):
-#                return
-#
-#            try:    
-#                if re.search(sword, message.content):
-#                    if shieldRole in message.author.roles:
-#                        await message.author.remove_roles(shieldRole)
-#
-#                    if swordRole not in message.author.roles:
-#                        msg = await message.channel.send(f'<@{message.author.id}> You have been registered as part of team Sword <:sword:643477122249392149>!')
-#                        await msg.delete(delay=5.0)
-#                        await message.author.add_roles(swordRole)
-#
-#                elif re.search(shield, message.content):
-#                    if swordRole in message.author.roles:
-#                        await message.author.remove_roles(swordRole)
-#
-#                    if shieldRole not in message.author.roles:
-#                        msg = await message.channel.send(f'<@{message.author.id}> You have been registered as part of team Shield <:shield:643477137864785950>!')
-#                        await msg.delete(delay=5.0)
-#                        await message.author.add_roles(shieldRole)
-#
-#            except (discord.Forbidden, discord.HTTPException):
-#                pass
+#        Large block of old event commented out code was removed on 12/02/2020
+#        Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
 
 #    @commands.command(name='archive')
 #    async def _archive(self, ctx, members: commands.Greey[discord.Member], channels: commands.Greedy[discord.Channel], limit: typing.Optional[int] = 200, channel_limiter: typing.Greedy[discord.Channel]):
@@ -523,6 +431,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if not puns.count():
             return await ctx.send(f'{config.redTick} User has no punishments on record')
 
+        # TODO: Should this be rathered fron config?
         punNames = {
             'tier1': 'T1 Warn',
             'tier2': 'T2 Warn',
