@@ -19,7 +19,7 @@ from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
 from emoji import UNICODE_EMOJI
-from fuzzywuzzy import fuzz, process
+from fuzzywuzzy import process
 
 import config
 import utils
@@ -244,19 +244,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
                     card.paste(missingImage, gameIconLocations[gameCount], missingImage)
 
-                    # NintenDeals decommissioned on 4/25/2020 - Features unavailable
-
-                    #try:
-                    #    await utils.game_data(game)
-                    #    # Image should have been put in storage after scrape
-                    #    gameImg = fs.get(game)
-                    #    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-                    #    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
-
-                    #except:
-                    #    missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-                    #    card.paste(missingImage, gameIconLocations[gameCount], missingImage)
-
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
 
@@ -425,7 +412,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         titleList[title] = gameEntry['_id']
 
                 results = process.extract(content, titleList.keys(), limit=2)
-                if results[0][1] >= 86:
+                if results and results[0][1] >= 86:
                     if gameCnt == 0 and dbUser['favgames']: db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
                     while True:
                         await message.channel.send(f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__')

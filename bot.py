@@ -1,13 +1,7 @@
-import asyncio
 import logging
-import sys
-import argparse
 from sys import exit
 
 import pymongo
-import tornado.ioloop
-import tornado.web
-import tornado
 import discord
 from discord.ext import commands
 
@@ -73,11 +67,6 @@ class BotCache(commands.Cog):
             logging.info('[Cache] Inital database syncronization complete')
             self.READY = True
 
-async def setup_discord():
-    bot.add_cog(BotCache(bot))
-    bot.load_extension('jishaku')
-    await bot.start(config.token)
-
 async def safe_send_message(channel, content=None, embeds=None):
     await channel.send(content, embed=embeds)
 
@@ -85,44 +74,9 @@ async def safe_send_message(channel, content=None, embeds=None):
 async def on_message(message):
     return # Return so commands will not process, and main extension can process instead
 
-class MainHandler(tornado.web.RequestHandler):
-    def set_default_headers(self):
-        self.set_header('Content-Type', 'text/plain; charset=UTF-8')
-
-    async def get(self, archiveID):
-        db = mclient.bowser.archive
-        doc = db.find_one({'_id': archiveID})
-
-        if not doc:
-            return self.write('# No archive exists for this ID or it is expired')
-
-        else:
-            self.write(doc['body'])
-
 if __name__ == '__main__':
-    print('\033[94mFils-A-Mech python by MattBSG#8888 2019\033[0m')
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--web', action='store_true')
-    parser.add_argument('--web-only', action='store_true')
-    args = parser.parse_args()
+    print('\033[94mMechaBowser by MattBSG#8888 2019\033[0m')
 
-    app = tornado.web.Application([
-        (r'/api/archive/([0-9]+-[0-9]+)', MainHandler)
-    ], xheader=True)
-
-    if args.web:
-        logging.info('[Bot] Running in legacy hybrid mode, initializing discord bot and web')
-        app.listen(8881)
-        tornado.ioloop.IOLoop.current().run_sync(setup_discord)
-        tornado.ioloop.IOLoop.current().start()
-
-    elif args.web_only:
-        logging.info('[Web] Running in legacy web only mode, discord bot will not initialize')
-        app.listen(8881)
-        tornado.ioloop.IOLoop.current().start()
-
-    else:
-        logging.info('[Bot] Running in bot only mode, run with option --web for legacy hybrid mode or --web-only for web serving only')
-        bot.add_cog(BotCache(bot))
-        bot.load_extension('jishaku')
-        bot.run(config.token)
+    bot.add_cog(BotCache(bot))
+    bot.load_extension('jishaku')
+    bot.run(config.token)

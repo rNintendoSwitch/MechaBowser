@@ -9,8 +9,6 @@ import discord
 import pymongo
 import gridfs
 import requests
-from selenium import webdriver
-from bs4 import BeautifulSoup as bs
 
 import config
 

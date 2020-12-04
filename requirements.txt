@@ -3,19 +3,15 @@ discord.py
 pymongo
 jishaku
 pylint
-tornado
 markovify
 dialogflow
 google-cloud-storage
 fuzzywuzzy[speedup]
-bs4
-selenium
 pillow
-numpy
 pytz
-cchardet
-aiodns
-nintendeals
-dpytest
 codepoints
 emoji
+
+# Workaround for numpy issue on windows. https://stackoverflow.com/a/64661876
+numpy==1.19.3; platform_system == "Windows"
+numpy>=1.19.4; platform_system == "linux"
