@@ -89,7 +89,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateTags = {
             "*": ["awc"],
-            "amazon.*": ["colid", "coliid", "tag"],
+            "amazon.*": ["colid", "coliid", "tag", "ascsubtag"],
             "bestbuy.*": ["aid", "cjpid", "lid", "pid"], 
             "bhphotovideo.com": ["sid"],
             "ebay.*": ["afepn", "campid", "pid"],
