@@ -89,7 +89,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.SMM2LevelPost = re.compile(r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)', re.I)
         self.affiliateTags = {
             "*": ["awc"],
-            "amazon.*": ["colid", "coliid", "tag"],
+            "amazon.*": ["colid", "coliid", "tag", "ascsubtag"],
             "bestbuy.*": ["aid", "cjpid", "lid", "pid"], 
             "bhphotovideo.com": ["sid"],
             "ebay.*": ["afepn", "campid", "pid"],
@@ -227,14 +227,21 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 labels = urlParts.hostname.split(".")
                 for i in range(0, len(labels)):
                     domain = ".".join(labels[i - len(labels):])
-                    
+         
+                    # Special case: rewrite 'amazon.*/exec/obidos/ASIN/B07TLYWMYW/' to 'amazon.*/dp/B07TLYWMYW/'
+                    if pathlib.PurePath(domain).match('amazon.*'):
+                        match = re.match(r'^/exec/obidos/ASIN/(\w+)/.*$', urlParts.path)
+                        if match:
+                            linkModified = True
+                            urlPartsList[2] = f'/dp/{match.group(1)}' # 2 = path
+
                     for glob, tags in self.affiliateTags.items():
                         if pathlib.PurePath(domain).match(glob):
                             for tag in tags:
                                 if tag in query:
                                     linkModified = True
                                     query.pop(tag, None)
-                
+
                 if linkModified:
                     urlPartsList[3] = urllib.parse.urlencode(query)
                     url = urllib.parse.urlunsplit(urlPartsList)
