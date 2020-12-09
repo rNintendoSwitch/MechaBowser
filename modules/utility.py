@@ -172,7 +172,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 labels = urlParts.hostname.split(".")
                 for i in range(0, len(labels)):
                     domain = ".".join(labels[i - len(labels):])
-                    
+		     
+                    # Special case: rewrite 'amazon.*/exec/obidos/ASIN/.../...' to 'amazon.*/dp/...'
+                    if pathlib.PurePath(domain).match('amazon.*'):
+                        match = re.match(r'^/exec/obidos/ASIN/(\w+)/.*$', urlParts.path)
+                        if match:
+                            linkModified = True
+                            urlPartsList[2] = f'/dp/{match.group(1)}' # 2 = path
+
                     for glob, tags in self.affiliateTags.items():
                         if pathlib.PurePath(domain).match(glob):
                             for tag in tags:
