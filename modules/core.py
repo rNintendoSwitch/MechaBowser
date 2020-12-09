@@ -23,6 +23,8 @@ mclient = pymongo.MongoClient(
 class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.private_modules_loaded = False
+
         try:
             self.bot.load_extension('utils')
             self.bot.load_extension('modules.moderation')
@@ -31,6 +33,7 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('modules.social')
             try: # Private submodule extensions
                 self.bot.load_extension('private.automod')
+                self.private_modules_loaded = True
 
             except commands.errors.ExtensionNotFound:
                 logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
@@ -304,7 +307,12 @@ class MainEvents(commands.Cog):
                         'timestamp': timestamp
                     })
 
-        return await self.bot.process_commands(message) # Allow commands to fire
+        await self.bot.process_commands(message) # Allow commands to fire
+
+        if not self.private_modules_loaded:
+            await self.bot.get_cog('Utility Commands').on_automod_finished(message)
+
+        return
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages): # TODO: Work with archives channel attribute to list channels
