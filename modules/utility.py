@@ -119,8 +119,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             except:
                 mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
             
-    @commands.Cog.listener()
-    async def on_message(self, message):
+    # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
+    async def on_automod_finished(self, message):
         if message.type == discord.MessageType.premium_guild_subscription:
             await self.adminChannel.send(message.system_content)
             await self.boostChannel.send(message.system_content)
@@ -152,50 +152,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 await message.delete()
                 await message.channel.send(f':bangbang: {message.author.mention} please do not post invite links to other Discord servers. If you believe the linked server(s) should be whitelisted, contact a moderator', delete_after=10)
                 await self.adminChannel.send(f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}')
-
-        # Filter and clean affiliate links
-        links = utils.linkRe.finditer(message.content)
-        if links: 
-            contentModified = False
-            content = message.content
-            for link in links:
-                linkModified = False
-
-                urlParts = urllib.parse.urlsplit(link[0])
-                urlPartsList = list(urlParts)
-
-                query_raw = dict(urllib.parse.parse_qsl(urlPartsList[3]))
-                # Make all keynames lowercase in dict, this shouldn't break a website, I hope...
-                query = {k.lower(): v for k, v in query_raw.items()}
-
-                # For each domain level of hostname, eg. foo.bar.example => foo.bar.example, bar.example, example
-                labels = urlParts.hostname.split(".")
-                for i in range(0, len(labels)):
-                    domain = ".".join(labels[i - len(labels):])
-                    
-                    for glob, tags in self.affiliateTags.items():
-                        if pathlib.PurePath(domain).match(glob):
-                            for tag in tags:
-                                if tag in query:
-                                    linkModified = True
-                                    query.pop(tag, None)
-                
-                if linkModified:
-                    urlPartsList[3] = urllib.parse.urlencode(query)
-                    url = urllib.parse.urlunsplit(urlPartsList)
-
-                    contentModified = True
-                    content = content.replace(link[0], url)
-
-            if contentModified:
-                hooks = await message.channel.webhooks()
-                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
-            
-                await message.delete()
-                async with aiohttp.ClientSession() as session:
-                    name = message.author.name if not message.author.nick else message.author.nick
-                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
-                    await webhook.send(content=content, username=name, avatar_url=message.author.avatar_url)
 
         #Filter for #mario
         if message.channel.id == config.marioluigiChannel: # #mario
@@ -250,6 +206,51 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 # Fall back to leaving user text
                 logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
             return
+
+        # Filter and clean affiliate links
+        # We want to call this last to ensure all above items are complete.
+        links = utils.linkRe.finditer(message.content)
+        if links: 
+            contentModified = False
+            content = message.content
+            for link in links:
+                linkModified = False
+
+                urlParts = urllib.parse.urlsplit(link[0])
+                urlPartsList = list(urlParts)
+
+                query_raw = dict(urllib.parse.parse_qsl(urlPartsList[3]))
+                # Make all keynames lowercase in dict, this shouldn't break a website, I hope...
+                query = {k.lower(): v for k, v in query_raw.items()}
+
+                # For each domain level of hostname, eg. foo.bar.example => foo.bar.example, bar.example, example
+                labels = urlParts.hostname.split(".")
+                for i in range(0, len(labels)):
+                    domain = ".".join(labels[i - len(labels):])
+                    
+                    for glob, tags in self.affiliateTags.items():
+                        if pathlib.PurePath(domain).match(glob):
+                            for tag in tags:
+                                if tag in query:
+                                    linkModified = True
+                                    query.pop(tag, None)
+                
+                if linkModified:
+                    urlPartsList[3] = urllib.parse.urlencode(query)
+                    url = urllib.parse.urlunsplit(urlPartsList)
+
+                    contentModified = True
+                    content = content.replace(link[0], url)
+
+            if contentModified:
+                hooks = await message.channel.webhooks()
+                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+            
+                await message.delete()
+                async with aiohttp.ClientSession() as session:
+                    name = message.author.name if not message.author.nick else message.author.nick
+                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
+                    await webhook.send(content=content, username=name, avatar_url=message.author.avatar_url)
 
 # Large block of old event commented out code was removed on 12/02/2020
 # Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
