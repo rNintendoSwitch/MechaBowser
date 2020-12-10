@@ -228,7 +228,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 for i in range(0, len(labels)):
                     domain = ".".join(labels[i - len(labels):])
          
-                    # Special case: rewrite 'amazon.*/exec/obidos/ASIN/B07TLYWMYW/' to 'amazon.*/dp/B07TLYWMYW/'
+                    # Special case: rewrite 'amazon.*/exec/obidos/ASIN/.../' to 'amazon.*/dp/.../'
                     if pathlib.PurePath(domain).match('amazon.*'):
                         match = re.match(r'^/exec/obidos/ASIN/(\w+)/.*$', urlParts.path)
                         if match:
