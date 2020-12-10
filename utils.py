@@ -616,6 +616,28 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     overlaps = spans_overlap_link(string, spans)
     return any(not overlap for overlap in overlaps)
 
+class PaginatedEmbedField(typing.TypedMapping):
+    name: str
+    value: int
+    inline: typing.Optional[bool]
+
+class PaginatedEmbedAuthor(typing.TypedMapping):
+    name: str
+    url: int
+    inline: typing.Optional[bool]
+
+# TODO: Look into replacing _stats_roles() and its embed_paginate(): using chunks instead of fields-- another function to prep for this one?
+async def send_paginated_embed(channel: discord.TextChannel,
+                               fields: typing.List[PaginatedEmbedField],
+                               *, 
+                               owner: typing.Optional[discord.User], 
+                               timeout: int = 600,
+                               title: typing.Optional[str],
+                               description: str,
+                               colour: typing.Union[discord.Colour, int, None],
+                               author: typing.Optional[PaginatedEmbedAuthor]) -> discord.Message:
+    '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
+
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
