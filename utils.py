@@ -7,14 +7,9 @@ import re
 
 import discord
 import pymongo
-import gridfs
-import requests
 
 import config
 
-driver = None
-storePageRe = re.compile(r'(http[s]?:\/\/(?:[^.]*\.)?[^.]*\.[^\/]*)(?:.*)')
-imageTagRe = re.compile(r'(?:src="([^"]*)")')
 mclient = pymongo.MongoClient(
 	config.mongoHost,
 	username=config.mongoUser,
@@ -31,6 +26,9 @@ timeUnits = {
     'd': lambda v: v * 60 * 60 * 24,
     'w': lambda v: v * 60 * 60 * 24 * 7,
 }
+
+# Most NintenDeals code (decommissioned 4/25/2020) was removed on 12/09/2020
+# https://github.com/rNintendoSwitch/MechaBowser/commit/d1550f1f4951c35ca953e1ceacaae054fc9d4963
 
 async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
     db = mclient.modmail.logs
@@ -214,157 +212,6 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'public_log_channel': None
     })
     return docID
-
-async def _request_noa(nsuid):
-    infoDict = {}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': 'https://www.nintendo.com',
-        'X-Algolia-API-Key': '9a20c93440cf63cf1a7008d75f7438bf',
-        'X-Algolia-Application-ID': 'U3B6GR4UA3',
-        'Host': 'u3b6gr4ua3-dsn.algolia.net',
-        'Referer': 'https://www.nintendo.com/pos-redirect/{}?a=gdp'.format(nsuid)
-    }
-    body = {
-        "requests": [
-            {
-                "indexName": "noa_aem_game_en_us",
-                "params": "query={}&hitsPerPage=1&maxValuesPerFacet=30&page=0".format(nsuid),
-                "facetFilters": [["platform:Nintendo Switch"]]
-            }
-        ]
-    }
-    algolia = requests.post('https://u3b6gr4ua3-dsn.algolia.net/1/indexes/*/queries', headers=headers, json=body)
-    try:
-        algolia.raise_for_status()
-
-    except Exception as e:
-        raise RuntimeError(e)
-
-    response = algolia.json()
-    #print(response)
-    if not response['results'][0]['hits']:
-        raise KeyError('_noa game not found based on id')
-
-    game = response['results'][0]['hits'][0]
-    if not game:
-        pass # TODO: fill in title for slug and web request
-
-    description = discord.utils.escape_markdown(game['description']).replace(' \n      ', '').replace('    ', '').replace('\n\n', '\n')
-    infoDict['description'] = re.sub(r'([,!?.:;])(?![\\n ])', '\g<1>', description)
-    infoDict['category'] = ', '.join(game['categories'])
-    infoDict['publisher'] = None if not game['publishers'] else ' & '.join(game['publishers'])
-    infoDict['developer'] = None if not game['developers'] else ' & '.join(game['developers'])
-    infoDict['image'] = 'https://nintendo.com' + game['boxArt']
-
-    return infoDict
-
-async def _request_noe(title):
-    infoDict = {}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
-    }
-
-    search = requests.get('https://search.nintendo-europe.com/en/select?q="{}"&start=0&rows=4000&wt=json&sort=title asc&fq=type:GAME AND system_names_txt:"switch"'.format(title), headers=headers)
-    try:
-        search.raise_for_status()
-
-    except Exception as e:
-        raise RuntimeError(e)
-
-    response = search.json()
-    #print(response)
-    gameList = response['response']['docs']
-    game = None
-
-    for entry in gameList:
-        if entry['title'] == title:
-            game = entry
-            break
-
-    if not game:
-        raise KeyError('Game {} not found in returned NOE search array'.format(title))
-
-    infoDict['description'] = None if not game['excerpt'] else game['excerpt']
-    infoDict['category'] = ', '.join(game['pretty_game_categories_txt'])
-    infoDict['publisher'] = None if not game['publisher'] else game['publisher']
-    infoDict['developer'] = None if not game['developer'] else game['developer']
-    infoDict['image'] = 'https:' + game['image_url']
-
-    return infoDict
-
-
-async def _request_noj(nsuid):
-    infoDict = {}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
-    }
-
-    titleAPI = requests.get('https://ec.nintendo.com/api/JP/ja/related/title/{}'.format(nsuid), headers=headers)
-    try:
-        titleAPI.raise_for_status()
-
-    except Exception as e:
-        raise RuntimeError(e)
-
-    gameDesc = titleAPI.json()
-    #print(gameDesc)
-    response = gameDesc['related_informations']['related_information'][0]
-
-    infoDict['description'] = None if not response['description'] else response['description']
-    infoDict['image'] = response['image_url']
-    # TODO: Scrape nintendo.co.jp entries for extra details
-    infoDict['category'] = None
-    infoDict['publisher'] = None
-    infoDict['developer'] = None
-
-    return infoDict
-
-
-async def game_data(nxid, desc_cap=2048):
-    db = mclient.bowser.games
-    fs = gridfs.GridFS(mclient.bowser)
-    gameDoc = db.find_one({'_id': nxid})
-
-    if gameDoc['description'] and gameDoc['cacheUpdate'] > (time.time() - 86400 * 30): # Younger than 30 days
-        return gameDoc
-
-    titles = gameDoc['titles']
-    print(titles)
-
-    if titles['NA']:
-        infoDict = await _request_noa(gameDoc['nsuids']['NA'])
-
-    elif titles['EU']:
-        infoDict = await _request_noe(gameDoc['titles']['EU'].encode('latin-1', errors='replace'))
-
-    else:
-        infoDict = await _request_noj(gameDoc['nsuids']['JP'])
-
-    if len(infoDict['description']) > desc_cap: infoDict['description'] = f'{infoDict["description"][:desc_cap - 3]}...'
-
-    if not fs.exists(nxid) or gameDoc['cacheUpdate'] < (time.time() - 86400 * 30): # Image not stored or older than 30 days
-        if fs.exists(nxid): fs.delete(nxid)
-        r = requests.get(infoDict['image'], stream=True)
-        if r.status_code != 200:
-            raise RuntimeError(f'Nintendo returned non-200 status code {r.status_code}')
-
-        fs.put(r.raw, _id=nxid)
-
-    infoDict['size'] = None # Depreciated
-    db.update_one({'_id': nxid}, {'$set': {
-        'description': infoDict['description'],
-        'category': infoDict['category'],
-        'publisher': infoDict['publisher'],
-        'developer': infoDict['developer'],
-        'size': infoDict['size'],
-        'image': infoDict['image'],
-        'cacheUpdate': int(time.time())
-        }})
-
-    return infoDict
 
 def resolve_duration(data):
     '''
