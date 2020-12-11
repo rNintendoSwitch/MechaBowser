@@ -4,6 +4,7 @@ import time
 import uuid
 import logging
 import re
+import asyncio
 
 import discord
 import pymongo
@@ -464,36 +465,32 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     return any(not overlap for overlap in overlaps)
 
 # TODO: Look into replacing _stats_roles() and its embed_paginate(): using chunks instead of fields-- another function to prep for this one?
-async def send_paginated_embed(channel: discord.TextChannel,
+async def send_paginated_embed(bot:  discord.ext.commands.Bot,
+                               channel: discord.TextChannel,
                                fields: typing.List[typing.Dict], # name: str , value: str, inline: optional bool
                                *, 
                                owner: typing.Optional[discord.User] = None, 
                                timeout: int = 600,
                                title: typing.Optional[str] = '',
                                description: typing.Optional[str] = None,
-                               colour: typing.Union[discord.Colour, int, None] = 0,
+                               colour: typing.Union[discord.Colour, int, None] = discord.Embed.Empty,
                                author: typing.Optional[typing.Dict] = None) -> discord.Message: # author = name: str, icon_url: optional str
     '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
 
     PAGE_TEMPLATE = '(Page {0}/{1})'
-    FOOTER_INSTRUCTION = 'Use ➡️ and ⬅️ to change pages and ⏹️ to end'
-    FOOTER_LAST_ACTION = ['In use by {0}', 'Last used by {0}', 'Ended by {0}']
-    FOOTER_TIME_STATUS = ['Expires in', 'Expired at', 'Ended at']
+    FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
+    PAGE_CHARACTER_LIMIT = 6000
 
-    # max(...) gets longest item; formats to mock discordtag#0000 (max length: 32+1+4=37)
-    footer_max_length = len(' | '.join([max(FOOTER_LAST_ACTION, key=len), FOOTER_INSTRUCTION, max(FOOTER_TIME_STATUS, key=len)]).format('.'*37))
-    title_max_length = len(title) + len(PAGE_TEMPLATE.format('99', '99')) + 1
+    # Find the page character cap
+    footer_max_length = len(PAGE_TEMPLATE) + len(FOOTER_INSTRUCTION) + 1
+    title_max_length = len(title) + len(FOOTER_INSTRUCTION) + 1
     description_length = 0 if not description else len(description)
     author_length = 0 if not author else len(author['name'])
 
-    page_char_cap = 6000 - footer_max_length - title_max_length - description_length - author_length
-
-    baseEmbed = discord.Embed(description=None if not description else description, colour=colour)
-    if author: baseEmbed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
+    page_char_cap = PAGE_CHARACTER_LIMIT - footer_max_length - title_max_length - description_length - author_length
 
     # Build pages
     pages = []
-
     while fields:
         remaining_chars = page_char_cap
         page = []
@@ -507,9 +504,76 @@ async def send_paginated_embed(channel: discord.TextChannel,
             page.append(fields.pop(0))
 
         pages.append(page)
-    return pages
 
+    timeout_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
+    current_page = 1
+    ended_by = None
 
+    # Setup messages, we wait to update the embed later so users don't click them before we're setup 
+    message = await channel.send('Please wait...')
+    await message.add_reaction('⬅')
+    await message.add_reaction('⏹')
+    await message.add_reaction('➡')
+
+    # Init embed
+    embed = discord.Embed(description=None if not description else description, colour=colour)
+    if author: embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
+    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
+
+    # Main loop
+    while (datetime.datetime.utcnow() <= timeout_at):
+        # Add Fields
+        embed.clear_fields()
+        for field in pages[current_page-1]:
+            embed.add_field(name=field['name'], value=field['value'], inline=embed.Empty if not 'inline' in field else field['inline'])
+
+        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+        embed.title = f'{title} {page_text}'
+        embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
+
+        await message.edit(content='', embed=embed)
+        
+        # Check user reaction
+        def check(reaction, user):
+            if user.id == bot.user.id: False
+            if owner and user.id != owner.id: return False
+
+            if reaction.message.id != message.id: return False
+            if not reaction.emoji in ['⬅', '➡', '⏹']: return False
+
+            return True
+
+        # Catch timeout
+        try:
+            reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
+        except asyncio.TimeoutError:
+            break
+        
+        await reaction.remove(user)
+
+        # Change page
+        if reaction.emoji == '⬅':
+            if current_page == 1: continue
+            current_page -= 1
+
+        elif reaction.emoji == '➡':
+            if current_page == len(pages): continue
+            current_page += 1
+
+        else:
+            ended_by = user
+            break
+
+    # Generate ended footer
+    page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+    footer_text = 'Ended by {ended_by}' if ended_by else 'Timed out'
+    embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
+
+    await message.clear_reactions()
+    await message.edit(embed=embed)
+
+    return message
+        
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
