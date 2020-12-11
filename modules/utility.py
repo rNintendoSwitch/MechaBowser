@@ -462,9 +462,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             desc = f'There are __{puns.count()}__ infraction records for this user:'
 
-        embed = discord.Embed(title='Infraction History', description=desc, color=0x18EE1C)
-        embed.set_author(name=f'{user} | {user.id}', icon_url=user.avatar_url)
-
+        fields = []
         for pun in puns.sort('timestamp', pymongo.DESCENDING):
             datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
             moderator = ctx.guild.get_member(pun['moderator'])
@@ -480,9 +478,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             else:
                 inf = punNames[pun['type']]
 
-            embed.add_field(name=datestamp, value=f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}')
+            fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
 
-        return await ctx.send(embed=embed)
+        author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
+        return await utils.send_paginated_embed(self.bot, ctx.channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)

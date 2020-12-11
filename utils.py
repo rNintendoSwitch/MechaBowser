@@ -4,6 +4,7 @@ import time
 import uuid
 import logging
 import re
+import asyncio
 
 import discord
 import pymongo
@@ -289,44 +290,6 @@ async def mod_cmd_invoke_delete(channel):
     else:
         return True
 
-async def embed_paginate(chunks: list, page=1, header=None, codeblock=True):
-    if page <= 0: raise IndexError('Requested page cannot be less than one')
-    charLimit = 2048 if not codeblock else 2042 # 2048 - 6 for 6 backticks
-    pages = 1
-    requestedPage = ''
-
-    if not header:
-        text = ''
-
-    else:
-        text = header
-
-    if codeblock:
-        header = '```' if not header else header + '```'
-        text = header
-
-    for x in chunks:
-        if len(x) > charLimit:
-            raise IndexError('Individual chunk surpassed character limit')
-
-        if len(text) + len(x) > charLimit:
-            if pages == page:
-                requestedPage = text if not codeblock else text + '```'
-
-            text = header + x if header else x
-            pages += 1
-            continue
-
-        text += x
-
-    if page > pages:
-        raise IndexError('Requested page out of range')
-
-    if pages == 1:
-        requestedPage = text if not codeblock else text + '```'
-
-    return requestedPage, pages
-
 async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=None, public=False, delay=300):
     if user: # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
@@ -462,6 +425,145 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
 
     overlaps = spans_overlap_link(string, spans)
     return any(not overlap for overlap in overlaps)
+
+async def send_paginated_embed(bot:  discord.ext.commands.Bot,
+                               channel: discord.TextChannel,
+                               fields: typing.List[typing.Dict], # name: str , value: str, inline: optional bool
+                               *, 
+                               owner: typing.Optional[discord.User] = None, 
+                               timeout: int = 600,
+                               title: typing.Optional[str] = '',
+                               description: typing.Optional[str] = None,
+                               color: typing.Union[discord.Colour, int, None] = discord.Embed.Empty,
+                               author: typing.Optional[typing.Dict] = None,
+                               page_character_limit: typing.Optional[int] = 6000) -> discord.Message: # author = name: str, icon_url: optional str
+    '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
+
+    PAGE_TEMPLATE = '(Page {0}/{1})'
+    FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
+    FOOTER_ENDED_BY = 'Ended by {0}'
+
+    # Find the page character cap
+    footer_max_length = len(PAGE_TEMPLATE) + max(len(FOOTER_INSTRUCTION), len(FOOTER_ENDED_BY.format('-'*37))) + 4 # 37 = max len(discordtag...#0000)
+    title_max_length = len(title) + len(FOOTER_INSTRUCTION) + 1
+    description_length = 0 if not description else len(description)
+    author_length = 0 if not author else len(author['name'])
+
+    page_char_cap = page_character_limit - footer_max_length - title_max_length - description_length - author_length
+
+    # Build pages
+    pages = []
+    while fields:
+        remaining_chars = page_char_cap
+        page = []
+
+        for field in fields.copy():
+            field_length = len(field['name']) + len(field['value'])
+
+            if remaining_chars - field_length < 0: break
+            remaining_chars -= field_length
+    
+            page.append(fields.pop(0))
+
+            if len(page) == 25: break
+
+        pages.append(page)
+
+    current_page = 1
+    ended_by = None
+    message = None
+
+    if len(pages) != 1: # short circuit -- if 1 page we don't have to page
+        # Setup messages, we wait to update the embed later so users don't click them before we're setup 
+        message = await channel.send('Please wait...')
+        await message.add_reaction('⬅')
+        await message.add_reaction('⏹')
+        await message.add_reaction('➡')
+
+    # Init embed
+    embed = discord.Embed(description=None if not description else description, colour=color)
+    if author: embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
+    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
+
+    # Main loop
+    while True: # loops ends on 1-page short circuit, reaction listening timeout, or user request
+        # Add Fields
+        embed.clear_fields()
+        for field in pages[current_page-1]:
+            embed.add_field(name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline'])
+
+        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+        embed.title = f'{title} {page_text}'
+
+        if len(pages) == 1: # short circuit -- if 1 page we don't have to page
+            embed.set_footer(text=page_text)
+            await channel.send(embed=embed)
+            break
+        else:
+            embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
+
+            await message.edit(content='', embed=embed)
+        
+        # Check user reaction
+        def check(reaction, user):
+            if user.id == bot.user.id: False
+            if owner and user.id != owner.id: return False
+
+            if reaction.message.id != message.id: return False
+            if not reaction.emoji in ['⬅', '➡', '⏹']: return False
+
+            return True
+
+        # Catch timeout
+        try:
+            reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
+        except asyncio.TimeoutError:
+            break
+        
+        await reaction.remove(user)
+
+        # Change page
+        if reaction.emoji == '⬅':
+            if current_page == 1: continue
+            current_page -= 1
+
+        elif reaction.emoji == '➡':
+            if current_page == len(pages): continue
+            current_page += 1
+
+        else:
+            ended_by = user
+            break
+
+    if len(pages) != 1:  # short circuit -- if 1 page we don't have to page
+        # Generate ended footer
+        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+        footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'
+        embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
+
+        await message.clear_reactions()
+        await message.edit(embed=embed)
+
+    return message
+
+def convert_list_to_fields(lines: str, add_newline: bool = False) -> typing.List[typing.Dict]:
+    fields = []
+
+    while lines:
+        value = '```'
+
+        for line in lines.copy():
+            staged = value + line + ('\n' if add_newline else '')
+            if len(staged) + 3 > 1024: break
+
+            lines.pop(0)
+            value = staged
+
+        # \uFEFF = ZERO WIDTH NO-BREAK SPACE
+        value += '```'
+        fields.append({'name': '\uFEFF', 'value': value, 'inline': False})
+
+    return fields
 
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
