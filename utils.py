@@ -616,27 +616,52 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     overlaps = spans_overlap_link(string, spans)
     return any(not overlap for overlap in overlaps)
 
-class PaginatedEmbedField(typing.TypedMapping):
-    name: str
-    value: int
-    inline: typing.Optional[bool]
-
-class PaginatedEmbedAuthor(typing.TypedMapping):
-    name: str
-    url: int
-    inline: typing.Optional[bool]
-
 # TODO: Look into replacing _stats_roles() and its embed_paginate(): using chunks instead of fields-- another function to prep for this one?
 async def send_paginated_embed(channel: discord.TextChannel,
-                               fields: typing.List[PaginatedEmbedField],
+                               fields: typing.List[typing.Dict], # name: str , value: str, inline: optional bool
                                *, 
-                               owner: typing.Optional[discord.User], 
+                               owner: typing.Optional[discord.User] = None, 
                                timeout: int = 600,
-                               title: typing.Optional[str],
-                               description: str,
-                               colour: typing.Union[discord.Colour, int, None],
-                               author: typing.Optional[PaginatedEmbedAuthor]) -> discord.Message:
+                               title: typing.Optional[str] = '',
+                               description: typing.Optional[str] = None,
+                               colour: typing.Union[discord.Colour, int, None] = 0,
+                               author: typing.Optional[typing.Dict] = None) -> discord.Message: # author = name: str, icon_url: optional str
     '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
+
+    PAGE_TEMPLATE = '(Page {0}/{1})'
+    FOOTER_INSTRUCTION = 'Use ➡️ and ⬅️ to change pages and ⏹️ to end'
+    FOOTER_LAST_ACTION = ['In use by {0}', 'Last used by {0}', 'Ended by {0}']
+    FOOTER_TIME_STATUS = ['Expires in', 'Expired at', 'Ended at']
+
+    # max(...) gets longest item; formats to mock discordtag#0000 (max length: 32+1+4=37)
+    footer_max_length = len(' | '.join([max(FOOTER_LAST_ACTION, key=len), FOOTER_INSTRUCTION, max(FOOTER_TIME_STATUS, key=len)]).format('.'*37))
+    title_max_length = len(title) + len(PAGE_TEMPLATE.format('99', '99')) + 1
+    description_length = 0 if not description else len(description)
+    author_length = 0 if not author else len(author['name'])
+
+    page_char_cap = 6000 - footer_max_length - title_max_length - description_length - author_length
+
+    baseEmbed = discord.Embed(description=None if not description else description, colour=colour)
+    if author: baseEmbed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
+
+    # Build pages
+    pages = []
+
+    while fields:
+        remaining_chars = page_char_cap
+        page = []
+
+        for field in fields.copy():
+            field_length = len(field['name']) + len(field['value'])
+
+            if remaining_chars - field_length < 0: break
+            remaining_chars -= field_length
+    
+            page.append(fields.pop(0))
+
+        pages.append(page)
+    return pages
+
 
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
