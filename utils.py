@@ -473,7 +473,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
                                timeout: int = 600,
                                title: typing.Optional[str] = '',
                                description: typing.Optional[str] = None,
-                               colour: typing.Union[discord.Colour, int, None] = discord.Embed.Empty,
+                               color: typing.Union[discord.Colour, int, None] = discord.Embed.Empty,
                                author: typing.Optional[typing.Dict] = None) -> discord.Message: # author = name: str, icon_url: optional str
     '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
 
@@ -503,20 +503,24 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     
             page.append(fields.pop(0))
 
+            if len(page) == 25: break
+
         pages.append(page)
 
     timeout_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
     current_page = 1
     ended_by = None
+    message = None
 
     # Setup messages, we wait to update the embed later so users don't click them before we're setup 
-    message = await channel.send('Please wait...')
-    await message.add_reaction('⬅')
-    await message.add_reaction('⏹')
-    await message.add_reaction('➡')
+    if len(pages) != 1: # short circuit -- if 1 page we don't have to page
+        message = await channel.send('Please wait...')
+        await message.add_reaction('⬅')
+        await message.add_reaction('⏹')
+        await message.add_reaction('➡')
 
     # Init embed
-    embed = discord.Embed(description=None if not description else description, colour=colour)
+    embed = discord.Embed(description=None if not description else description, colour=color)
     if author: embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
     embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
 
@@ -525,13 +529,19 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
         # Add Fields
         embed.clear_fields()
         for field in pages[current_page-1]:
-            embed.add_field(name=field['name'], value=field['value'], inline=embed.Empty if not 'inline' in field else field['inline'])
+            embed.add_field(name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline'])
 
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         embed.title = f'{title} {page_text}'
-        embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
 
-        await message.edit(content='', embed=embed)
+        if len(pages) == 1: # short circuit -- if 1 page we don't have to page
+            embed.set_footer(text=page_text)
+            await channel.send(embed=embed)
+            break
+        else:
+            embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
+
+            await message.edit(content='', embed=embed)
         
         # Check user reaction
         def check(reaction, user):
@@ -564,13 +574,14 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
             ended_by = user
             break
 
-    # Generate ended footer
-    page_text = PAGE_TEMPLATE.format(current_page, len(pages))
-    footer_text = 'Ended by {ended_by}' if ended_by else 'Timed out'
-    embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
+    if len(pages) != 1:  # short circuit -- if 1 page we don't have to page
+        # Generate ended footer
+        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+        footer_text = f'Ended by {ended_by}' if ended_by else 'Timed out'
+        embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
 
-    await message.clear_reactions()
-    await message.edit(embed=embed)
+        await message.clear_reactions()
+        await message.edit(embed=embed)
 
     return message
         
