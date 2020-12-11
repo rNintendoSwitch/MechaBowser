@@ -480,7 +480,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
 
-        # TODO: @MattBSG#8888 should history command lock user of embed or nah?
         author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
         return await utils.send_paginated_embed(self.bot, ctx.channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
 
