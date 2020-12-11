@@ -469,7 +469,6 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
 
         pages.append(page)
 
-    timeout_at = datetime.datetime.utcnow() + datetime.timedelta(seconds=timeout)
     current_page = 1
     ended_by = None
     message = None
@@ -487,7 +486,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
 
     # Main loop
-    while (datetime.datetime.utcnow() <= timeout_at):
+    while True: # loops ends on 1-page short circuit, reaction listening timeout, or user request
         # Add Fields
         embed.clear_fields()
         for field in pages[current_page-1]:
