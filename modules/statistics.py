@@ -163,7 +163,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     @_stats.command(name='roles', aliases=['role'])
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_roles(self, ctx, *, role: typing.Optional[typing.Union[discord.Role, int, str]]): # TODO: create and pull role add/remove data from events
-        msg = await ctx.send('One moment, crunching the numbers...')
+        
         if role:
             if type(role) is int:
                 role = ctx.guild.get_role(role)
@@ -176,63 +176,13 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
                     return await ctx.send(f'{config.redTick} There is no role by that name')
 
             chunks = []
-            header = f'There are currently **{len(role.members)}** users with the **{role.name}** role:\n\n'
+            desc = f'There are currently **{len(role.members)}** users with the **{role.name}** role:\n\n'
             for member in role.members:
                 chunks.append(f'* {member} ({member.id})\n')
 
-            embed = discord.Embed(title=f'{ctx.guild.name} Role Statistics', color=0xD267BA)
-            embed.add_field(name='Instructions', value='Use :arrow_right: and :arrow_left: to scroll between pages. :stop_button: To end')
-            newPage, pages = await utils.embed_paginate(chunks, header=header)
-            embed.description = newPage
-            await msg.edit(content=None, embed=embed)
-            page = 1 # pylint: disable=unused-variable
-            stop = time.time() + 1800
-
-            await msg.add_reaction('⬅')
-            await msg.add_reaction('➡')
-            await msg.add_reaction('⏹')
-
-            def check(reaction, user):
-                if user.id != ctx.author.id or reaction.message.id != msg.id:
-                    return False
-
-                return True
-
-            while time.time() <= stop:
-                try:
-                    reaction, user = await self.bot.wait_for('reaction_add', timeout=30, check=check)
-                    if reaction.emoji == '⬅':
-                        if page == 1: # Don't switch down past page 1
-                            await reaction.remove(user)
-                            continue
-
-                        else:
-                            await reaction.remove(user)
-                            page -= 1
-
-                    elif reaction.emoji == '➡':
-                        if page == pages: # Don't exceed last page
-                            await reaction.remove(user)
-                            continue
-
-                        else:
-                            await reaction.remove(user)
-                            page += 1
-
-                    elif reaction.emoji == '⏹':
-                        break
-
-                    else:
-                        continue
-
-                    newPage, pages = await utils.embed_paginate(chunks, header=header, page=page)
-                    embed.description = newPage
-                    await msg.edit(embed=embed)
-
-                except asyncio.TimeoutError:
-                    pass
-
-            await msg.clear_reactions()
+            title = f'{ctx.guild.name} Role Statistics'
+            fields = utils.convert_list_to_fields(chunks)
+            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=title, description=desc, color=0xD267BA, page_character_limit=3000)
 
         else:
             roleCounts = []
@@ -242,7 +192,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             roleList = '\n'.join(roleCounts)
             embed = discord.Embed(title=f'{ctx.guild.name} Role Statistics', description=f'Server role list and respective member count\n\n{roleList}', color=0xD267BA)
 
-        return await msg.edit(content=None, embed=embed)
+            return await ctx.send(embed=embed)
 
     @_stats.command(name='channels')
     @commands.has_any_role(config.moderator, config.eh)

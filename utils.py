@@ -290,44 +290,6 @@ async def mod_cmd_invoke_delete(channel):
     else:
         return True
 
-async def embed_paginate(chunks: list, page=1, header=None, codeblock=True):
-    if page <= 0: raise IndexError('Requested page cannot be less than one')
-    charLimit = 2048 if not codeblock else 2042 # 2048 - 6 for 6 backticks
-    pages = 1
-    requestedPage = ''
-
-    if not header:
-        text = ''
-
-    else:
-        text = header
-
-    if codeblock:
-        header = '```' if not header else header + '```'
-        text = header
-
-    for x in chunks:
-        if len(x) > charLimit:
-            raise IndexError('Individual chunk surpassed character limit')
-
-        if len(text) + len(x) > charLimit:
-            if pages == page:
-                requestedPage = text if not codeblock else text + '```'
-
-            text = header + x if header else x
-            pages += 1
-            continue
-
-        text += x
-
-    if page > pages:
-        raise IndexError('Requested page out of range')
-
-    if pages == 1:
-        requestedPage = text if not codeblock else text + '```'
-
-    return requestedPage, pages
-
 async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=None, public=False, delay=300):
     if user: # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
@@ -464,7 +426,6 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     overlaps = spans_overlap_link(string, spans)
     return any(not overlap for overlap in overlaps)
 
-# TODO: Look into replacing _stats_roles() and its embed_paginate(): using chunks instead of fields-- another function to prep for this one?
 async def send_paginated_embed(bot:  discord.ext.commands.Bot,
                                channel: discord.TextChannel,
                                fields: typing.List[typing.Dict], # name: str , value: str, inline: optional bool
@@ -487,7 +448,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     description_length = 0 if not description else len(description)
     author_length = 0 if not author else len(author['name'])
 
-    page_char_cap = PAGE_CHARACTER_LIMIT - footer_max_length - title_max_length - description_length - author_length
+    page_char_cap = page_character_limit - footer_max_length - title_max_length - description_length - author_length
 
     # Build pages
     pages = []
@@ -584,6 +545,26 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
         await message.edit(embed=embed)
 
     return message
+
+def convert_list_to_fields(lines: str, add_newline: bool = False) -> typing.List[typing.Dict]:
+    fields = []
+
+    while lines:
+        value = '```'
+
+        for line in lines.copy():
+            staged = value + line + ('\n' if add_newline else '')
+            if len(staged) + 3 > 1024: break
+
+            lines.pop(0)
+            value = staged
+
+        # \uFEFF = ZERO WIDTH NO-BREAK SPACE
+        value += '```'
+        fields.append({'name': '\uFEFF', 'value': value, 'inline': False})
+
+    return fields
+
         
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
