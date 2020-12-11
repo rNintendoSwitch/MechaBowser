@@ -474,12 +474,12 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
                                title: typing.Optional[str] = '',
                                description: typing.Optional[str] = None,
                                color: typing.Union[discord.Colour, int, None] = discord.Embed.Empty,
-                               author: typing.Optional[typing.Dict] = None) -> discord.Message: # author = name: str, icon_url: optional str
+                               author: typing.Optional[typing.Dict] = None,
+                               page_character_limit: typing.Optional[int] = 6000) -> discord.Message: # author = name: str, icon_url: optional str
     '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
 
     PAGE_TEMPLATE = '(Page {0}/{1})'
     FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
-    PAGE_CHARACTER_LIMIT = 6000
 
     # Find the page character cap
     footer_max_length = len(PAGE_TEMPLATE) + len(FOOTER_INSTRUCTION) + 1
