@@ -441,9 +441,10 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
 
     PAGE_TEMPLATE = '(Page {0}/{1})'
     FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
+    FOOTER_ENDED_BY = 'Ended by {0}'
 
     # Find the page character cap
-    footer_max_length = len(PAGE_TEMPLATE) + len(FOOTER_INSTRUCTION) + 1
+    footer_max_length = len(PAGE_TEMPLATE) + max(len(FOOTER_INSTRUCTION), len(FOOTER_ENDED_BY.format('-'*37))) + 4 # 37 = max len(discordtag...#0000)
     title_max_length = len(title) + len(FOOTER_INSTRUCTION) + 1
     description_length = 0 if not description else len(description)
     author_length = 0 if not author else len(author['name'])
@@ -473,8 +474,8 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     ended_by = None
     message = None
 
-    # Setup messages, we wait to update the embed later so users don't click them before we're setup 
     if len(pages) != 1: # short circuit -- if 1 page we don't have to page
+        # Setup messages, we wait to update the embed later so users don't click them before we're setup 
         message = await channel.send('Please wait...')
         await message.add_reaction('⬅')
         await message.add_reaction('⏹')
@@ -538,7 +539,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     if len(pages) != 1:  # short circuit -- if 1 page we don't have to page
         # Generate ended footer
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
-        footer_text = f'Ended by {ended_by}' if ended_by else 'Timed out'
+        footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'
         embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
 
         await message.clear_reactions()
@@ -565,7 +566,6 @@ def convert_list_to_fields(lines: str, add_newline: bool = False) -> typing.List
 
     return fields
 
-        
 def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
