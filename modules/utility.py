@@ -579,7 +579,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         await ctx.message.delete()
 
         if tag:
-            embed = discord.Embed(title=f'{name} source', description=f'```\n{tag["content"]}\n```')
+            embed = discord.Embed(title=f'{name} source', description=f'```md\n{tag["content"]}\n```')
             return await ctx.send(embed=embed)
 
         else:
