@@ -473,8 +473,8 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     ended_by = None
     message = None
 
-    if len(pages) != 1: # short circuit -- if 1 page we don't have to page
-        # Setup messages, we wait to update the embed later so users don't click them before we're setup 
+    if len(pages) != 1: # Short circuit: if one page only, we don't need to change pages
+        # Setup messages, we wait to update the embed later so users don't click reactions before we're setup 
         message = await channel.send('Please wait...')
         await message.add_reaction('⬅')
         await message.add_reaction('⏹')
@@ -486,7 +486,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
 
     # Main loop
-    while True: # loops ends on 1-page short circuit, reaction listening timeout, or user request
+    while True: # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
         # Add Fields
         embed.clear_fields()
         for field in pages[current_page-1]:
@@ -495,7 +495,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         embed.title = f'{title} {page_text}'
 
-        if len(pages) == 1: # short circuit -- if 1 page we don't have to page
+        if len(pages) == 1: # Short circuit: if one page only, we don't need to change pages
             embed.set_footer(text=page_text)
             await channel.send(embed=embed)
             break
@@ -535,7 +535,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
             ended_by = user
             break
 
-    if len(pages) != 1:  # short circuit -- if 1 page we don't have to page
+    if len(pages) != 1:  # Short circuit: if one page only, we don't need to change pages
         # Generate ended footer
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'
@@ -546,22 +546,21 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
 
     return message
 
-def convert_list_to_fields(lines: str, add_newline: bool = False) -> typing.List[typing.Dict]:
+def convert_list_to_fields(lines: str, *, add_newline: bool = False, codeblock: bool = True) -> typing.List[typing.Dict]:
     fields = []
 
     while lines:
-        value = '```'
+        value = '```' if codeblock else ''
 
         for line in lines.copy():
             staged = value + line + ('\n' if add_newline else '')
-            if len(staged) + 3 > 1024: break
+            if len(staged) + (3 if codeblock else 0) > 1024: break
 
             lines.pop(0)
             value = staged
-
-        # \uFEFF = ZERO WIDTH NO-BREAK SPACE
-        value += '```'
-        fields.append({'name': '\uFEFF', 'value': value, 'inline': False})
+            
+        value += '```' if codeblock else ''
+        fields.append({'name': '\uFEFF', 'value': value, 'inline': False}) # \uFEFF = ZERO WIDTH NO-BREAK SPACE
 
     return fields
 
