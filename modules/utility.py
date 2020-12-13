@@ -216,7 +216,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             for link in links:
                 linkModified = False
 
-                urlParts = urllib.parse.urlsplit(link[0])
+                try:
+                    urlParts = urllib.parse.urlsplit(link[0])
+                except ValueError: # Invalid URL edge case
+                    continue
+                
                 urlPartsList = list(urlParts)
 
                 query_raw = dict(urllib.parse.parse_qsl(urlPartsList[3]))
