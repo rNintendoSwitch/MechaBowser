@@ -628,6 +628,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         tag = db.find_one({'_id': name})
 
         await ctx.message.delete()
+        content =  ' '.join(content.splitlines())
 
         if tag:
             db.update_one({'_id': tag['_id']}, {'$set': {'desc': content}})
@@ -646,6 +647,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         tag = db.find_one({'_id': name})
 
         await ctx.message.delete()
+        content =  ' '.join(content.splitlines())
 
         IMG_TYPES = {
             'main': {'key': 'img_main', 'name': 'main'},
