@@ -556,7 +556,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         name = name.lower()
         tag = db.find_one({'_id': name})
         await ctx.message.delete()
-        if name in ['list', 'edit', 'delete', 'source']:
+        if name in ['list', 'edit', 'delete', 'source']: # Name blacklist
             return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
 
         if tag:
@@ -604,6 +604,26 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
+    @_tag.command(name='setdesc')
+    @commands.has_any_role(config.moderator, config.helpfulUser)
+    async def _tag_setdesc(self, ctx,  name, *, content: typing.Optional[str] = ''):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+        await ctx.message.delete()
+
+        if tag:
+            db.update_one({'_id': tag['_id']},
+               {'$set': {'desc': content}}
+            )
+
+            status = 'updated' if content else 'cleared'
+            return await ctx.send(f'{config.greenTick} The **{name}** tag description has been {status}', delete_after=10)
+
+        else:
+            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
+
     @_tag.command(name='source')
     @commands.has_any_role(config.moderator, config.helpfulUser)
     async def _tag_source(self, ctx, *, name):
@@ -614,10 +634,15 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if tag:
             embed = discord.Embed(title=f'{name} source', description=f'```md\n{tag["content"]}\n```')
+
+            description = tag['desc'] if 'desc' in tag else ''
+            embed.add_field(name='Description', value=tag['desc'] if description else '*No description*')
+
             return await ctx.send(embed=embed)
 
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
@@ -724,6 +749,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @_tag_list.error
     @_tag_create.error
     @_tag_delete.error
+    @_tag_setdesc.error
     @_tag_source.error
     async def utility_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
