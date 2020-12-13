@@ -523,6 +523,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             description = tag['desc'] if 'desc' in tag else ''
             tagList.append((tag['_id'], description))
 
+        tagList.sort(key=lambda x: x[0].lower())
+
         if not tagList: return await ctx.send('{config.redTick} This server has no tags!')
 
         if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
