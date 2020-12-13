@@ -513,41 +513,54 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await self._tag_list(ctx)
 
     @_tag.command(name='list')
-    async def _tag_list(self, ctx):
+    async def _tag_list(self, ctx, prefix: typing.Optional[str] = ''):
         db = mclient.bowser.tags
-        embed_title = 'Tag List'
-        embed_desc = 'Here is a list of tags you can access:'
+        EMBED_TITLE = 'Tag List'
+        EMBED_DESC_TEMPLATE = 'Here is a list of tags you can access{0}:'
 
         tagList = []
         for tag in db.find({'active': True}):
             description = tag['desc'] if 'desc' in tag else ''
-            tagList.append((tag['_id'], description))
+            tagList.append({'name': tag['_id'].lower(), 'desc': description})
 
-        tagList.sort(key=lambda x: x[0].lower())
+        tagList.sort(key=lambda x: x['name'])
 
         if not tagList: return await ctx.send('{config.redTick} This server has no tags!')
 
         if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
-            embed = discord.Embed(title=embed_title, description=f'{embed_desc}\n\n' + ', '.join( [x[0] for x in tagList] ))
-            embed.set_footer(text=f'Type \'{ctx.prefix}tag <name>\' to request a tag or \'{ctx.prefix}tag list\' to view tag descriptions')
+
+            embed_desc = EMBED_DESC_TEMPLATE.format('') + '\n\n'
+            tags = ', '.join( [tag['name'] for tag in tagList] )
+
+            embed = discord.Embed(title=EMBED_TITLE, description=embed_desc + tags)
+            embed.set_footer(text=f'Type \'{ctx.prefix}tag <name>\' to request a tag or \'{ctx.prefix}tag list (search)\' to view tag descriptions')
             return await ctx.send(embed=embed)
 
-        else:
+        else: # Complex list
             # If the command is being not being run in commands channel, they must be a mod or helpful user to run it.
             if ctx.channel.id != config.commandsChannel:
                 if not (ctx.guild.get_role(config.modemeritus) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
-            longest_name = len(max([x[0] for x in tagList], key=len))
-            lines = []
+            embed_desc = EMBED_DESC_TEMPLATE.format(f' beginning with `{prefix}`' if prefix else '')
 
-            for tag in tagList:
-                name = tag[0].ljust(longest_name)
-                desc = tag[1] if tag[1] else '*No description*'
-                lines.append(f'`{name}` {desc}')
+            if prefix:
+                tagList = list(filter(lambda x: x['name'].startswith(prefix), tagList) )
+
+            if tagList:
+                longest_name = len(max([tag['name'] for tag in tagList], key=len))
+                lines = []
+
+                for tag in tagList:
+                    name = tag['name'].ljust(longest_name)
+                    desc = tag['desc'] if tag['desc'] else '*No description*'
+
+                    lines.append(f'`{name}` {desc}')
+
+            else: lines = ['*No results found*']
 
             fields = utils.convert_list_to_fields(lines, codeblock=False)
-            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=embed_title, description=embed_desc, page_character_limit=1500)
+            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
 
     @_tag.command(name='edit')
     @commands.has_any_role(config.moderator, config.helpfulUser)
