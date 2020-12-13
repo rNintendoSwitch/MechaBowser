@@ -571,7 +571,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-        await ctx.message.delete()
         if name in ['list', 'edit', 'delete', 'source', 'setdesc', 'setimg']: # Name blacklist
             return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
 
@@ -582,6 +581,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             })
             msg = f'{config.greenTick} The **{name}** tag has been '
             msg += 'updated' if tag['active'] else 'created'
+            await ctx.message.delete()
             return await ctx.send(msg, delete_after=10)
 
         else:
@@ -627,13 +627,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         name = name.lower()
         tag = db.find_one({'_id': name})
 
-        await ctx.message.delete()
         content =  ' '.join(content.splitlines())
 
         if tag:
             db.update_one({'_id': tag['_id']}, {'$set': {'desc': content}})
 
             status = 'updated' if content else 'cleared'
+            await ctx.message.delete()
             return await ctx.send(f'{config.greenTick} The **{name}** tag description has been {status}', delete_after=10)
 
         else:
@@ -645,8 +645,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-
-        await ctx.message.delete()
 
         IMG_TYPES = {
             'main': {'key': 'img_main', 'name': 'main'},
@@ -668,8 +666,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: url}})
 
             status = 'updated' if url else 'cleared'
+            await ctx.message.delete()
             return await ctx.send(f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}', delete_after=10)
-
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
