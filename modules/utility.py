@@ -507,6 +507,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             embed = discord.Embed(title=tag['_id'], description=tag['content'])
             embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.avatar_url)
+
+            if 'img_main' in tag and tag['img_main']: embed.set_image(url=tag['img_main'])
+            if 'img_thumb' in tag and tag['img_thumb']: embed.set_thumbnail(url=tag['img_thumb'])
+
             return await ctx.send(embed=embed)
 
         else:
@@ -520,7 +524,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         tagList = []
         for tag in db.find({'active': True}):
-            description = tag['desc'] if 'desc' in tag else ''
+            description = '' if not 'desc' in tag else tag['desc']
             tagList.append({'name': tag['_id'].lower(), 'desc': description})
 
         tagList.sort(key=lambda x: x['name'])
@@ -544,8 +548,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             embed_desc = EMBED_DESC_TEMPLATE.format(f' beginning with `{prefix}`' if prefix else '')
 
-            if prefix:
-                tagList = list(filter(lambda x: x['name'].startswith(prefix), tagList) )
+            if prefix: tagList = list(filter(lambda x: x['name'].startswith(prefix), tagList) )
 
             if tagList:
                 longest_name = len(max([tag['name'] for tag in tagList], key=len))
@@ -553,7 +556,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
                 for tag in tagList:
                     name = tag['name'].ljust(longest_name)
-                    desc = tag['desc'] if tag['desc'] else '*No description*'
+                    desc = '*No description*' if not tag['desc'] else tag['desc']
 
                     lines.append(f'`{name}` {desc}')
 
@@ -623,12 +626,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
+
         await ctx.message.delete()
 
         if tag:
-            db.update_one({'_id': tag['_id']},
-               {'$set': {'desc': content}}
-            )
+            db.update_one({'_id': tag['_id']}, {'$set': {'desc': content}})
 
             status = 'updated' if content else 'cleared'
             return await ctx.send(f'{config.greenTick} The **{name}** tag description has been {status}', delete_after=10)
@@ -636,6 +638,34 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
+    @_tag.command(name='setimg')
+    @commands.has_any_role(config.moderator, config.helpfulUser)
+    async def _tag_setimg(self, ctx, name, img_type_arg, *, content: typing.Optional[str] = ''):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+
+        await ctx.message.delete()
+
+        IMG_TYPES = {
+            'main': {'key': 'img_main', 'name': 'main'},
+            'thumb': {'key': 'img_thumb', 'name': 'thumbnail'},
+            'thumbnail': {'key': 'img_thumb', 'name': 'thumbnail'},
+        }
+
+        if img_type_arg.lower() in IMG_TYPES: 
+            img_type = IMG_TYPES[img_type_arg]
+        else:
+            return await ctx.send(f'{config.redTick} Invalid image type, `{img_type_arg}`; Image type must be: {", ". join(IMG_TYPES.keys())}')
+
+        if tag:
+            db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: content}})
+
+            status = 'updated' if content else 'cleared'
+            return await ctx.send(f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}', delete_after=10)
+
+        else:
+            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
     @_tag.command(name='source')
     @commands.has_any_role(config.moderator, config.helpfulUser)
@@ -648,8 +678,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if tag:
             embed = discord.Embed(title=f'{name} source', description=f'```md\n{tag["content"]}\n```')
 
-            description = tag['desc'] if 'desc' in tag else ''
-            embed.add_field(name='Description', value=tag['desc'] if description else '*No description*')
+            description = '' if not 'desc' in tag else tag['desc']
+            img_main = '' if not 'img_main' in tag else tag['img_main']
+            img_thumb = '' if not 'img_thumb' in tag else tag['img_thumb']
+
+            embed.add_field(name='Description', value='*No description*' if not description else description, inline=True)
+            embed.add_field(name='Main Image', value='*No URL set*' if not img_main else img_main, inline=True)
+            embed.add_field(name='Thumbnail Image', value='*No URL set*' if not img_thumb else img_thumb, inline=True)
 
             return await ctx.send(embed=embed)
 
@@ -763,6 +798,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @_tag_create.error
     @_tag_delete.error
     @_tag_setdesc.error
+    @_tag_setimg.error
     @_tag_source.error
     async def utility_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
