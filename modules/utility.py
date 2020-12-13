@@ -641,13 +641,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @_tag.command(name='setimg')
     @commands.has_any_role(config.moderator, config.helpfulUser)
-    async def _tag_setimg(self, ctx, name, img_type_arg, *, content: typing.Optional[str] = ''):
+    async def _tag_setimg(self, ctx, name, img_type_arg, *, url: typing.Optional[str] = ''):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
 
         await ctx.message.delete()
-        content =  ' '.join(content.splitlines())
 
         IMG_TYPES = {
             'main': {'key': 'img_main', 'name': 'main'},
@@ -658,12 +657,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if img_type_arg.lower() in IMG_TYPES: 
             img_type = IMG_TYPES[img_type_arg]
         else:
-            return await ctx.send(f'{config.redTick} Invalid image type, `{img_type_arg}`; Image type must be: {", ". join(IMG_TYPES.keys())}')
+            return await ctx.send(f'{config.redTick} An invalid image type, `{img_type_arg}`, was given. Image type must be: {", ". join(IMG_TYPES.keys())}')
+
+        url =  ' '.join(url.splitlines())
+        match = utils.linkRe.match(url)
+        if not match or match.span()[0] != 0: # If url argument does not match or does not begin with a valid url
+            return await ctx.send(f'{config.redTick} An invalid url, `{url}`, was given')
 
         if tag:
-            db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: content}})
+            db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: url}})
 
-            status = 'updated' if content else 'cleared'
+            status = 'updated' if url else 'cleared'
             return await ctx.send(f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}', delete_after=10)
 
         else:
