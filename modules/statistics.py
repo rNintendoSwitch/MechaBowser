@@ -175,13 +175,13 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
                 if not role:
                     return await ctx.send(f'{config.redTick} There is no role by that name')
 
-            chunks = []
+            lines = []
             desc = f'There are currently **{len(role.members)}** users with the **{role.name}** role:\n\n'
             for member in role.members:
-                chunks.append(f'* {member} ({member.id})\n')
+                lines.append(f'* {member} ({member.id})')
 
             title = f'{ctx.guild.name} Role Statistics'
-            fields = utils.convert_list_to_fields(chunks)
+            fields = utils.convert_list_to_fields(lines)
             return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=title, description=desc, color=0xD267BA, page_character_limit=3000)
 
         else:

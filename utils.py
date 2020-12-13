@@ -546,14 +546,14 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
 
     return message
 
-def convert_list_to_fields(lines: str, *, add_newline: bool = False, codeblock: bool = True) -> typing.List[typing.Dict]:
+def convert_list_to_fields(lines: str, codeblock: bool = True) -> typing.List[typing.Dict]:
     fields = []
 
     while lines:
         value = '```' if codeblock else ''
 
         for line in lines.copy():
-            staged = value + line + ('\n' if add_newline else '')
+            staged = value + line + '\n'
             if len(staged) + (3 if codeblock else 0) > 1024: break
 
             lines.pop(0)
