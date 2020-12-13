@@ -495,7 +495,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @commands.group(name='tag', aliases=['tags'], invoke_without_command=True)
     async def _tag(self, ctx, *, query=None):
         db = mclient.bowser.tags
-        await ctx.message.delete()
 
         if query:
             query = query.lower()
@@ -504,7 +503,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if not tag:
                 return await ctx.send(f'{config.redTick} A tag with that name does not exist', delete_after=10)
 
+            await ctx.message.delete()
+
             embed = discord.Embed(title=tag['_id'], description=tag['content'])
+            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.avatar_url)
             return await ctx.send(embed=embed)
 
         else:
@@ -525,7 +527,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
             embed = discord.Embed(title=embed_title, description=f'{embed_desc}\n\n' + ', '.join( [x[0] for x in tagList] ))
-            embed.set_footer(text=f'Use {ctx.prefix}tag list to view tag descriptions')
+            embed.set_footer(text=f'Type \'{ctx.prefix}tag <name>\' to request a tag or \'{ctx.prefix}tag list\' to view tag descriptions')
             return await ctx.send(embed=embed)
 
         else:
