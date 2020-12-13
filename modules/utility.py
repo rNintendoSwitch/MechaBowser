@@ -547,7 +547,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else: # Complex list
             # If the command is being not being run in commands channel, they must be a mod or helpful user to run it.
             if ctx.channel.id != config.commandsChannel:
-                if not (ctx.guild.get_role(config.modemeritus) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
+                if not (ctx.guild.get_role(config.moderator) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
             embed_desc = EMBED_DESC_TEMPLATE.format(f' beginning with `{prefix}`' if prefix else '')
