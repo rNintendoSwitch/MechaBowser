@@ -216,7 +216,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             for link in links:
                 linkModified = False
 
-                urlParts = urllib.parse.urlsplit(link[0])
+                try:
+                    urlParts = urllib.parse.urlsplit(link[0])
+                except ValueError: # Invalid URL edge case
+                    continue
+                
                 urlPartsList = list(urlParts)
 
                 query_raw = dict(urllib.parse.parse_qsl(urlPartsList[3]))
@@ -495,7 +499,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @commands.group(name='tag', aliases=['tags'], invoke_without_command=True)
     async def _tag(self, ctx, *, query=None):
         db = mclient.bowser.tags
-        await ctx.message.delete()
 
         if query:
             query = query.lower()
@@ -504,16 +507,67 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if not tag:
                 return await ctx.send(f'{config.redTick} A tag with that name does not exist', delete_after=10)
 
+            await ctx.message.delete()
+
             embed = discord.Embed(title=tag['_id'], description=tag['content'])
+            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.avatar_url)
+
+            if 'img_main' in tag and tag['img_main']: embed.set_image(url=tag['img_main'])
+            if 'img_thumb' in tag and tag['img_thumb']: embed.set_thumbnail(url=tag['img_thumb'])
+
             return await ctx.send(embed=embed)
 
         else:
-            tagList = []
-            for x in db.find({'active': True}):
-                tagList.append(x['_id'])
+            await self._tag_list(ctx)
 
-            embed = discord.Embed(title='Tag List', description='Here is a list of tags you can access:\n\n' + ', '.join(tagList))
+    @_tag.command(name='list')
+    async def _tag_list(self, ctx, prefix: typing.Optional[str] = ''):
+        db = mclient.bowser.tags
+        EMBED_TITLE = 'Tag List'
+        EMBED_DESC_TEMPLATE = 'Here is a list of tags you can access{0}:'
+
+        tagList = []
+        for tag in db.find({'active': True}):
+            description = '' if not 'desc' in tag else tag['desc']
+            tagList.append({'name': tag['_id'].lower(), 'desc': description})
+
+        tagList.sort(key=lambda x: x['name'])
+
+        if not tagList: return await ctx.send('{config.redTick} This server has no tags!')
+
+        if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
+
+            embed_desc = EMBED_DESC_TEMPLATE.format('') + '\n\n'
+            tags = ', '.join( [tag['name'] for tag in tagList] )
+
+            embed = discord.Embed(title=EMBED_TITLE, description=embed_desc + tags)
+            embed.set_footer(text=f'Type \'{ctx.prefix}tag <name>\' to request a tag or \'{ctx.prefix}tag list (search)\' to view tag descriptions')
             return await ctx.send(embed=embed)
+
+        else: # Complex list
+            # If the command is being not being run in commands channel, they must be a mod or helpful user to run it.
+            if ctx.channel.id != config.commandsChannel:
+                if not (ctx.guild.get_role(config.modemeritus) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
+                    return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
+
+            embed_desc = EMBED_DESC_TEMPLATE.format(f' beginning with `{prefix}`' if prefix else '')
+
+            if prefix: tagList = list(filter(lambda x: x['name'].startswith(prefix), tagList) )
+
+            if tagList:
+                longest_name = len(max([tag['name'] for tag in tagList], key=len))
+                lines = []
+
+                for tag in tagList:
+                    name = tag['name'].ljust(longest_name)
+                    desc = '*No description*' if not tag['desc'] else tag['desc']
+
+                    lines.append(f'`{name}` {desc}')
+
+            else: lines = ['*No results found*']
+
+            fields = utils.convert_list_to_fields(lines, codeblock=False)
+            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
 
     @_tag.command(name='edit')
     @commands.has_any_role(config.moderator, config.helpfulUser)
@@ -521,8 +575,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-        await ctx.message.delete()
-        if name in ['edit', 'delete', 'source']:
+        if name in ['list', 'edit', 'delete', 'source', 'setdesc', 'setimg']: # Name blacklist
             return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
 
         if tag:
@@ -532,6 +585,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             })
             msg = f'{config.greenTick} The **{name}** tag has been '
             msg += 'updated' if tag['active'] else 'created'
+            await ctx.message.delete()
             return await ctx.send(msg, delete_after=10)
 
         else:
@@ -570,6 +624,57 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
+    @_tag.command(name='setdesc')
+    @commands.has_any_role(config.moderator, config.helpfulUser)
+    async def _tag_setdesc(self, ctx,  name, *, content: typing.Optional[str] = ''):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+
+        content =  ' '.join(content.splitlines())
+
+        if tag:
+            db.update_one({'_id': tag['_id']}, {'$set': {'desc': content}})
+
+            status = 'updated' if content else 'cleared'
+            await ctx.message.delete()
+            return await ctx.send(f'{config.greenTick} The **{name}** tag description has been {status}', delete_after=10)
+
+        else:
+            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
+    @_tag.command(name='setimg')
+    @commands.has_any_role(config.moderator, config.helpfulUser)
+    async def _tag_setimg(self, ctx, name, img_type_arg, *, url: typing.Optional[str] = ''):
+        db = mclient.bowser.tags
+        name = name.lower()
+        tag = db.find_one({'_id': name})
+
+        IMG_TYPES = {
+            'main': {'key': 'img_main', 'name': 'main'},
+            'thumb': {'key': 'img_thumb', 'name': 'thumbnail'},
+            'thumbnail': {'key': 'img_thumb', 'name': 'thumbnail'},
+        }
+
+        if img_type_arg.lower() in IMG_TYPES: 
+            img_type = IMG_TYPES[img_type_arg]
+        else:
+            return await ctx.send(f'{config.redTick} An invalid image type, `{img_type_arg}`, was given. Image type must be: {", ". join(IMG_TYPES.keys())}')
+
+        url =  ' '.join(url.splitlines())
+        match = utils.linkRe.match(url)
+        if not match or match.span()[0] != 0: # If url argument does not match or does not begin with a valid url
+            return await ctx.send(f'{config.redTick} An invalid url, `{url}`, was given')
+
+        if tag:
+            db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: url}})
+
+            status = 'updated' if url else 'cleared'
+            await ctx.message.delete()
+            return await ctx.send(f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}', delete_after=10)
+        else:
+            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
     @_tag.command(name='source')
     @commands.has_any_role(config.moderator, config.helpfulUser)
     async def _tag_source(self, ctx, *, name):
@@ -579,11 +684,21 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         await ctx.message.delete()
 
         if tag:
-            embed = discord.Embed(title=f'{name} source', description=f'```\n{tag["content"]}\n```')
+            embed = discord.Embed(title=f'{name} source', description=f'```md\n{tag["content"]}\n```')
+
+            description = '' if not 'desc' in tag else tag['desc']
+            img_main = '' if not 'img_main' in tag else tag['img_main']
+            img_thumb = '' if not 'img_thumb' in tag else tag['img_thumb']
+
+            embed.add_field(name='Description', value='*No description*' if not description else description, inline=True)
+            embed.add_field(name='Main Image', value='*No URL set*' if not img_main else img_main, inline=True)
+            embed.add_field(name='Thumbnail Image', value='*No URL set*' if not img_thumb else img_thumb, inline=True)
+
             return await ctx.send(embed=embed)
 
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
@@ -687,8 +802,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @_roles.error
     @_roles_set.error
     @_tag.error
+    @_tag_list.error
     @_tag_create.error
     @_tag_delete.error
+    @_tag_setdesc.error
+    @_tag_setimg.error
     @_tag_source.error
     async def utility_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
