@@ -640,6 +640,7 @@ class LoopTasks(commands.Cog):
             'mute': self.NS.get_role(config.mute)
         }
         self.expiry_check.start() #pylint: disable=no-member
+        self.expiry_check.add_exception_type(discord.errors.DiscordServerError) #pylint: disable=no-member
         logging.info('[Cog] Moderation tasks cog loaded')
 
     def cog_unload(self):
