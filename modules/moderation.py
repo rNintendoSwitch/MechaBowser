@@ -4,6 +4,7 @@ import datetime
 import time
 import re
 import copy
+import typing
 
 import pymongo
 import discord
@@ -40,6 +41,22 @@ class ResolveUser(commands.Converter):
 
         except discord.NotFound:
             raise commands.BadArgument
+
+class StrikeRange(commands.Converter):
+    async def convert(self, ctx, argument):
+        if not argument:
+            raise commands.BadArgument
+
+        try:
+            arg = int(argument)
+
+        except:
+            raise commands.BadArgument
+
+        if not 1 <= arg <= 16:
+            raise commands.BadArgument
+
+        return arg
 
 class Moderation(commands.Cog, name='Moderation Commands'):
     def __init__(self, bot):
@@ -438,6 +455,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
 
+    @commands.has_any_role(config.moderator, config.eh)
+    @commands.group(name='strike', invoke_without_command=True)
+    async def _strike(self, ctx, count: typing.Optional[StrikeRange] = 1, *, reason):
+        pass
     @_banning.error
     @_unbanning.error
     @_kicking.error
@@ -445,6 +466,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @_unmuting.error
     @_warning.error
     @_warning_review.error
+    @_strike.error
     @_note.error
     @_hide_modlog.error
     async def mod_error(self, ctx, error):
