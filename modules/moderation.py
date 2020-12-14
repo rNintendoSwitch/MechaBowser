@@ -284,170 +284,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
-    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _warning(self, ctx, member: discord.Member, *, reason):
-        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
-        db = mclient.bowser.puns
-        warnLevel = 0
-        tierLevel = {
-            0: ctx.guild.get_role(config.warnTier1),
-            1: ctx.guild.get_role(config.warnTier2),
-            2: ctx.guild.get_role(config.warnTier3)
-        }
-
-        puns = db.find_one({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-        _warnType = 'warn'
-        if puns: # Active punishments, give tier 2/3
-            if puns['type'] == 'tier3':
-                return await ctx.send(f'{config.redTick} That user is already warn tier 3')
-
-            _warnType = 'warnup'
-            db.update_one({'_id': puns['_id']}, {'$set': {
-                'active': False
-            }})
-            warnLevel = 2 if puns['type'] == 'tier2' else 1
-
-        embedWarnType = ''
-        if _warnType == 'warnup':
-            embedWarnType = f'was Tier {warnLevel}'
-
-        for role in member.roles:
-            if role in [tierLevel[0], tierLevel[1], tierLevel[2]]:
-                await member.remove_roles(role, reason='Warn action performed by moderator')
-
-        await member.add_roles(tierLevel[warnLevel], reason='Warn action performed by moderator')
-        docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason, int(utils.resolve_duration('30d').timestamp()))
-        await utils.send_modlog(self.bot, self.modLogs, f'tier{warnLevel+1}', docID, reason, user=member, moderator=ctx.author, extra_author=embedWarnType, public=True)
-        try:
-            await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {warnLevel + 1}'))
-        except discord.Forbidden: # User has DMs off
-            pass
-
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
-
-    @_warning.command(name='clear')
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _warning_clear(self, ctx, member: discord.Member, *, reason):
-        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn clear reason is too long, reduce it by at least {len(reason) - 990} characters')
-        db = mclient.bowser.puns
-        tierLevel = {
-            1: ctx.guild.get_role(config.warnTier1),
-            2: ctx.guild.get_role(config.warnTier2),
-            3: ctx.guild.get_role(config.warnTier3)
-        }
-        puns = db.find({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-
-        if not puns.count():
-            return await ctx.send(f'{config.redTick} That user has no active warnings')
-
-        for x in puns:
-            db.update_one({'_id': x['_id']}, {'$set': {
-                'active': False
-            }})
-            tierInt = int(x['type'][-1:])
-            await member.remove_roles(tierLevel[tierInt])
-
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
-        await utils.send_modlog(self.bot, self.modLogs, f'clear', docID, reason, user=member, moderator=ctx.author, public=True)
-        try:
-            await member.send(utils.format_pundm('warnclear', reason, ctx.author))
-        except discord.Forbidden: # User has DMs off
-            pass
-
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {member} ({member.id})')
-
-    @_warning.command(name='level')
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _warning_setlevel(self, ctx, member: discord.Member, tier: int, *, reason):
-        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
-        if tier not in [1, 2, 3]:
-            return await ctx.send(f'{config.redTick} Invalid tier number provided')
-    
-        db = mclient.bowser.puns
-        tierLevel = {
-            1: ctx.guild.get_role(config.warnTier1),
-            2: ctx.guild.get_role(config.warnTier2),
-            3: ctx.guild.get_role(config.warnTier3)
-        }
-        embedColor = {
-            1: discord.Color(0xFFFA1C),
-            2: discord.Color(0xFF9000),
-            3: discord.Color(0xD0021B)
-        }
-        warnText = {
-            1: 'First warning',
-            2: 'Second warning',
-            3: 'Third warning'
-        }
-
-        puns = db.find({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-        _warnType = 'warn'
-        oldTierInt = 0
-        if puns:
-            for x in puns:
-                if oldTierInt == tier:
-                    return await ctx.send(f'{config.redTick} User is already warned at that tier')
-
-                db.update_one({'_id': x['_id']}, {'$set': {
-                    'active': False
-                }})
-                oldTierInt = int(x['type'][-1:])
-
-                await member.remove_roles(tierLevel[oldTierInt])
-                if oldTierInt > tier:
-                    _warnType = 'warndown'
-
-                else:
-                    _warnType = 'warnup'
-
-        embedWarnType = ''
-        if _warnType in ['warnup', 'warndown']:
-            embedWarnType = f'was Tier {oldTierInt}'
-
-        await member.add_roles(tierLevel[tier])
-        docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, int(utils.resolve_duration('30d').timestamp()), context='level_set')
-        await utils.send_modlog(self.bot, self.modLogs, f'tier{tier}', docID, reason, user=member, moderator=ctx.author, extra_author=embedWarnType, public=True)
-        try:
-            await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {tier}'))
-        except discord.Forbidden: # User has DMs off
-            pass
-
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully warned; they are now tier {tier}')
+    async def _warning(self, ctx):
+        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`); if you need to manually review an warning, you may still use the `!warn review user` command')
 
     @_warning.command(name='review')
     @commands.has_any_role(config.moderator, config.eh)
@@ -474,7 +312,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         embed.set_footer(text="This message will expire in 15 minutes")
         embed.add_field(name="Warning details", value=f'**Type:** {config.punStrs[warnPun["type"]]}\n**Issued by:** <@{warnPun["moderator"]}>\n**Issued at:** {issueTime}\n**Reason**: {warnPun["reason"]}')
 
-        resp = await ctx.send(embed=embed)
+        resp = await ctx.send(':warning: Warns are depreciated, please move to the strike system :warning:', embed=embed)
         await resp.add_reaction(config.nextTrack) # track_next
         await resp.add_reaction(config.fastForward) # fast_forward
         await resp.add_reaction(config.playButton) # arrow_forward
@@ -606,8 +444,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @_muting.error
     @_unmuting.error
     @_warning.error
-    @_warning_clear.error
-    @_warning_setlevel.error
     @_warning_review.error
     @_note.error
     @_hide_modlog.error
