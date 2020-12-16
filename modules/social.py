@@ -40,9 +40,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.friendCodeRegex = { # Friend Code Regexs (\u2014 = em-dash)
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
-            # Chat filter, "It appears you've sent a friend code." Requires separators and discards AC designer prefixes.
-            # Discards Animal Crossing's MA & MO designer codes. Thanks to Jade for pointing out alternation and negated sets.
-            "chatFilter": re.compile(r'(?:sw|m[^ao]|[^M][\w]|^\w|^)[ \-\u2014]?(\d{4})[ \-\u2014](\d{4})[ \-\u2014](\d{4})', re.I + re.M)
+            # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
+            # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
+            "chatFilter": re.compile(r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014]?\d{4}[ \-\u2014]\d{4}[ \-\u2014]\d{4}', re.I + re.M)
         }
 
     @commands.group(name='profile', invoke_without_command=True)
