@@ -663,7 +663,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         url =  ' '.join(url.splitlines())
         match = utils.linkRe.match(url)
-        if not match or match.span()[0] != 0: # If url argument does not match or does not begin with a valid url
+        if url and (not match or match.span()[0] != 0): # If url argument does not match or does not begin with a valid url
             return await ctx.send(f'{config.redTick} An invalid url, `{url}`, was given')
 
         if tag:
