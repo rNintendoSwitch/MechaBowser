@@ -7,7 +7,6 @@ import time
 import aiohttp
 import urllib
 import pathlib
-from attr import __description__
 
 import pymongo
 import discord
