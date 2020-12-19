@@ -188,7 +188,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             levelDescription = block.group(7)
 
             embed = discord.Embed(color=discord.Color(0x6600FF))
-            embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
+            embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=f'{message.author.avatar_url}#mab_remover_{message.author.id}')
+            embed.set_footer(text='The author may react with 🗑️ to delete this message.')
+
             embed.add_field(name='Name', value=levelName, inline=True)
             embed.add_field(name='Level ID', value=levelID, inline=True)
             embed.add_field(name='Description', value=levelDescription, inline=False)
@@ -200,7 +202,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed.add_field(name='Tags', value=levelTags, inline=False)
 
             try:
-                await message.channel.send(embed=embed)
+                new_message = await message.channel.send(embed=embed)
+                await new_message.add_reaction('🗑️')
                 await message.delete()
 
             except discord.errors.Forbidden:
@@ -267,6 +270,43 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
                     await webhook.send(content=content, username=message.author.display_name, avatar_url=message.author.avatar_url)
                     await message.channel.send(embed=embed) # A seperate message is sent so that the orginal message has embeds
+
+    # Handle :wastebasket: reactions for user deletions on messages reposed on a user's behalf
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+        if not payload.member: return # Not in a guild
+        if payload.emoji.name != '🗑️': return # Not a :wastebasket: emoji
+        if payload.user_id == self.bot.user.id: return # This reaction was added by this bot
+
+        channel = self.bot.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        embed = None if not message.embeds else message.embeds[0]
+
+        if message.author.id != self.bot.user.id: return # Message is not from the bot
+        if not embed: return # Message does not have an embed
+
+        allowed_remover = None
+        target_message = None
+        # Search for special url tag in footer/author icon urls:
+        # ...#mab_remover_{remover} or ..#mab_remover_{remover}_{message}
+        for icon_url in [embed.author.icon_url, embed.footer.icon_url]:
+            if not icon_url: continue # Location does not have an icon_url
+
+            match = re.search(r'#mab_remover_(\d{15,25})(?:_(\d{15,25}))?$', icon_url)
+            if not match: continue # No special url tag here
+
+            allowed_remover = match.group(1)
+            target_message = match.group(2) if match.group(2) else payload.message_id # Default to this message to target if not specified
+            break
+
+        if not allowed_remover: return # No special url tag detected
+        if str(payload.user_id) != str(allowed_remover): return # Reactor is not the allowed remover
+        try:
+            msg = await channel.fetch_message(target_message)
+            await msg.delete()   
+        except Exception as e:
+            logging.warning(e)
+            pass
 
 # Large block of old event commented out code was removed on 12/02/2020
 # Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
