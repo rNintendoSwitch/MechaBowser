@@ -187,8 +187,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             levelDifficulty = block.group(6)
             levelDescription = block.group(7)
 
-            embed = discord.Embed(color=discord.Color(0x6600FF))
-            embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=f'{message.author.avatar_url}#mab_remover_{message.author.id}')
+            embed = discord.Embed(color=discord.Color(0x6600FF)) 
+            # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
+            embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=f'{message.author.avatar_url}#mab_remover_{message.author.id}') 
             embed.set_footer(text='The author may react with 🗑️ to delete this message.')
 
             embed.add_field(name='Name', value=levelName, inline=True)
@@ -259,17 +260,28 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             if contentModified:
                 hooks = await message.channel.webhooks()
-                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+
+                if hooks:
+                    useHook = hooks[0]
+                else:
+                    useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1 or more is required for affiliate filtering')
             
-                await message.delete()
-
-                embed = discord.Embed(description='The above message was automatically reposted by Mecha Bowser to remove an affiliate marketing link.')
-                embed.set_footer(text=f'Author: {str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
-
                 async with aiohttp.ClientSession() as session:
                     webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
-                    await webhook.send(content=content, username=message.author.display_name, avatar_url=message.author.avatar_url)
-                    await message.channel.send(embed=embed) # A seperate message is sent so that the orginal message has embeds
+                    webhook_message = await webhook.send(content=content, username=message.author.display_name, avatar_url=message.author.avatar_url, wait=True)
+
+                    await message.delete()
+
+                    embed = discord.Embed(
+                        description='The above message was automatically reposted by Mecha Bowser to remove an affiliate marketing link. The author may react with 🗑️ to delete these messages.')
+
+                    # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
+                    icon_url = f'{message.author.avatar_url}#mab_remover_{message.author.id}_{webhook_message.id}'
+                    embed.set_footer(text=f'Author: {str(message.author)} ({message.author.id})', icon_url=icon_url)
+
+                    # A seperate message is sent so that the original message has embeds
+                    embed_message = await message.channel.send(embed=embed)
+                    await embed_message.add_reaction('🗑️')
 
     # Handle :wastebasket: reactions for user deletions on messages reposed on a user's behalf
     @commands.Cog.listener()
@@ -296,14 +308,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if not match: continue # No special url tag here
 
             allowed_remover = match.group(1)
-            target_message = match.group(2) if match.group(2) else payload.message_id # Default to this message to target if not specified
+            target_message = match.group(2)
             break
 
         if not allowed_remover: return # No special url tag detected
         if str(payload.user_id) != str(allowed_remover): return # Reactor is not the allowed remover
         try:
-            msg = await channel.fetch_message(target_message)
-            await msg.delete()   
+            if target_message:
+                msg = await channel.fetch_message(target_message)
+                await msg.delete()  
+            
+            await message.delete() 
         except Exception as e:
             logging.warning(e)
             pass
