@@ -7,6 +7,7 @@ import time
 import aiohttp
 import urllib
 import pathlib
+from attr import __description__
 
 import pymongo
 import discord
@@ -187,7 +188,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             levelDescription = block.group(7)
 
             embed = discord.Embed(color=discord.Color(0x6600FF))
-            embed.set_author(name=str(message.author), icon_url=message.author.avatar_url)
+            embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
             embed.add_field(name='Name', value=levelName, inline=True)
             embed.add_field(name='Level ID', value=levelID, inline=True)
             embed.add_field(name='Description', value=levelDescription, inline=False)
@@ -258,10 +259,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
             
                 await message.delete()
+
+                embed = discord.Embed(description='The above message was automatically reposted by Mecha Bowser to remove an affiliate marketing link.')
+                embed.set_footer(text=f'Author: {str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
+
                 async with aiohttp.ClientSession() as session:
-                    name = message.author.name if not message.author.nick else message.author.nick
                     webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
-                    await webhook.send(content=content, username=name, avatar_url=message.author.avatar_url)
+                    await webhook.send(content=content, username=message.author.display_name, avatar_url=message.author.avatar_url)
+                    await message.channel.send(embed=embed) # A seperate message is sent so that the orginal message has embeds
 
 # Large block of old event commented out code was removed on 12/02/2020
 # Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
