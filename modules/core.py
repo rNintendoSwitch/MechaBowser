@@ -450,20 +450,6 @@ class MainEvents(commands.Cog):
                 embed.add_field(name='Mention', value=f'<@{before.id}>')
                 await self.serverLogs.send(':closed_lock_with_key: User\'s roles updated', embed=embed)
 
-        if before.status != after.status:
-            statuses = {
-                discord.Status.online: 'online',
-                discord.Status.idle: 'away',
-                discord.Status.dnd: 'dnd',
-                discord.Status.offline: 'offline'
-            }
-            statsCol = mclient.bowser.stats
-            statsUser = statsCol.find({'author': before.id, 'type': 'status'}).sort('timestamp', pymongo.DESCENDING)
-            if statsUser.count() and statsUser[0]['status'] != statuses[after.status]:
-                statsCol.update_one({'_id': statsUser[0]['_id']}, {'$set': {'ended': int(time.time())}})
-
-            statsCol.insert_one({'type': 'status', 'status': statuses[after.status], 'ended': None, 'author': before.id, 'guild': before.guild.id, 'timestamp': int(time.time())})
-
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
         before_name = discord.utils.escape_markdown(before.name)
