@@ -292,21 +292,6 @@ class MainEvents(commands.Cog):
             'sanitized': False
         })
 
-        if message.content and message.channel.type == discord.ChannelType.text:
-            emojiList = re.findall(r'<(?:a)?:[\w\d]+:(\d+)>', message.content)
-            if emojiList:
-                stats = mclient.bowser.stats # Only need to pull emoji at this time
-                for emoji in emojiList:
-                    stats.insert_one({
-                        'type': 'emoji',
-                        'message': message.id,
-                        'author': message.author.id,
-                        'channel': message.channel.id,
-                        'guild': message.guild.id,
-                        'id': emoji,
-                        'timestamp': timestamp
-                    })
-
         await self.bot.process_commands(message) # Allow commands to fire
 
         if not self.private_modules_loaded:

@@ -199,22 +199,10 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     async def _stats_channels(self, ctx):
         return await ctx.send(f'{config.redTick} Channel statistics are not ready for use')
 
-    @_stats.command(name='emoji')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _stats_emoji(self, ctx):
-        return await ctx.send(f'{config.redTick} Emoji statistics are not ready for use')
-
-    @_stats.command(name='statuses')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _stats_statuses(self, ctx):
-        return await ctx.send(f'{config.redTick} Status statistics are not ready for use')
-
     @_stats.error
     @_stats_channels.error
-    @_stats_emoji.error
     @_stats_roles.error
     @_stats_server.error
-    @_stats_statuses.error
     @_stats_users.error
     async def stat_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name

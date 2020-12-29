@@ -727,14 +727,7 @@ class LoopTasks(commands.Cog):
                     f'For a full history, use `!history {member.id}`' \
                     f'\n```diff\n{punishments}```'
                 issueDate = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y')
-                statusInfo = mclient.bowser.stats.find({'type': 'status', 'author': member.id, 'status': {'$ne': 'offline'}}).sort([('timestamp', -1)]).limit(1)
-                if not statusInfo.count():
-                    description = f"A warning for <@{pun['user']}> was issued over **30 days ago** ({issueDate}) and is now due for moderator review. This can either be __postponed__ to be re-reviewed at a later date or __reduced__ to the tier directly below (removed in the case of tier 1).\n\n**Infraction ID:** __{pun['_id']}__\n\n*I was unable to find the last active date for this user*"
-
-                else:
-                    lastStatus = statusInfo[0]
-                    statusDate = datetime.datetime.utcfromtimestamp(lastStatus['timestamp']).strftime('%B %d, %Y at %H:%M UTC')
-                    description = f"A warning for <@{pun['user']}> was issued over **30 days ago** ({issueDate}) and is now due for moderator review. This can either be __postponed__ to be re-reviewed at a later date or __reduced__ to the tier directly below (removed in the case of tier 1).\n\n**Infraction ID:** __{pun['_id']}__\n\nI last saw this user **{lastStatus['status']}** on **{statusDate}**"
+                description = f"A warning for <@{pun['user']}> was issued over **30 days ago** ({issueDate}) and is now due for moderator review. This can either be __postponed__ to be re-reviewed at a later date or __reduced__ to the tier directly below (removed in the case of tier 1).\n\n**Infraction ID:** __{pun['_id']}__"
 
                 embed = discord.Embed(title="Warning due for staff review", colour=discord.Color(0xddbe2d), description=description, timestamp=datetime.datetime.utcfromtimestamp(pun['timestamp']))
                 embed.set_thumbnail(url=member.avatar_url)
