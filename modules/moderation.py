@@ -472,16 +472,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             except discord.NotFound:
                 mclient.bowser.users.update_one({'_id': doc['user']}, {'$set': {'migrate_unnotified': True}}) # Set flag for on_member_join to instruct of new system should they return
+                continue
 
             await utils.issue_pun(doc['user'], self.bot.id, 'strike', f'[Migrated] {doc["reason"]}', context='strike-migration', public=False)
 
-            explanation = """Hello there\n\n__I am letting you know of a change in status for your active {} warning issued on {}__. The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:
-\* Your warning level will be converted to **{}** strikes.
-\* Your strikes will decay *at the same rate as warnings*. Each warning tier is the same as 4 strikes with one strike decaying per-week instead of one warn level per four weeks.
-\* You will no longer have any permission restrictions you had with your previous warning tier. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.
+            explanation = """Hello there\n\n__I am letting you know of a change in status for your active {} warning issued on {}__. The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n\* Your warning level will be converted to **{}** strikes.\n\* Your strikes will decay *at the same rate as warnings*. Each warning tier is the same as 4 strikes with one strike decaying per-week instead of one warn level per four weeks.\n\* You will no longer have any permission restrictions you had with your previous warning tier. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\nStrikes will allow the moderation team to weigh rule breaking behavior better and serve as a reminder to users who may need to review our rules. You can find more information about this change in #faq. Please feel free to send a modmail to @Parakarry if you have any questions or concerns.""".format('Tier ' + doc['type'][-1:], datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), int(doc['type'][-1:]) * 4)
 
-Strikes will allow the moderation team to weigh rule breaking behavior better and serve as a reminder to users who may need to review our rules. You can find more information about this change in #faq. Please feel free to send a modmail to @Parakarry if you have any questions or concerns.""".format('Tier ' + doc['type'][-1:], datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), int(doc['type'][-1:]) * 4)
-            
+            try:
+                await user.send
+
 
     @_banning.error
     @_unbanning.error
