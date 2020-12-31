@@ -832,15 +832,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             }})
             docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
 
-        embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{statusText} | {str(member)}')
-        embed.set_footer(text=docID)
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=ctx.author.mention, inline=True)
-        embed.add_field(name='Channel', value=mention)
-        embed.add_field(name='Reason', value=reason)
-
-        await self.modLogs.send(embed=embed)
         await utils.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
 
         try:
