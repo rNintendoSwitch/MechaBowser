@@ -500,8 +500,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 continue
 
             except discord.HTTPException as e:
+                failures += 1
                 logging.error(f'[Warn Migration] Failed to migrate {member.id}, {e}')
                 continue
+
+        await ctx.send(f'Completed action. Unable to notify {failures} users')
 
     @_banning.error
     @_unbanning.error
