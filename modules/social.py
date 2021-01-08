@@ -42,7 +42,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
             # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
-            "chatFilter": re.compile(r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014]?\d{4}[ \-\u2014]\d{4}[ \-\u2014]\d{4}', re.I + re.M)
+            "chatFilter": re.compile(r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014]?\d{4}[ \-\u2014]\d{4}[ \-\u2014]\d{4}', re.I + re.M),
+            # super mario maker friend code
+            "smm": re.compile(r'(\d{3})[ \-\u2014]?(\d{3})[ \-\u2014]?(\d{3})', re.IGNORECASE)
         }
 
     @commands.group(name='profile', invoke_without_command=True)
@@ -135,6 +137,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         # Friend code
         if dbUser['friendcode']:
             draw.text((350, 330), dbUser['friendcode'], (87, 111, 251), font=subtextFont)
+
+        if dbUser['smmcode']:
+            draw.text((350, 385) if dbUser['friendcode'] else (350, 330),
+                      dbUser['smmcode'], (251, 251, 87), filt=subtextFont)
 
         # Start customized content -- stats
         draw.text((440, 505), f'{mclient.bowser.messages.find({"author": member.id}).count():,}', (80, 80, 80), font=mediumFont)
@@ -284,11 +290,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await ctx.send(f'{config.redTick} {ctx.author.mention} You are already editing your profile! Please finish or wait a few minutes before trying again', delete_after=15)
 
         headerBase = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.'
-        phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
-        phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
-        phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
-        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
-        phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
+        phase_friend_msg = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
+        phase_smm_msg = 'What is your Super Mario Maker User ID? It Looks like this: `XXX-XXX-XXX`'
+        phase_region_msg = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
+        phase_timezone_msg = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
+        phase_games_msg = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
+        phase_background_msg = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
 
         # Lookup tables of values dependant on if user has setup their profile
         header = {
@@ -310,7 +317,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         def check(m):
             return m.author.id == ctx.author.id and m.channel.id == mainMsg.channel.id
 
-        async def _phase1(message):
+        async def _phase_friend_code(message):
             response = await self.bot.wait_for('message', timeout=120, check=check)
 
             content = response.content.lower().strip()
@@ -328,8 +335,25 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             else:
                 return False
-                   
-        async def _phase2(message):
+
+        async def _phase_smm_code(message):
+            responce = await self.bot.wait_for('message', timeout=120, check=check)
+
+            content = responce.content.strip()
+            if content.lower() == 'skip':
+                return True
+            if content.lower() == 'reset':
+                db.update_one({'_id': ctx.author.id}, {'$set': {'smmcode': None}})
+                await message.channel.send('I\'ve gone ahead and reset you setting for **Super Mario Maker Code**')
+            code = re.search(self.friendCodeRegex['smm'], content)
+            if code:  # re match
+                smmcode = f'SMM: {code.group(1)}-{code.group(2)}-{code.group(3)}'
+                db.update_one({'_id': ctx.author.id}, {'$set': {'smmcode': smmcode}})
+                return True
+            else:
+                return False
+
+        async def _phase_region(message):
             response = await self.bot.wait_for('message', timeout=120, check=check)
 
             content = response.content.strip()
@@ -358,7 +382,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             db.update_one({'_id': ctx.author.id}, {'$set': {'regionFlag': pointStr}})
             return True
 
-        async def _phase3(message):
+        async def _phase_timezone(message):
             response = await self.bot.wait_for('message', timeout=300, check=check)
 
             content = response.content.lower().strip()
@@ -375,13 +399,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             return False
 
-        async def _phase4(message):
+        async def _phase_fav_games(message):
             gameCnt = 0
             failedFetch = False
             userGames = []
             while gameCnt < 3:
-                if failedFetch: await message.channel.send(f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase4.format(gameCnt))
-                else: await message.channel.send(phase4.format(gameCnt))
+                if failedFetch:
+                    await message.channel.send(f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n' + phase_games_msg.format(gameCnt))
+                else:
+                    await message.channel.send(phase_games_msg.format(gameCnt))
                 failedFetch = False
 
                 response = await self.bot.wait_for('message', timeout=180, check=check)
@@ -434,7 +460,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 else:
                     failedFetch = True
 
-        async def _phase5(message):
+        async def _phase_background(message):
             backgrounds = list(dbUser['backgrounds'])
             backgrounds.remove('default')
 
@@ -444,7 +470,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             else:
                 backgrounds = list(dbUser['backgrounds'])
-                await message.channel.send(phase5.format(', '.join(backgrounds)))
+                await message.channel.send(phase_background_msg.format(', '.join(backgrounds)))
                 while True:
                     response = await self.bot.wait_for('message', timeout=120, check=check)
 
@@ -460,18 +486,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                             break
 
                         else:
-                            await message.channel.send(f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n' + phase5.format(', '.join(backgrounds)))
+                            await message.channel.send(f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n' + phase_background_msg.format(', '.join(backgrounds)))
 
                     else:
                         break
 
-
         profileSetup = dbUser['profileSetup']
 
-        embed = discord.Embed(title=embedText['title'][profileSetup], description=embedText["descBase"][profileSetup] + \
-                                '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country' \
-                                '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile' \
-                                '\n\nWhen prompted, simply reply with what you would like to set the field as.')
+        embed = discord.Embed(title=embedText['title'][profileSetup], description=embedText["descBase"][profileSetup] +
+                              '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\nyour Super Mario Maker code'
+                              '\n･ The regional flag for your country'
+                              '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile'
+                              '\n\nWhen prompted, simply reply with what you would like to set the field as.')
         embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
 
         try:
@@ -488,55 +514,53 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not profileSetup:
             db.update_one({'_id': ctx.author.id}, {'$set': {'profileSetup': True}})
 
-        botMsg = await mainMsg.channel.send(header[profileSetup] + phase1)
+        botMsg = await mainMsg.channel.send(header[profileSetup] + phase_friend_msg)
         try:
             # Phase 1
-            phaseStart = time.time()
             phaseSuccess = False
             while not phaseSuccess:
-                if not await _phase1(botMsg):
-                    botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1)
+                if not await _phase_friend_code(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase_friend_msg)
 
                 else:
                     phaseSuccess = True
 
-            # Phase 2
-            await botMsg.channel.send(phase2)
+            await botMsg.channel.send(phase_smm_msg)
+            while not phaseSuccess:
+                if not await _phase_smm_code(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That SMM Code doesn\'t look right\n\n' + phase_smm_msg)
 
-            phaseStart = time.time()
+            # Phase 2
+            await botMsg.channel.send(phase_region_msg)
+
             phaseSuccess = False
             while not phaseSuccess:
-                if not await _phase2(botMsg):
-                    botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase2)
+                if not await _phase_region(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n' + phase_region_msg)
 
                 else:
                     phaseSuccess = True
 
             # Phase 3
-            await botMsg.channel.send(phase3)
+            await botMsg.channel.send(phase_timezone_msg)
 
-            phaseStart = time.time()
             phaseSuccess = False
             while not phaseSuccess:
-                if not await _phase3(botMsg):
-                    botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase3)
+                if not await _phase_timezone(botMsg):
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n' + phase_timezone_msg)
 
                 else:
                     phaseSuccess = True
 
-
-            phaseStart = time.time()
             phaseSuccess = False
 
             # Phase 4
-            phaseStart = time.time()
             phaseSuccess = False
-            await _phase4(botMsg)
+            await _phase_fav_games(botMsg)
 
             # Phase 5
-            phaseStart = time.time()
             phaseSuccess = False
-            await _phase5(botMsg)
+            await _phase_background(botMsg)
 
             del self.inprogressEdits[ctx.author.id]
             card = await self._generate_profile_card(ctx.author)
