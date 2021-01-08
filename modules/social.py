@@ -532,7 +532,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             while not phaseSuccess:
                 if not await _phase_smm_code(botMsg):
-                    botMsg = await botMsg.channel.send(f'{config.redTick} That SMM Code doesn\'t look right\n\n' + phase_smm_msg)
+                    botMsg = await botMsg.channel.send(f'{config.redTick} That SMM2 Code doesn\'t look right\n\n' + phase_smm_msg)
                 else:
                     phaseSuccess = True
 
