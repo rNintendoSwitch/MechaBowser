@@ -203,6 +203,7 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'moderator': moderator,
         'type': _type,
         'strike_count': strike_count,
+        'active_strike_count': strike_count,
         'timestamp': int(timestamp),
         'reason': reason,
         'expiry': expiry,

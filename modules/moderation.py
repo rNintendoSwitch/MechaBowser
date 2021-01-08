@@ -64,6 +64,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.publicModLogs = self.bot.get_channel(config.publicModChannel)
+        self.taskHandles = []
 
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
@@ -77,6 +78,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 expires = None
 
             loop.create_task(utils.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+
+    def cog_unload(self):
+        for task in self.taskHandles:
+            task.cancel()
 
     @commands.command(name='hide', aliases=['unhide'])
     @commands.has_any_role(config.moderator, config.eh)
@@ -530,6 +535,45 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         else:
             await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
             raise error
+
+    async def expire_actions(self, _id, guild):
+        db = mclient.bowser.puns
+        doc = db.find_one({'_id': _id})
+        if not doc:
+            logging.error(f'[Moderation] Expiry failed. Doc {_id} does not exist!')
+            return
+
+        # Lets do a sanity check.
+        if not doc['active']:
+            logging.error(f'[Moderation] Expiry failed. Doc {_id} is not active but was scheduled to expire!')
+
+        if doc['type'] == 'strike':
+            userDB = mclient.bowser.users
+            user = userDB.find_one({'_id': doc['user']})
+            twelveHr = 60 * 60 * 12
+            if user['strike_check'] > time.time() - 5: # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
+                retryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
+                self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
+                return
+
+            # Start logic
+            if doc['active_strike_count'] - 1 == 0:
+                db.update_one({'_id': doc['_id']}, {'$set': {'active': False}, '$inc': {'active_strike_count': -1}})
+                strikes = [x for x in db.find({'user': doc['user'], 'type': 'strike', 'active': True}).sort({'timestamp': 1})]
+                if not strikes: # Last active strike expired, no additional
+                    return
+
+                self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(strikes[0]['_id'], guild)))
+
+            elif doc['active_strike_count'] > 0:
+                db.update_one({'_id': doc['_id']}, {'$inc': {'active_strike_count': -1}})
+                self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(doc['_id'], guild)))
+
+            else:
+                logging.warning(f'[Moderation] Expiry failed. Doc {_id} had a negative active strike count and was skipped')
+                return
+
+            userDB.update_one({'_id': doc['user']}, {'$set': {'strike_check': time.time() + 60 * 60 * 24 * 7}})
 
 class LoopTasks(commands.Cog):
     def __init__(self, bot):
