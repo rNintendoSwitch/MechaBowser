@@ -466,12 +466,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         pass
 
     @commands.is_owner()
+    @commands.command()
     async def migratewarns(self, ctx):
         """
         Temporary command for debugging and migration. To be removed upon full migration completion.
         """
         db = mclient.bowser.puns
         userDB = mclient.bowser.users
+        loop = self.bot.loop
         punCount = db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}})
         if not punCount > 0:
             return await ctx.send('nothing to do!')
@@ -486,7 +488,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 userDB.update_one({'_id': doc['user']}, {'$set': {'migrate_unnotified': True}}) # Set flag for on_member_join to instruct of new system should they return
                 continue # TODO: handle this in core
 
-            await utils.issue_pun(doc['user'], self.bot.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
+            db.update_one({'_id': doc['_id']}, {'$set': {'active': False}})
+            docID = await utils.issue_pun(doc['user'], self.bot.user.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
+            self.taskHandles.append(loop.call_later(5, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
             userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
 
             explanation = """Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\nThe **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n\* Your warning level will be converted to **{}** strikes.\n\* __Your strikes will decay at the same rate as warnings previously did__. Each warning tier is the same as four strikes with one strike decaying per-week instead of one warn level per four weeks.\n\* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\nStrikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.""".format(
