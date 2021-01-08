@@ -292,21 +292,6 @@ class MainEvents(commands.Cog):
             'sanitized': False
         })
 
-        if message.content and message.channel.type == discord.ChannelType.text:
-            emojiList = re.findall(r'<(?:a)?:[\w\d]+:(\d+)>', message.content)
-            if emojiList:
-                stats = mclient.bowser.stats # Only need to pull emoji at this time
-                for emoji in emojiList:
-                    stats.insert_one({
-                        'type': 'emoji',
-                        'message': message.id,
-                        'author': message.author.id,
-                        'channel': message.channel.id,
-                        'guild': message.guild.id,
-                        'id': emoji,
-                        'timestamp': timestamp
-                    })
-
         await self.bot.process_commands(message) # Allow commands to fire
 
         if not self.private_modules_loaded:
@@ -449,20 +434,6 @@ class MainEvents(commands.Cog):
                 embed.add_field(name=f'Current Role{"" if len(roleStr) == 1 else "s"}', value=', '.join(n for n in reversed(roleStr)), inline=False)
                 embed.add_field(name='Mention', value=f'<@{before.id}>')
                 await self.serverLogs.send(':closed_lock_with_key: User\'s roles updated', embed=embed)
-
-        if before.status != after.status:
-            statuses = {
-                discord.Status.online: 'online',
-                discord.Status.idle: 'away',
-                discord.Status.dnd: 'dnd',
-                discord.Status.offline: 'offline'
-            }
-            statsCol = mclient.bowser.stats
-            statsUser = statsCol.find({'author': before.id, 'type': 'status'}).sort('timestamp', pymongo.DESCENDING)
-            if statsUser.count() and statsUser[0]['status'] != statuses[after.status]:
-                statsCol.update_one({'_id': statsUser[0]['_id']}, {'$set': {'ended': int(time.time())}})
-
-            statsCol.insert_one({'type': 'status', 'status': statuses[after.status], 'ended': None, 'author': before.id, 'guild': before.guild.id, 'timestamp': int(time.time())})
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):

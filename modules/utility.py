@@ -186,8 +186,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             levelDifficulty = block.group(6)
             levelDescription = block.group(7)
 
-            embed = discord.Embed(color=discord.Color(0x6600FF))
-            embed.set_author(name=str(message.author), icon_url=message.author.avatar_url)
+            embed = discord.Embed(color=discord.Color(0x6600FF)) 
+            # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
+            embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=f'{message.author.avatar_url}#mab_remover_{message.author.id}') 
+            embed.set_footer(text='The author may react with 🗑️ to delete this message.')
+
             embed.add_field(name='Name', value=levelName, inline=True)
             embed.add_field(name='Level ID', value=levelID, inline=True)
             embed.add_field(name='Description', value=levelDescription, inline=False)
@@ -199,7 +202,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed.add_field(name='Tags', value=levelTags, inline=False)
 
             try:
-                await message.channel.send(embed=embed)
+                new_message = await message.channel.send(embed=embed)
+                await new_message.add_reaction('🗑️')
                 await message.delete()
 
             except discord.errors.Forbidden:
@@ -255,13 +259,68 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             if contentModified:
                 hooks = await message.channel.webhooks()
-                useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1<= required for chat filtering') if not hooks else hooks[0]
+
+                if hooks:
+                    useHook = hooks[0]
+                else:
+                    useHook = await message.channel.create_webhook(name=f'mab_{message.channel.id}', reason='No webhooks existed; 1 or more is required for affiliate filtering')
             
-                await message.delete()
                 async with aiohttp.ClientSession() as session:
-                    name = message.author.name if not message.author.nick else message.author.nick
                     webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
-                    await webhook.send(content=content, username=name, avatar_url=message.author.avatar_url)
+                    webhook_message = await webhook.send(content=content, username=message.author.display_name, avatar_url=message.author.avatar_url, wait=True)
+
+                    await message.delete()
+
+                    embed = discord.Embed(
+                        description='The above message was automatically reposted by Mecha Bowser to remove an affiliate marketing link. The author may react with 🗑️ to delete these messages.')
+
+                    # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
+                    icon_url = f'{message.author.avatar_url}#mab_remover_{message.author.id}_{webhook_message.id}'
+                    embed.set_footer(text=f'Author: {str(message.author)} ({message.author.id})', icon_url=icon_url)
+
+                    # A seperate message is sent so that the original message has embeds
+                    embed_message = await message.channel.send(embed=embed)
+                    await embed_message.add_reaction('🗑️')
+
+    # Handle :wastebasket: reactions for user deletions on messages reposed on a user's behalf
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+        if not payload.member: return # Not in a guild
+        if payload.emoji.name != '🗑️': return # Not a :wastebasket: emoji
+        if payload.user_id == self.bot.user.id: return # This reaction was added by this bot
+
+        channel = self.bot.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        embed = None if not message.embeds else message.embeds[0]
+
+        if message.author.id != self.bot.user.id: return # Message is not from the bot
+        if not embed: return # Message does not have an embed
+
+        allowed_remover = None
+        target_message = None
+        # Search for special url tag in footer/author icon urls:
+        # ...#mab_remover_{remover} or ..#mab_remover_{remover}_{message}
+        for icon_url in [embed.author.icon_url, embed.footer.icon_url]:
+            if not icon_url: continue # Location does not have an icon_url
+
+            match = re.search(r'#mab_remover_(\d{15,25})(?:_(\d{15,25}))?$', icon_url)
+            if not match: continue # No special url tag here
+
+            allowed_remover = match.group(1)
+            target_message = match.group(2)
+            break
+
+        if not allowed_remover: return # No special url tag detected
+        if str(payload.user_id) != str(allowed_remover): return # Reactor is not the allowed remover
+        try:
+            if target_message:
+                msg = await channel.fetch_message(target_message)
+                await msg.delete()  
+            
+            await message.delete() 
+        except Exception as e:
+            logging.warning(e)
+            pass
 
 # Large block of old event commented out code was removed on 12/02/2020
 # Includes: Holiday season celebration, 30k members celebration, Splatoon splatfest event, Pokemon sword/shield event
@@ -773,15 +832,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             }})
             docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
 
-        embed = discord.Embed(color=discord.Color(0xF5A623), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{statusText} | {str(member)}')
-        embed.set_footer(text=docID)
-        embed.add_field(name='User', value=member.mention, inline=True)
-        embed.add_field(name='Moderator', value=ctx.author.mention, inline=True)
-        embed.add_field(name='Channel', value=mention)
-        embed.add_field(name='Reason', value=reason)
-
-        await self.modLogs.send(embed=embed)
         await utils.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
 
         try:
