@@ -44,7 +44,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
             "chatFilter": re.compile(r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014]?\d{4}[ \-\u2014]\d{4}[ \-\u2014]\d{4}', re.I + re.M),
             # super mario maker friend code
-            "smm": re.compile(r'(\d{3})[ \-\u2014]?(\d{3})[ \-\u2014]?(\d{3})', re.IGNORECASE)
+            "smm2": re.compile(r'([\da-z]{3})[ \-\u2014]?([\da-z]{3})[ \-\u2014]?([\da-z]{3})', re.I)
         }
 
     @commands.group(name='profile', invoke_without_command=True)
@@ -138,9 +138,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if dbUser['friendcode']:
             draw.text((350, 330), dbUser['friendcode'], (87, 111, 251), font=subtextFont)
 
-        if dbUser['smmcode']:
-            draw.text((350, 385) if dbUser['friendcode'] else (350, 330),
-                      dbUser['smmcode'], (251, 251, 87), filt=subtextFont)
+        try:
+            if dbUser['smmcode']:
+                draw.text((350, 385) if dbUser['friendcode'] else (350, 330), dbUser['smmcode'], (251, 251, 87), font=subtextFont)
+        except KeyError:
+            pass
 
         # Start customized content -- stats
         draw.text((440, 505), f'{mclient.bowser.messages.find({"author": member.id}).count():,}', (80, 80, 80), font=mediumFont)
@@ -291,7 +293,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         headerBase = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.'
         phase_friend_msg = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
-        phase_smm_msg = 'What is your Super Mario Maker User ID? It Looks like this: `XXX-XXX-XXX`'
+        phase_smm_msg = 'What is your Super Mario Maker 2 User ID? It Looks like this: `XXX-XXX-XXX`'
         phase_region_msg = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
         phase_timezone_msg = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
         phase_games_msg = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
@@ -344,10 +346,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 return True
             if content.lower() == 'reset':
                 db.update_one({'_id': ctx.author.id}, {'$set': {'smmcode': None}})
-                await message.channel.send('I\'ve gone ahead and reset you setting for **Super Mario Maker Code**')
-            code = re.search(self.friendCodeRegex['smm'], content)
+                await message.channel.send('I\'ve gone ahead and reset you setting for **Super Mario Maker 2 Code**')
+            code = re.search(self.friendCodeRegex['smm2'], content)
             if code:  # re match
-                smmcode = f'SMM: {code.group(1)}-{code.group(2)}-{code.group(3)}'
+                smmcode = f'SMM2: {code.group(1)}-{code.group(2)}-{code.group(3)}'
                 db.update_one({'_id': ctx.author.id}, {'$set': {'smmcode': smmcode}})
                 return True
             else:
