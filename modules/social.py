@@ -349,7 +349,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 await message.channel.send('I\'ve gone ahead and reset you setting for **Super Mario Maker 2 Code**')
             code = re.search(self.friendCodeRegex['smm2'], content)
             if code:  # re match
-                smmcode = f'SMM2: {code.group(1)}-{code.group(2)}-{code.group(3)}'
+                smmcode = f'SMM2: {code.group(1)}-{code.group(2)}-{code.group(3)}'.upper()
                 db.update_one({'_id': ctx.author.id}, {'$set': {'smmcode': smmcode}})
                 return True
             else:
@@ -527,10 +527,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 else:
                     phaseSuccess = True
 
+            phaseSuccess = False
             await botMsg.channel.send(phase_smm_msg)
+
             while not phaseSuccess:
                 if not await _phase_smm_code(botMsg):
                     botMsg = await botMsg.channel.send(f'{config.redTick} That SMM Code doesn\'t look right\n\n' + phase_smm_msg)
+                else:
+                    phaseSuccess = True
 
             # Phase 2
             await botMsg.channel.send(phase_region_msg)
