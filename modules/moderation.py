@@ -462,25 +462,46 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.is_owner()
     async def migratewarns(self, ctx):
+        """
+        Temporary command for debugging and migration. To be removed upon full migration completion.
+        """
         db = mclient.bowser.puns
-        if not db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}}) > 0:
-            return await ctx.send('nothing to do')
+        userDB = mclient.bowser.users
+        punCount = db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}})
+        if not punCount > 0:
+            return await ctx.send('nothing to do!')
 
+        failures = 0
         for doc in db.find({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}}):
+            strikeCount = int(doc['type'][-1:]) * 4
             try:
-                user = await ctx.guild.fetch_member(doc['user'])
+                member = await ctx.guild.fetch_member(doc['user'])
 
             except discord.NotFound:
-                mclient.bowser.users.update_one({'_id': doc['user']}, {'$set': {'migrate_unnotified': True}}) # Set flag for on_member_join to instruct of new system should they return
-                continue
+                userDB.update_one({'_id': doc['user']}, {'$set': {'migrate_unnotified': True}}) # Set flag for on_member_join to instruct of new system should they return
+                continue # TODO: handle this in core
 
-            await utils.issue_pun(doc['user'], self.bot.id, 'strike', f'[Migrated] {doc["reason"]}', context='strike-migration', public=False)
+            await utils.issue_pun(doc['user'], self.bot.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
+            userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
 
-            explanation = """Hello there\n\n__I am letting you know of a change in status for your active {} warning issued on {}__. The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n\* Your warning level will be converted to **{}** strikes.\n\* Your strikes will decay *at the same rate as warnings*. Each warning tier is the same as 4 strikes with one strike decaying per-week instead of one warn level per four weeks.\n\* You will no longer have any permission restrictions you had with your previous warning tier. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\nStrikes will allow the moderation team to weigh rule breaking behavior better and serve as a reminder to users who may need to review our rules. You can find more information about this change in #faq. Please feel free to send a modmail to @Parakarry if you have any questions or concerns.""".format('Tier ' + doc['type'][-1:], datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), int(doc['type'][-1:]) * 4)
+            explanation = """Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\nThe **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n\* Your warning level will be converted to **{}** strikes.\n\* __Your strikes will decay at the same rate as warnings previously did__. Each warning tier is the same as four strikes with one strike decaying per-week instead of one warn level per four weeks.\n\* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\nStrikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.""".format(
+                str(member), # Username
+                doc['type'][-1:], # Tier type
+                datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), # Date of warn
+                strikeCount, # How many strikes will replace tier,
+                config.parakarry # Parakarry mention for DM
+            )
 
             try:
-                await user.send
+                await member.send(explanation)
 
+            except discord.Forbidden:
+                failures += 1
+                continue
+
+            except discord.HTTPException as e:
+                logging.error(f'[Warn Migration] Failed to migrate {member.id}, {e}')
+                continue
 
     @_banning.error
     @_unbanning.error

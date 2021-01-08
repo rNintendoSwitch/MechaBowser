@@ -190,7 +190,7 @@ async def store_user(member, messages=0):
     }
     db.insert_one(userData)
 
-async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None, public=True):
+async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None, public=True, strike_count=None):
     db = mclient.bowser.puns
     timestamp = time.time() if not _date else _date
     docID = str(uuid.uuid4())
@@ -202,6 +202,7 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'user': user,
         'moderator': moderator,
         'type': _type,
+        'strike_count': strike_count,
         'timestamp': int(timestamp),
         'reason': reason,
         'expiry': expiry,
