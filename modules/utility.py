@@ -604,7 +604,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             channel = ctx.author if self_check else ctx.channel
 
             if self_check:
-                await channel.send('You requested a copy of your current infraction history:')
+                await channel.send('You requested the following copy of your current infraction history. If you have questions concerning your history,' + 
+                    f' you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>)')
                 await ctx.message.add_reaction('📬')
 
             author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
