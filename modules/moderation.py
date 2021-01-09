@@ -348,152 +348,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
 
-    @commands.group(name='warn', invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _warning(self, ctx):
-        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`); if you need to manually review an warning, you may still use the `!warn review user` command')
-
-    @_warning.command(name='review')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _warning_review(self, ctx, member: discord.Member):
-        db = mclient.bowser.puns
-        warnPun = db.find_one({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-
-        if not warnPun:
-            return await ctx.send(f'{config.redTick} No warnings are currently active for {str(member)} ({member.id})')
-
-        issueTime = datetime.datetime.utcfromtimestamp(warnPun['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
-
-        embed = discord.Embed(title="Warning review", colour=discord.Color(0xea4345), description="To change the status of the warning, react with the following emoji. You must react to make a choice.\n\n:track_next: Re-review in 30 days\n:fast_forward: Re-review in 14 days\n:arrow_forward: Re-review in 7 days\n:small_red_triangle_down: Reduce warn tier (or remove if tier1)\n:octagonal_sign: Make warning permanent", timestamp=utils.resolve_duration('15m'))
-        embed.set_thumbnail(url=member.avatar_url)
-        embed.set_author(name=f"{member} ({member.id})")
-        embed.set_footer(text="This message will expire in 15 minutes")
-        embed.add_field(name="Warning details", value=f'**Type:** {config.punStrs[warnPun["type"]]}\n**Issued by:** <@{warnPun["moderator"]}>\n**Issued at:** {issueTime}\n**Reason**: {warnPun["reason"]}')
-
-        resp = await ctx.send(':warning: Warns are depreciated, please move to the strike system :warning:', embed=embed)
-        await resp.add_reaction(config.nextTrack) # track_next
-        await resp.add_reaction(config.fastForward) # fast_forward
-        await resp.add_reaction(config.playButton) # arrow_forward
-        await resp.add_reaction(config.downTriangle) # small_red_triangle_down
-        await resp.add_reaction(config.stopSign) # octagonal_sign
-
-        metaReactions = {
-            config.nextTrack: 0,
-            config.fastForward: 0,
-            config.playButton: 0,
-            config.downTriangle: 0,
-            config.stopSign: 0
-        }
-        tierLevel = {
-            'tier1': ctx.guild.get_role(config.warnTier1),
-            'tier2': ctx.guild.get_role(config.warnTier2),
-            'tier3': ctx.guild.get_role(config.warnTier3)
-        }
-        renew = False
-        perm = False
-
-        def check(reaction, user):
-            if user.bot:
-                return False
-            #print(reaction.emoji)
-
-            if ctx.guild.get_role(config.moderator) in user.roles and str(reaction.emoji) in [config.nextTrack, config.fastForward, config.playButton, config.downTriangle, config.stopSign]:
-                metaReactions[str(reaction.emoji)] += 1
-                #print(metaReactions)
-                if metaReactions[str(reaction.emoji)] >= 1:
-                    return True
-
-            else:
-                return False
-
-        try:
-            reaction = await self.bot.wait_for('reaction_add', timeout=900.0, check=check)
-            #print(reaction[0])
-            emoji = str(reaction[0])
-
-            if emoji == config.nextTrack:
-                renew = utils.resolve_duration('30d')
-
-            elif emoji == config.fastForward:
-                renew = utils.resolve_duration('2w')
-
-            elif emoji == config.playButton:
-                renew = utils.resolve_duration('1w')
-
-            elif emoji == config.stopSign:
-                renew = True
-                perm = True
-
-            if not renew:
-                if warnPun['type'] == 'tier1':
-                    await member.remove_roles(tierLevel[warnPun['type']])
-                    db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}})
-                    try:
-                        await member.send(utils.format_pundm('warnclear', 'A moderator has reviewed your warning', None, auto=True))
-
-                    except (discord.Forbidden, discord.HTTPException):
-                        pass
-
-                    # Because this does not generate a pun document, this will not be pushed to the pub modlog due to strike overhaul soon
-                    embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
-                    embed.set_author(name=f'Warning reduced | {member} ({member.id})')
-                    embed.set_footer(text=warnPun['_id'])
-                    embed.add_field(name='User', value=member.mention, inline=True)
-                    embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
-                    embed.add_field(name='Moderator', value=ctx.author.mention, inline=False)
-                    embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
-                    await self.modLogs.send(embed=embed)
-                    await resp.delete()
-                    return await ctx.send(f'{config.greenTick} Warning review complete for {member} ({member.id}). Will be reduced one tier')
-
-                else:
-                    await member.remove_roles(tierLevel[warnPun['type']])
-                    newTier = 'tier1' if warnPun['type'] == 'tier2' else 'tier2' # If tier2, make it tier1 else tier3 make it tier2
-                    await member.add_roles(tierLevel[newTier])
-
-                    db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
-                    convertStr = f'(T{int(newTier[-1]) + 1}->T{newTier[-1]}) ' # Example return: "(T3->T2) "
-                    docID = await utils.issue_pun(member.id, ctx.author.id, newTier, convertStr + warnPun['reason'], int(utils.resolve_duration('30d').timestamp()), context='vote')
-                    await utils.send_modlog(self.bot, self.modLogs, newTier, docID, 'Warning tier decayed', user=member, moderator=ctx.author, extra_author=convertStr[1:-2], public=True)
-
-                    try:
-                        await member.send(utils.format_pundm('warndown', 'A moderator has reviewed your warning', None, newTier, True))
-
-                    except (discord.Forbidden, discord.HTTPException):
-                        pass
-
-                    await resp.delete()
-                    return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')
-
-            elif renew and perm:
-                db.update_one({'_id': warnPun['_id']}, {'$set': {'expiry': None}})
-
-                embed = discord.Embed(color=0xD0021B, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Warning made permanent | {member} ({member.id})')
-                embed.set_footer(text=warnPun['_id'])
-                embed.add_field(name='User', value=member.mention, inline=True)
-                embed.add_field(name='Reason', value='Moderator decision to make warning permanent')
-                await self.modLogs.send(embed=embed)
-                await resp.delete()
-                return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be made permanent; no further warning review reminders will be sent.')
-
-            else:
-                db.update_one({'_id': warnPun['_id']}, {'$set': {'expiry': int(renew.timestamp())}})
-                await resp.delete()
-                return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be delayed {utils.humanize_duration(renew)}')
-
-        except asyncio.TimeoutError:
-            await resp.delete()
-            return await ctx.send(content=f'{config.redTick} Command timed out. Rerun to continue.')
-
     @commands.has_any_role(config.moderator, config.eh)
     @commands.command(name='note')
     async def _note(self, ctx, user: discord.User, *, content):
@@ -503,6 +357,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await ctx.message.delete()
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
+
+    @commands.group(name='warn', invoke_without_command=True)
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _warning(self, ctx):
+        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`); if you need to manually review an warning, you may still use the `!warn review user` command')
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
