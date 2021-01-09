@@ -220,14 +220,7 @@ class MainEvents(commands.Cog):
                 reason = '-No reason specified-' if not audited.reason else audited.reason
                 docID = await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 
-                embed = discord.Embed(description='User was manually banned through Discord', color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Ban | {audited.target}')
-                embed.set_footer(text=docID)
-                embed.add_field(name='User', value=audited.target.mention, inline=True)
-                embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
-                embed.add_field(name='Reason', value=reason)
-
-                await self.modLogs.send(embed=embed)
+                await utils.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, user=user, moderator=audited.user, public=True)
 
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
@@ -256,14 +249,7 @@ class MainEvents(commands.Cog):
                     'active': False
                 }})
 
-                embed = discord.Embed(description='User was manually unbanned through Discord', color=discord.Color(0x4A90E2), timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Unban | {audited.target}')
-                embed.set_footer(text=docID)
-                embed.add_field(name='User', value=audited.target.mention, inline=True)
-                embed.add_field(name='Moderator', value=audited.user.mention, inline=True)
-                embed.add_field(name='Reason', value=reason)
-
-                await self.modLogs.send(embed=embed)
+                await utils.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, user=user, moderator=audited.user, public=True)
 
         embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
