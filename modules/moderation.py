@@ -195,7 +195,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             try:
                 await user.send(utils.format_pundm('ban', reason, ctx.author))
-            except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+
+            except (discord.Forbidden, AttributeError):
                 pass
 
             try:
@@ -258,16 +259,21 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters')
         docID = await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+        await utils.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
             await member.send(utils.format_pundm('kick', reason, ctx.author))
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
-        await member.kick(reason='Kick action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
+
+        except (discord.Forbidden, AttributeError):
+            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them of this action')
+
+            await member.kick(reason='Kick action performed by moderator')
+            return
+
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -295,8 +301,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         await utils.send_modlog(self.bot, self.modLogs, 'mute', docID, reason, user=member, moderator=ctx.author, expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', public=True)
         try:
             await member.send(utils.format_pundm('mute', reason, ctx.author, utils.humanize_duration(_duration)))
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
+
+        except (discord.Forbidden, AttributeError):
+            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them of this action')
+
+        else:
+            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted')
 
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())
@@ -305,8 +316,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
-
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully muted')
 
     @commands.command(name='unmute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -324,11 +333,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
         await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True)
+
         try:
             await member.send(utils.format_pundm('unmute', reason, ctx.author))
 
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
+        except (discord.Forbidden, AttributeError):
+            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them of this action')
+
+            return
 
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
@@ -646,10 +659,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
             await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
-
-    @commands.command()
-    async def test(self, ctx):
-        self.bot.loop.call_later(-2, asyncio.create_task, self.expire_actions('test', 123))
 
 class LoopTasks(commands.Cog):
     def __init__(self, bot):
