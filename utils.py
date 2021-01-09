@@ -325,8 +325,9 @@ async def send_modlog(bot, channel, _type, footer, reason, user=None, username=N
 async def send_public_modlog(bot, id, channel, expires=None):
     db = mclient.bowser.puns
     doc = db.find_one({'_id': id})
-    user = await bot.fetch_user(doc["user"])
+    if not doc: return # Edge case: if the document has been removed, ignore.
 
+    user = await bot.fetch_user(doc["user"])
     author = f'{config.punStrs[doc["type"]]} '
     if doc['type'] == 'blacklist':
         author += f'({doc["context"]}) '
