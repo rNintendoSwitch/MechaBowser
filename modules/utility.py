@@ -532,16 +532,16 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 'You have no punishments on record'
             ),
             'single_inf': (
-                'There is __1__ infraction record for this user:',
-                'You have __1__ infraction record:'
+                'There is **1** infraction record for this user:',
+                'You have **1** infraction record:'
             ),
             'multiple_infs': (
-                'There are __{}__ infraction records for this user:',
-                'You have __{}__ infraction records:'
+                'There are **{}** infraction records for this user:',
+                'You have **{}** infraction records:'
             ),
             'total_strikes': (
-                'User currently has {} active strikes ({} in total)\n',
-                'You currently have {} active strikes ({} in total)\n'
+                'User currently has **{}** active strikes (**{}** in total.)\n',
+                'You currently have **{}** active strikes (**{}** in total.)\n'
             )
         }
 
