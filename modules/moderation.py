@@ -368,7 +368,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters')
         userDB = mclient.bowser.users
-        docID = await utils.issue_pun(member.id, self.bot.user.id, 'strike', reason, strike_count=count, public=True)
+        docID = await utils.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
         userDB.update_one({'_id': member.id}, {'$set': {
             'strike_check': time.time() + (60 * 60 * 24 * 7) # 7 days
         }})
