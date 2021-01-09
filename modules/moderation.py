@@ -374,6 +374,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         }})
 
         self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))) # Check in 12 hours, prevents time drifting
+        await utils.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
             await member.send(utils.format_pundm('strike', reason, ctx.author, details=count))
 
@@ -449,7 +450,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @_muting.error
     @_unmuting.error
     @_warning.error
-    @_warning_review.error
     @_strike.error
     @_note.error
     @_hide_modlog.error

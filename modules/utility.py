@@ -397,11 +397,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         messages = mclient.bowser.messages.find({'author': user.id})
         msgCount = 0 if not messages else messages.count()
 
-        desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
+        desc = f'Fetched user {user.mention}.' if inServer else f'Fetched information about previous member {user.mention} ' \
             'from the API because they are not in this server. ' \
             'Showing last known data from before they left.'
-
-
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
         embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
@@ -468,9 +466,15 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         else:
             puns = 0
+            activeStrikes = 0
+            totalStrikes = 0
             for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
+                if pun['type'] == 'strike':
+                    totalStrikes += pun['strike_count']
+                    activeStrikes += pun['active_strike_count']
+
                 if puns >= 5:
-                    break
+                    continue
 
                 puns += 1
                 stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
@@ -484,6 +488,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
                 f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
                 f'\n```diff\n{punishments}```'
+
+            if totalStrikes:
+                embed.description = embed.description + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes > 1 or activeStrikes < 1 else ""} ({totalStrikes} in total)'
+
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
 
@@ -504,6 +512,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.redTick} User has no punishments on record')
 
         punNames = {
+            'strike': '{} Strike{}',
             'tier1': 'T1 Warn',
             'tier2': 'T2 Warn',
             'tier3': 'T3 Warn',
@@ -526,13 +535,20 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             desc = f'There are __{puns.count()}__ infraction records for this user:'
 
         fields = []
+        activeStrikes = 0
+        totalStrikes = 0
         for pun in puns.sort('timestamp', pymongo.DESCENDING):
             datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
             moderator = ctx.guild.get_member(pun['moderator'])
             if not moderator:
                 moderator = await self.bot.fetch_user(pun['moderator'])
 
-            if pun['type'] in ['blacklist', 'unblacklist']:
+            if pun['type'] == 'strike':
+                activeStrikes += pun['active_strike_count']
+                totalStrikes += pun['strike_count']
+                inf = punNames[pun['type']].format(totalStrikes, "s" if totalStrikes > 1 else "")
+
+            elif pun['type'] in ['blacklist', 'unblacklist']:
                 inf = punNames[pun['type']].format(pun['context'])
 
             elif pun['type'] == 'appealdeny':
@@ -544,6 +560,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
 
         author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
+        if totalStrikes:
+            desc = f'User currently has {activeStrikes} active strikes ({totalStrikes} in total)\n' + desc
+
         return await utils.send_paginated_embed(self.bot, ctx.channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
 
     @commands.command(name='roles')
