@@ -506,7 +506,32 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
-    async def _strike(self, ctx, count: typing.Optional[StrikeRange] = 1, *, reason):
+    async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters')
+        userDB = mclient.bowser.users
+        docID = await utils.issue_pun(member.id, self.bot.user.id, 'strike', reason, strike_count=count, public=True)
+        userDB.update_one({'_id': member.id}, {'$set': {
+            'strike_check': time.time() + (60 * 60 * 24 * 7) # 7 days
+        }})
+
+        self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))) # Check in 12 hours, prevents time drifting
+        try:
+            await member.send(utils.format_pundm('strike', reason, ctx.author, details=count))
+
+        except discord.Forbidden:
+            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck. I was not able to DM them of this action')
+
+            return
+
+        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck')
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @_strike.command(name='set')
+    async def _strike_set(self, ctx, member: discord.Member, count: StrikeRange, *, reason):
         pass
 
     @commands.is_owner()
