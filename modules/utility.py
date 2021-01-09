@@ -496,8 +496,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         return await ctx.send(embed=embed)
 
     @commands.command(name='history')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _history(self, ctx, user: typing.Union[discord.User, int]):
+    async def _history(self, ctx, user: typing.Union[discord.User, int, None] = None):
+        if user is None:
+            user = ctx.author
+
         if type(user) == int:
             # User doesn't share the ctx server, fetch it instead
             try:
@@ -506,64 +508,114 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             except discord.NotFound:
                 return await ctx.send(f'{config.redTick} User does not exist')
 
+        if ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.guild.get_role(config.eh) not in ctx.author.roles:
+            self_check = True
+
+            #  If they are not mod and not running on themselves, they do not have permssion.
+            if user != ctx.author: 
+                await ctx.message.delete()
+                return await ctx.send(f'{config.redTick} You do not have permission to run this command on other users', delete_after=15)
+
+            if ctx.channel.id != config.commandsChannel:
+                await ctx.message.delete()
+                return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use bot commands in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
+                
+        else:  
+            self_check = False
+
         db = mclient.bowser.puns
         puns = db.find({'user': user.id})
-        if not puns.count():
-            return await ctx.send(f'{config.redTick} User has no punishments on record')
 
-        punNames = {
-            'strike': '{} Strike{}',
-            'tier1': 'T1 Warn',
-            'tier2': 'T2 Warn',
-            'tier3': 'T3 Warn',
-            'clear': 'Warn Clear',
-            'mute': 'Mute',
-            'unmute': 'Unmute',
-            'kick': 'Kick',
-            'ban': 'Ban',
-            'unban': 'Unban',
-            'blacklist': 'Blacklist ({})',
-            'unblacklist': 'Unblacklist ({})',
-            'appealdeny': 'Denied ban appeal (until {})',
-            'note': 'User note'
+        deictic_language = {
+            'no_punishments': (
+                'User has no punishments on record',
+                'You have no punishments on record'
+            ),
+            'single_inf': (
+                'There is __1__ infraction record for this user:',
+                'You have __1__ infraction record:'
+            ),
+            'multiple_infs': (
+                'There are __{}__ infraction records for this user:',
+                'You have __{}__ infraction records:'
+            ),
+            'total_strikes': (
+                'User currently has {} active strikes ({} in total)\n',
+                'You currently have {} active strikes ({} in total)\n'
+            )
         }
 
-        if puns.count() == 1:
-            desc = f'There is __1__ infraction record for this user:'
+        if not puns.count():
+            return await ctx.channel.send(f'{config.redTick} {deictic_language["no_punishments"][self_check]}')
 
         else:
-            desc = f'There are __{puns.count()}__ infraction records for this user:'
+            punNames = {
+                'strike': '{} Strike{}',
+                'tier1': 'T1 Warn',
+                'tier2': 'T2 Warn',
+                'tier3': 'T3 Warn',
+                'clear': 'Warn Clear',
+                'mute': 'Mute',
+                'unmute': 'Unmute',
+                'kick': 'Kick',
+                'ban': 'Ban',
+                'unban': 'Unban',
+                'blacklist': 'Blacklist ({})',
+                'unblacklist': 'Unblacklist ({})',
+                'appealdeny': 'Denied ban appeal (until {})',
+                'note': 'User note'
+            }
 
-        fields = []
-        activeStrikes = 0
-        totalStrikes = 0
-        for pun in puns.sort('timestamp', pymongo.DESCENDING):
-            datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
-            moderator = ctx.guild.get_member(pun['moderator'])
-            if not moderator:
-                moderator = await self.bot.fetch_user(pun['moderator'])
+            desc = deictic_language['single_inf'][self_check] if puns.count() == 1 else deictic_language['multiple_infs'][self_check].format(puns.count())
+            fields = []
+            activeStrikes = 0
+            totalStrikes = 0
+            for pun in puns.sort('timestamp', pymongo.DESCENDING):
+                datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
+                moderator = ctx.guild.get_member(pun['moderator'])
+                if not moderator:
+                    moderator = await self.bot.fetch_user(pun['moderator'])
 
-            if pun['type'] == 'strike':
-                activeStrikes += pun['active_strike_count']
-                totalStrikes += pun['strike_count']
-                inf = punNames[pun['type']].format(totalStrikes, "s" if totalStrikes > 1 else "")
+                if pun['type'] == 'strike':
+                    activeStrikes += pun['active_strike_count']
+                    totalStrikes += pun['strike_count']
+                    inf = punNames[pun['type']].format(totalStrikes, "s" if totalStrikes > 1 else "")
 
-            elif pun['type'] in ['blacklist', 'unblacklist']:
-                inf = punNames[pun['type']].format(pun['context'])
+                elif pun['type'] in ['blacklist', 'unblacklist']:
+                    inf = punNames[pun['type']].format(pun['context'])
 
-            elif pun['type'] == 'appealdeny':
-                inf = punNames[pun['type']].format(datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
+                elif pun['type'] == 'appealdeny':
+                    inf = punNames[pun['type']].format(datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
 
+                # Do not include notes if ran unprivileged on self
+                elif pun['type'] == 'note' and self_check:
+                    continue
+
+                else:
+                    inf = punNames[pun['type']]
+
+                moderatorStr = f'**Moderator:** {moderator}\n' if not self_check else ''
+                fields.append({'name': datestamp, 'value':f'{moderatorStr}**Details:** [{inf}] {pun["reason"]}'})
+
+            if totalStrikes:
+                desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
+
+        try:
+            channel = ctx.author if self_check else ctx.channel
+
+            if self_check:
+                await channel.send('You requested a copy of your current infraction history:')
+                await ctx.message.add_reaction('📬')
+
+            author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
+            await utils.send_paginated_embed(self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
+
+        except discord.Forbidden:
+            if self_check:
+                await ctx.send(f'{config.redTick} {ctx.author.mention} I was unable to DM you. Please make sure your DMs are open and try again', delete_after=10)
             else:
-                inf = punNames[pun['type']]
-
-            fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
-
-        author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
-        if totalStrikes:
-            desc = f'User currently has {activeStrikes} active strikes ({totalStrikes} in total)\n' + desc
-
-        return await utils.send_paginated_embed(self.bot, ctx.channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
+                raise
+            
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
