@@ -324,9 +324,13 @@ async def send_modlog(bot, channel, _type, footer, reason, user=None, username=N
         post_action = event_loop.call_later(delay, event_loop.create_task, send_public_modlog(bot, footer, bot.get_channel(config.publicModChannel), expires))
         return post_action
 
-async def send_public_modlog(bot, id, channel, expires=None):
+async def send_public_modlog(bot, id, channel, expires=None, mock_document=None):
     db = mclient.bowser.puns
-    doc = db.find_one({'_id': id})
+    doc = mock_document if not id else db.find_one({'_id': id})
+
+    if not doc:
+        return
+
     user = await bot.fetch_user(doc["user"])
 
     author = f'{config.punStrs[doc["type"]]} '
@@ -351,10 +355,12 @@ async def send_public_modlog(bot, id, channel, expires=None):
         embed.description = 'This is an automatic action'
 
     message = await channel.send(embed=embed)
-    db.update_one({'_id': id}, {'$set': {
-        'public_log_message': message.id,
-        'public_log_channel': channel.id
-    }})
+
+    if id:
+        db.update_one({'_id': id}, {'$set': {
+            'public_log_message': message.id,
+            'public_log_channel': channel.id
+        }})
 
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {
