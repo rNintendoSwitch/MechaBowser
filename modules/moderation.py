@@ -65,6 +65,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.publicModLogs = self.bot.get_channel(config.publicModChannel)
         self.taskHandles = []
+        self.NS = self.bot.get_guild(config.nintendoswitch)
+        self.roles = {
+            'mute': self.NS.get_role(config.mute)
+        }
 
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
@@ -78,6 +82,28 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 expires = None
 
             loop.create_task(utils.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+
+        # Run expiration tasks
+        userDB = mclient.bowser.users
+        pendingPuns = db.find({'active': True, 'type': {'$in': ['strike', 'mute']}})
+        twelveHr = 60 * 60 * 12
+        trackedStrikes = [] # List of unique users
+        for pun in pendingPuns:
+            if pun['type'] == 'strike':
+                if pun['user'] in trackedStrikes: continue # We don't want to create many tasks when we only remove one
+                user = userDB.find_one({'_id': pun['user']})
+                trackedStrikes.append(pun['user'])
+                if user['strike_check'] > time.time(): # In the future
+                    tryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
+                    self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)))
+
+                else: # In the past
+                    self.taskHandles.append(self.bot.loop.call_soon(asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)))
+
+            elif pun['type'] == 'mute':
+                tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
+                logging.info(f'using {tryTime} for mute')
+                self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)))
 
     def cog_unload(self):
         for task in self.taskHandles:
@@ -272,6 +298,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
+        twelveHr = 60 * 60 * 12
+        expireTime = time.mktime(_duration.timetuple())
+        logging.info(f'using {expireTime}')
+        tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
+        self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
@@ -551,11 +582,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if not doc['active']:
             logging.error(f'[Moderation] Expiry failed. Doc {_id} is not active but was scheduled to expire!')
 
+        twelveHr = 60 * 60 * 12
         if doc['type'] == 'strike':
             userDB = mclient.bowser.users
             user = userDB.find_one({'_id': doc['user']})
-            twelveHr = 60 * 60 * 12
-            if user['strike_check'] > time.time() - 5: # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
+            if user['strike_check'] > time.time(): # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
                 retryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
                 self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
                 return
@@ -578,6 +609,47 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return
 
             userDB.update_one({'_id': doc['user']}, {'$set': {'strike_check': time.time() + 60 * 60 * 24 * 7}})
+
+        elif doc['type'] == 'mute' and doc['expiry']: # A mute that has an expiry
+            if doc['active'] == False: return # Mute was set to inactive between checks
+            if doc['expiry'] > time.time(): # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
+                retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
+                self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
+                return
+
+            punGuild = self.bot.get_guild(guild)
+            try:
+                member = await punGuild.fetch_member(doc['user'])
+
+            except discord.NotFound:
+                # User has left the server after the mute was issued. Lets just move on and let on_member_join handle on return
+                return
+
+            except discord.HTTPException:
+                # Issue with API, lets just try again later in 30 seconds
+                self.taskHandles.append(self.bot.loop.call_later(30, asyncio.create_task, self.expire_actions(_id, guild)))
+                return
+
+            newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {
+                'active': False
+            }})
+            docID = await utils.issue_pun(doc['user'], self.bot.user.id, 'unmute', 'Mute expired', active=False, context=doc['_id'])
+
+            if not newPun: # There is near zero reason this would ever hit, but in case...
+                logging.error(f'[Moderation] Expiry failed. Database failed to update user on pun expiration of {doc["_id"]}')
+
+            await member.remove_roles(self.roles[doc['type']])
+            try:
+                await member.send(utils.format_pundm('unmute', 'Mute expired', None, auto=True))
+
+            except discord.Forbidden: # User has DMs off
+                pass
+
+            await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
+
+    @commands.command()
+    async def test(self, ctx):
+        self.bot.loop.call_later(-2, asyncio.create_task, self.expire_actions('test', 123))
 
 class LoopTasks(commands.Cog):
     def __init__(self, bot):
@@ -695,10 +767,10 @@ class LoopTasks(commands.Cog):
 
 def setup(bot):
     bot.add_cog(Moderation(bot))
-    bot.add_cog(LoopTasks(bot))
+    #bot.add_cog(LoopTasks(bot))
     logging.info('[Extension] Moderation module loaded')
 
 def teardown(bot):
     bot.remove_cog('Moderation')
-    bot.remove_cog('LoopTasks')
+    #bot.remove_cog('LoopTasks')
     logging.info('[Extension] Moderation module unloaded')
