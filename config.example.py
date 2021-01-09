@@ -86,6 +86,7 @@ punDM = 'You have received a moderation action on the /r/NintendoSwitch Discord 
     'Please do not respond to this message, I cannot reply.'
 
 punStrs = {
+    'strike': 'Strike',
     'tier1': 'Tier 1 Warning',
     'tier2': 'Tier 2 Warning',
     'tier3': 'Tier 3 Warning',
@@ -102,6 +103,7 @@ punStrs = {
 }
 
 punColors = {
+    'strike': 0xEDC605,
     'tier1': 0xFFFA1C,
     'tier2': 0xFF9000,
     'tier3': 0xD0021B,

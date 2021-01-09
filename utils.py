@@ -358,6 +358,7 @@ async def send_public_modlog(bot, id, channel, expires=None):
 
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {
+        'strike': f'You have received **{details} strike{"s" if details > 1 else ""}** on',
         'warn': f'You have been **warned (now {details})** on',
         'warnup': f'Your **warning level** has been **increased (now {details})** on',
         'warndown': f'Your **warning level** has been **decreased (now {details})** on',
