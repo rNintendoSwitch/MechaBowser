@@ -334,7 +334,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}')
+        depre = discord.Embed(title='⚠️', description='The warning system is depreciated and will be superceded by strikes. [Click here for more info](https://canary.discordapp.com/channels/238080556708003851/238081192019099650/797315679048564768)')
+        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}', embed=depre)
 
     @_warning.command(name='clear')
     @commands.has_any_role(config.moderator, config.eh)
@@ -377,7 +378,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {member} ({member.id})')
+        depre = discord.Embed(title='⚠️', description='The warning system is depreciated and will be superceded by strikes. [Click here for more info](https://canary.discordapp.com/channels/238080556708003851/238081192019099650/797315679048564768)')
+        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {member} ({member.id})', embed=depre)
 
     @_warning.command(name='level')
     @commands.has_any_role(config.moderator, config.eh)
@@ -447,7 +449,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if await utils.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully warned; they are now tier {tier}')
+        depre = discord.Embed(title='⚠️', description='The warning system is depreciated and will be superceded by strikes. [Click here for more info](https://canary.discordapp.com/channels/238080556708003851/238081192019099650/797315679048564768)')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully warned; they are now tier {tier}', embed=depre)
 
     @_warning.command(name='review')
     @commands.has_any_role(config.moderator, config.eh)
