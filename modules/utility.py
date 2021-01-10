@@ -384,10 +384,18 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 return await ctx.send(f'{config.redTick} User does not exist')
 
             if not dbUser:
-                embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about {user.mention} from the API because they are not in this server. There is little information to display as they have not been recorded joining the server before.')
+                desc = (f'Fetched information about {user.mention} from the API because they are not in this server. '
+                    'There is little information to display as they have not been recorded joining the server before')
+
+                infractions = mclient.bowser.puns.find({'user': user.id}).count()
+                if infractions:
+                    desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `{ctx.prefix}history {user.id}` to view'
+
+                embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
                 embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
                 embed.set_thumbnail(url=user.avatar_url)
                 embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
+
                 return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
 
         else:
@@ -397,9 +405,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         messages = mclient.bowser.messages.find({'author': user.id})
         msgCount = 0 if not messages else messages.count()
 
-        desc = f'Fetched user {user.mention}.' if inServer else f'Fetched information about previous member {user.mention} ' \
-            'from the API because they are not in this server. ' \
-            'Showing last known data from before they left.'
+        desc = f'Fetched user {user.mention}.' if inServer else (f'Fetched information about previous member {user.mention} '
+            'from the API because they are not in this server. '
+            'Showing last known data from before they left')
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
         embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
@@ -441,7 +449,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
 
         noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
-        fieldValue = 'View history to get full details on all notes.\n\n'
+        fieldValue = 'View history to get full details on all notes\n\n'
         if noteDocs.count():
             noteCnt = noteDocs.count()
             noteList = []
@@ -452,7 +460,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 fieldLength = 0
                 for value in noteList: fieldLength += len(value)
                 if len(noteContent) + fieldLength > 924:
-                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
+                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes ' + fieldValue
                     break
 
                 noteList.append(noteContent)
@@ -486,7 +494,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     punishments += f'+ [{stamp}] {punType}\n'
 
             punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
-                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
+                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history {user.id}`' \
                 f'\n```diff\n{punishments}```'
 
             if totalStrikes:
