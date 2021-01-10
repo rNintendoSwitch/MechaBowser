@@ -529,15 +529,15 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         deictic_language = {
             'no_punishments': (
                 'User has no punishments on record',
-                'You have no visible punishments on record'
+                'You have no available punishments on record'
             ),
             'single_inf': (
                 'There is **1** infraction record for this user:',
-                'You have **1** visibleinfraction record:'
+                'You have **1** available infraction record:'
             ),
             'multiple_infs': (
                 'There are **{}** infraction records for this user:',
-                'You have **{}** visible infraction records:'
+                'You have **{}** available infraction records:'
             ),
             'total_strikes': (
                 'User currently has **{}** active strikes (**{}** in total.)\n',
