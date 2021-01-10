@@ -367,7 +367,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.group(name='strike', invoke_without_command=True)
     async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters')
+        punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
+
+        activeStrikes = 0
+        for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
+            activeStrikes += pun['active_strike_count']
+
+        if activeStrikes + count > 16: # Max of 16 active strikes
+            return await ctx.send(f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes + count - 16} or consider banning the user instead')
+
         docID = await utils.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
         userDB.update_one({'_id': member.id}, {'$set': {
             'strike_check': time.time() + (60 * 60 * 24 * 7) # 7 days
