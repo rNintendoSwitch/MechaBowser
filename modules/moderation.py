@@ -11,7 +11,7 @@ import discord
 from discord.ext import commands, tasks
 
 import config
-import utils
+import tools
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -76,12 +76,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         loop = bot.loop
         for log in pendingLogs:
             if log['type'] == 'mute':
-                expires = utils.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
+                expires = tools.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
 
             else:
                 expires = None
 
-            loop.create_task(utils.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
 
         # Run expiration tasks
         userDB = mclient.bowser.users
@@ -194,7 +194,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
             try:
-                await user.send(utils.format_pundm('ban', reason, ctx.author))
+                await user.send(tools.format_pundm('ban', reason, ctx.author))
 
             except (discord.Forbidden, AttributeError):
                 pass
@@ -210,11 +210,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 failedBans += 1
                 continue
 
-            docID = await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
-            await utils.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, username=username, userid=userid, moderator=ctx.author, public=True)
+            docID = await tools.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            await tools.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, username=username, userid=userid, moderator=ctx.author, public=True)
             banCount += 1
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         if len(users) == 1:
@@ -245,10 +245,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
-        docID = await utils.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
+        docID = await tools.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
         await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, username=str(user), userid=user, moderator=ctx.author, public=True)
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        await tools.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, username=str(user), userid=user, moderator=ctx.author, public=True)
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {user} has been unbanned')
@@ -258,19 +258,19 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters')
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
-        await utils.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+        await tools.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
-            await member.send(utils.format_pundm('kick', reason, ctx.author))
+            await member.send(tools.format_pundm('kick', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError):
-            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them of this action')
 
             await member.kick(reason='Kick action performed by moderator')
             return
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
@@ -286,7 +286,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         muteRole = ctx.guild.get_role(config.mute)
         try:
-            _duration = utils.resolve_duration(duration)
+            _duration = tools.resolve_duration(duration)
             if int(duration):
                 raise TypeError
 
@@ -296,14 +296,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except ValueError:
             pass
 
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.add_roles(muteRole, reason='Mute action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'mute', docID, reason, user=member, moderator=ctx.author, expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', public=True)
+        await tools.send_modlog(self.bot, self.modLogs, 'mute', docID, reason, user=member, moderator=ctx.author, expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({tools.humanize_duration(_duration)})', public=True)
         try:
-            await member.send(utils.format_pundm('mute', reason, ctx.author, utils.humanize_duration(_duration)))
+            await member.send(tools.format_pundm('mute', reason, ctx.author, tools.humanize_duration(_duration)))
 
         except (discord.Forbidden, AttributeError):
-            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them of this action')
 
         else:
@@ -314,7 +314,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         logging.info(f'using {expireTime}')
         tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
         self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
     @commands.command(name='unmute')
@@ -330,20 +330,20 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if not action:
             return await ctx.send(f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted')
 
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True)
+        await tools.send_modlog(self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True)
 
         try:
-            await member.send(utils.format_pundm('unmute', reason, ctx.author))
+            await member.send(tools.format_pundm('unmute', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError):
-            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them of this action')
 
             return
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
@@ -356,8 +356,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if len(content) > 900:
             return await ctx.send(f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters')
 
-        await utils.issue_pun(userid, ctx.author.id, 'note', content, active=False, public=False)
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        await tools.issue_pun(userid, ctx.author.id, 'note', content, active=False, public=False)
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
@@ -365,7 +365,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning(self, ctx):
-        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`); if you need to manually review an warning, you may still use the `!warn review user` command')
+        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`).')
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
@@ -381,23 +381,23 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if activeStrikes + count > 16: # Max of 16 active strikes
             return await ctx.send(f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes + count - 16} or consider banning the user instead')
 
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
         userDB.update_one({'_id': member.id}, {'$set': {
             'strike_check': time.time() + (60 * 60 * 24 * 7) # 7 days
         }})
 
         self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))) # Check in 12 hours, prevents time drifting
-        await utils.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, public=True)
+        await tools.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
-            await member.send(utils.format_pundm('strike', reason, ctx.author, details=count))
+            await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
         except discord.Forbidden:
-            if not await utils.mod_cmd_invoke_delete(ctx.channel):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck. I was not able to DM them of this action')
 
             return
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck')
@@ -441,7 +441,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 continue # TODO: handle this in core
 
             db.update_one({'_id': doc['_id']}, {'$set': {'active': False}})
-            docID = await utils.issue_pun(doc['user'], self.bot.user.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
+            docID = await tools.issue_pun(doc['user'], self.bot.user.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
             self.taskHandles.append(loop.call_later(5, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
             userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
 
@@ -559,19 +559,19 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {
                 'active': False
             }})
-            docID = await utils.issue_pun(doc['user'], self.bot.user.id, 'unmute', 'Mute expired', active=False, context=doc['_id'])
+            docID = await tools.issue_pun(doc['user'], self.bot.user.id, 'unmute', 'Mute expired', active=False, context=doc['_id'])
 
             if not newPun: # There is near zero reason this would ever hit, but in case...
                 logging.error(f'[Moderation] Expiry failed. Database failed to update user on pun expiration of {doc["_id"]}')
 
             await member.remove_roles(self.roles[doc['type']])
             try:
-                await member.send(utils.format_pundm('unmute', 'Mute expired', None, auto=True))
+                await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
 
             except discord.Forbidden: # User has DMs off
                 pass
 
-            await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
+            await tools.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
 
 class LoopTasks(commands.Cog):
     def __init__(self, bot):
@@ -629,7 +629,7 @@ class LoopTasks(commands.Cog):
                 newPun = db.find_one_and_update({'_id': pun['_id']}, {'$set': {
                     'active': False
                 }})
-                docID = await utils.issue_pun(member.id, self.bot.user.id, 'unmute', 'Mute expired', active=False, context=pun['_id'])
+                docID = await tools.issue_pun(member.id, self.bot.user.id, 'unmute', 'Mute expired', active=False, context=pun['_id'])
 
                 if not newPun: # There is near zero reason this would ever hit, but in case...
                     logging.error(f'[expiry_check] Database failed to update user on pun expiration of {pun["_id"]}')
@@ -637,12 +637,12 @@ class LoopTasks(commands.Cog):
 
                 await member.remove_roles(self.roles[pun['type']])
                 try:
-                     await member.send(utils.format_pundm('unmute', 'Mute expired', None, auto=True))
+                     await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
 
                 except discord.Forbidden: # User has DMs off
                     pass
 
-                await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
+                await tools.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
 
             elif pun['type'] in warns and member:
                 if int(time.time()) < (pun['expiry']):
