@@ -590,8 +590,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 else:
                     inf = punNames[pun['type']]
 
-                moderatorStr = f'**Moderator:** {moderator}\n' if not self_check else ''
-                fields.append({'name': datestamp, 'value':f'{moderatorStr}**Details:** [{inf}] {pun["reason"]}'})
+                fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
 
             if totalStrikes:
                 desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
