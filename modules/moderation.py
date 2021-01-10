@@ -401,7 +401,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.has_any_role(config.moderator, config.eh)
     @_strike.command(name='set')
     async def _strike_set(self, ctx, member: discord.Member, count: StrikeRange, *, reason):
-        pass
+        punDB = mclient.bowser.puns
+        activeStrikes = 0
+        for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
+            activeStrikes += pun['active_strike_count']
+
+        if activeStrikes == count:
+            return await ctx.send(f'{config.redTick} That user already has {activeStrikes} active strikes')
+
+        elif count > activeStrikes: # This is going to be a positive diff, lets just do the math and defer work to _strike()
+            return await self._strike(ctx, member, count - activeStrikes, reason=reason)
+
 
     @commands.is_owner()
     @commands.command()
