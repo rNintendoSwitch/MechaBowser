@@ -22,7 +22,7 @@ from emoji import UNICODE_EMOJI
 from fuzzywuzzy import process
 
 import config
-import utils
+import tools
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -553,7 +553,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return
 
         content = re.sub(r'(<@!?\d+>)', '', message.content)
-        contains_code = utils.re_match_nonlink(self.friendCodeRegex['chatFilter'], content)
+        contains_code = tools.re_match_nonlink(self.friendCodeRegex['chatFilter'], content)
 
         if not contains_code: return
         if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:

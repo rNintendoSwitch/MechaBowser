@@ -14,7 +14,7 @@ from discord import Webhook, AsyncWebhookAdapter
 from discord.ext import commands, tasks
 
 import config
-import utils
+import tools
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -155,7 +155,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         #Filter for #mario
         if message.channel.id == config.marioluigiChannel: # #mario
-            if utils.re_match_nonlink(self.SMM2LevelID, message.content):
+            if tools.re_match_nonlink(self.SMM2LevelID, message.content):
                 await message.delete()
                 response = await message.channel.send(f'{config.redTick} <@{message.author.id}> Please do not post Super Mario Maker 2 level codes ' \
                     f'here. Post in <#{config.smm2Channel}> with the pinned template instead.')
@@ -213,7 +213,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         # Filter and clean affiliate links
         # We want to call this last to ensure all above items are complete.
-        links = utils.linkRe.finditer(message.content)
+        links = tools.linkRe.finditer(message.content)
         if links: 
             contentModified = False
             content = message.content
@@ -612,7 +612,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 await ctx.message.add_reaction('📬')
 
             author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
-            await utils.send_paginated_embed(self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
+            await tools.send_paginated_embed(self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
 
         except discord.Forbidden:
             if self_check:
@@ -700,8 +700,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             else: lines = ['*No results found*']
 
-            fields = utils.convert_list_to_fields(lines, codeblock=False)
-            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
+            fields = tools.convert_list_to_fields(lines, codeblock=False)
+            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
 
     @_tag.command(name='edit')
     @commands.has_any_role(config.moderator, config.helpfulUser)
@@ -796,7 +796,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.redTick} An invalid image type, `{img_type_arg}`, was given. Image type must be: {", ". join(IMG_TYPES.keys())}')
 
         url =  ' '.join(url.splitlines())
-        match = utils.linkRe.match(url)
+        match = tools.linkRe.match(url)
         if url and (not match or match.span()[0] != 0): # If url argument does not match or does not begin with a valid url
             return await ctx.send(f'{config.redTick} An invalid url, `{url}`, was given')
 
@@ -899,24 +899,24 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         db = mclient.bowser.puns
         if statusText.lower() == 'blacklisted':
-            docID = await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=context)
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=context)
 
         else:
             db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True, 'context': context}, {'$set':{
             'active': False
             }})
-            docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
 
-        await utils.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
+        await tools.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
 
         try:
             statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
-            await member.send(utils.format_pundm(statusText, reason, ctx.author, mention))
+            await member.send(tools.format_pundm(statusText, reason, ctx.author, mention))
 
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')

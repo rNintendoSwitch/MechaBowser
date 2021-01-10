@@ -28,7 +28,7 @@ from discord.ext import commands, tasks
 from discord import Embed, File, Member, NotFound
 
 import config
-import utils
+import tools
 from events.resources.lm3 import qte
 
 mclient = pymongo.MongoClient(
@@ -412,19 +412,19 @@ class Mansion(commands.Cog):
         self.maxhp = attackGhost['hp']
         value = attackGhost['value']
         if boss:
-            expires = utils.resolve_duration('6h')
+            expires = tools.resolve_duration('6h')
 
         elif self.superSize:
-            expires = utils.resolve_duration('10m')
+            expires = tools.resolve_duration('10m')
             self.maxhp *= self.superSize
             value *= self.superSize
 
         elif magnet:
-            expires = utils.resolve_duration('5m')
+            expires = tools.resolve_duration('5m')
             self.maxhp *= 1.3
 
         else:
-            expires = utils.resolve_duration('5m')
+            expires = tools.resolve_duration('5m')
 
         # Floor multipliers
         if not boss:
@@ -485,7 +485,7 @@ class Mansion(commands.Cog):
             newBar = await self.health_bar(self.maxhp, self.hp)
 
             if editDelay <= 0:
-                embed.set_field_at(1, name='Time remaining', value=utils.humanize_duration(expires))
+                embed.set_field_at(1, name='Time remaining', value=tools.humanize_duration(expires))
                 embed.set_field_at(0, name=f'HP {round(self.hp)} | {round(dps, 1)} DPS', value=f'[{newBar}]')
                 await self.ghost.edit(embed=embed)
                 editDelay = 1
@@ -773,9 +773,9 @@ class Mansion(commands.Cog):
 
                 for x in self.activeItems:
                     if x['id'] == 'bone' and not localCooldownExept:
-                        return await ctx.send(f'{config.redTick} {ctx.author.mention} You must wait {utils.humanize_duration(x["expires"])} before using **{self.items[item]["name"]}** again', delete_after=10)
+                        return await ctx.send(f'{config.redTick} {ctx.author.mention} You must wait {tools.humanize_duration(x["expires"])} before using **{self.items[item]["name"]}** again', delete_after=10)
 
-                self.activeItems.append({'id': 'bone', 'expires': utils.resolve_duration('30s')})
+                self.activeItems.append({'id': 'bone', 'expires': tools.resolve_duration('30s')})
                 localCooldownExept = True
                 if not remove_item(item): return await ctx.send(f'{config.redTick} {ctx.author.mention} You don\'t have any **{self.items[item]["name"]}**. You can buy some in <#638872378545274900>', delete_after=10)
                 gambleItems = [
@@ -826,9 +826,9 @@ class Mansion(commands.Cog):
 
                 for x in self.activeItems:
                     if x['id'] == 'double' and x['user'] == ctx.author.id and x['active']:
-                        return await ctx.send(f'{config.redTick} {ctx.author.mention} The **{self.items[item]["name"]}** is under a cooldown and can be used again in {utils.humanize_duration(x["expires"])}', delete_after=10)
+                        return await ctx.send(f'{config.redTick} {ctx.author.mention} The **{self.items[item]["name"]}** is under a cooldown and can be used again in {tools.humanize_duration(x["expires"])}', delete_after=10)
     
-                self.activeItems.append({'id': 'double', 'expires': utils.resolve_duration('1h'), 'user': ctx.author.id, 'active': True})
+                self.activeItems.append({'id': 'double', 'expires': tools.resolve_duration('1h'), 'user': ctx.author.id, 'active': True})
                 self.participants[ctx.author.id]['flags'].append('double')
                 remove_item(item)
                 await ctx.send(f'{config.greenTick} {ctx.author.mention} Success! You used your **{self.items[item]["name"]}**. __Your__ coin output from the current ghost will be **doubled**', delete_after=10)
@@ -841,11 +841,11 @@ class Mansion(commands.Cog):
                         if n['id'] == 'gooigi':
                             firstExpires.append(n['expires'])
 
-                    timeToFirstExpire = utils.humanize_duration(sorted(firstExpires)[0])
+                    timeToFirstExpire = tools.humanize_duration(sorted(firstExpires)[0])
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} The maximum amount of gooigi boosts is currently active. You can use this when currently active one expires in {timeToFirstExpire}', delete_after=10)
     
                 remove_item(item)
-                self.activeItems.append({'id': 'gooigi', 'expires': utils.resolve_duration('1h')})
+                self.activeItems.append({'id': 'gooigi', 'expires': tools.resolve_duration('1h')})
                 if self.multiplier == 1:
                     self.multiplier = 2
 
@@ -867,9 +867,9 @@ class Mansion(commands.Cog):
                 if not remove_item(item, check=True): return await ctx.send(f'{config.redTick} {ctx.author.mention} You don\'t have any **{self.items[item]["name"]}**. You can buy some in <#638872378545274900>', delete_after=10)
                 for x in self.activeItems:
                     if x['id'] == 'sauce':
-                        return await ctx.send(f'{config.redTick} {ctx.author.mention} Another **{self.items[item]["name"]}** is already active for the server. You can use this when it runs out in {utils.humanize_duration(x["expires"])}', delete_after=10)
+                        return await ctx.send(f'{config.redTick} {ctx.author.mention} Another **{self.items[item]["name"]}** is already active for the server. You can use this when it runs out in {tools.humanize_duration(x["expires"])}', delete_after=10)
 
-                self.activeItems.append({'id': 'sauce', 'expires': utils.resolve_duration('2h')})
+                self.activeItems.append({'id': 'sauce', 'expires': tools.resolve_duration('2h')})
                 self.coinMultiplier = True
                 remove_item(item)
                 await ctx.send(f'{config.greenTick} {ctx.author.mention} Success! You used your **{self.items[item]["name"]}**. __The server__ now has a **2x** coin boost for **2 hours**', delete_after=10)
@@ -882,9 +882,9 @@ class Mansion(commands.Cog):
                         return await ctx.send(f'{config.redTick} {ctx.author.mention} You cannot have more than one **{self.items[item]["name"]}** active for yourself at one time. Please wait until the next ghost appears', delete_after=10)
         
                     if x['id'] == 'banana' and x['user'] == ctx.author.id and not x['active']:
-                        return await ctx.send(f'{config.redTick} {ctx.author.mention} The **{self.items[item]["name"]}** is under a cooldown and can be used again in {utils.humanize_duration(x["expires"])}', delete_after=10)
+                        return await ctx.send(f'{config.redTick} {ctx.author.mention} The **{self.items[item]["name"]}** is under a cooldown and can be used again in {tools.humanize_duration(x["expires"])}', delete_after=10)
     
-                self.activeItems.append({'id': 'banana', 'expires': utils.resolve_duration('45m'), 'user': ctx.author.id, 'active': True})
+                self.activeItems.append({'id': 'banana', 'expires': tools.resolve_duration('45m'), 'user': ctx.author.id, 'active': True})
 
                 remove_item(item)
                 await ctx.send(f'{config.greenTick} {ctx.author.mention} Success! You used your **{self.items[item]["name"]}**. You will steal a small amount of coins from each player who defeats the current ghost', delete_after=10)
@@ -919,9 +919,9 @@ class Mansion(commands.Cog):
 
                 for x in self.activeItems:
                     if x['id'] == 'dark-light':
-                        return await ctx.send(f'{config.redTick} {ctx.author.mention} You must wait {utils.humanize_duration(x["expires"])} before using **{self.items[item]["name"]}** again', delete_after=10)
+                        return await ctx.send(f'{config.redTick} {ctx.author.mention} You must wait {tools.humanize_duration(x["expires"])} before using **{self.items[item]["name"]}** again', delete_after=10)
 
-                self.activeItems.append({'id': 'dark-light', 'expires': utils.resolve_duration('5m')})
+                self.activeItems.append({'id': 'dark-light', 'expires': tools.resolve_duration('5m')})
                 diffHP = self.maxhp * 0.1
                 if self.hp - diffHP <= 0:
                     self.hp = 0
@@ -939,10 +939,10 @@ class Mansion(commands.Cog):
                         if n['id'] == 'potion':
                             firstExpires.append(n['expires'])
 
-                    timeToFirstExpire = utils.humanize_duration(sorted(firstExpires)[0])
+                    timeToFirstExpire = tools.humanize_duration(sorted(firstExpires)[0])
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} The maximum amount of elixir boosts is currently active. You can use one when oldest currently active one expires in {timeToFirstExpire}', delete_after=10)
 
-                self.activeItems.append({'id': 'potion', 'expires': utils.resolve_duration('90m')})
+                self.activeItems.append({'id': 'potion', 'expires': tools.resolve_duration('90m')})
                 await ctx.send(f'{config.greenTick} {ctx.author.mention} Success! You used your **{self.items[item]["name"]}**. Your boost will last for **one hour**', delete_after=10)
 
             else:
