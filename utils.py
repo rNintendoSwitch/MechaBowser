@@ -482,7 +482,10 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     ended_by = None
     message = None
 
-    if len(pages) != 1: # Short circuit: if one page only, we don't need to change pages
+    single_page = len(pages) == 1
+    dm_channel = not isinstance(channel, discord.TextChannel)
+
+    if not (single_page or dm_channel):
         # Setup messages, we wait to update the embed later so users don't click reactions before we're setup 
         message = await channel.send('Please wait...')
         await message.add_reaction('⬅')
@@ -504,13 +507,28 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         embed.title = f'{title} {page_text}'
 
-        if len(pages) == 1: # Short circuit: if one page only, we don't need to change pages
+        if single_page or dm_channel:
             embed.set_footer(text=page_text)
             await channel.send(embed=embed)
+
+        if single_page:
             break
+
+        elif dm_channel:
+            if current_page >= 10:
+                if len(pages) > 10:
+                    await channel.send(f'Limited to 10 pages in DM channel. {len(pages) - 10} page{"s" if len(pages) == 1 else ""} was not sent')
+                break
+
+            elif current_page == len(pages):
+                break
+            
+            else:
+                current_page += 1
+                continue
+
         else:
             embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
-
             await message.edit(content='', embed=embed)
         
         # Check user reaction
@@ -544,7 +562,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
             ended_by = user
             break
 
-    if len(pages) != 1:  # Short circuit: if one page only, we don't need to change pages
+    if not (single_page or dm_channel):
         # Generate ended footer
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'
