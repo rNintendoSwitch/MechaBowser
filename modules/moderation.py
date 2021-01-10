@@ -365,7 +365,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning(self, ctx):
-        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`); if you need to manually review an warning, you may still use the `!warn review user` command')
+        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`).')
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
