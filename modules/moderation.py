@@ -447,6 +447,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @_banning.error
     @_unbanning.error
     @_kicking.error
+    @_strike.error
+    @_strike_set.error
     @_muting.error
     @_unmuting.error
     @_warning.error
@@ -483,10 +485,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if doc['type'] == 'strike':
             userDB = mclient.bowser.users
             user = userDB.find_one({'_id': doc['user']})
-            if user['strike_check'] > time.time(): # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
-                retryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
-                self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
-                return
+            try:
+                if user['strike_check'] > time.time(): # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
+                    retryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
+                    self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
+                    return
+
+            except KeyError: # This is a rare edge case, but if a pun is manually created the user may not have the flag yet. More a dev handler than not
+                logging.error(f'[Moderation] Expiry failed. Could not get strike_check from db.users resolving for pun {_id}, was it manually added?')
 
             # Start logic
             if doc['active_strike_count'] - 1 == 0:
