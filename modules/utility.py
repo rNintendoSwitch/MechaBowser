@@ -524,20 +524,20 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             self_check = False
 
         db = mclient.bowser.puns
-        puns = db.find({'user': user.id})
+        puns = db.find({'user': user.id, 'type': {'$ne': 'note'}}) if self_check else db.find({'user': user.id})
 
         deictic_language = {
             'no_punishments': (
                 'User has no punishments on record',
-                'You have no punishments on record'
+                'You have no visible punishments on record'
             ),
             'single_inf': (
                 'There is **1** infraction record for this user:',
-                'You have **1** infraction record:'
+                'You have **1** visibleinfraction record:'
             ),
             'multiple_infs': (
                 'There are **{}** infraction records for this user:',
-                'You have **{}** infraction records:'
+                'You have **{}** visible infraction records:'
             ),
             'total_strikes': (
                 'User currently has **{}** active strikes (**{}** in total.)\n',
@@ -586,10 +586,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
                 elif pun['type'] == 'appealdeny':
                     inf = punNames[pun['type']].format(datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
-
-                # Do not include notes if ran unprivileged on self
-                elif pun['type'] == 'note' and self_check:
-                    continue
 
                 else:
                     inf = punNames[pun['type']]
