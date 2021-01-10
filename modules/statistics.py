@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 import config
-import utils
+import tools
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -181,8 +181,8 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
                 lines.append(f'* {member} ({member.id})')
 
             title = f'{ctx.guild.name} Role Statistics'
-            fields = utils.convert_list_to_fields(lines)
-            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=title, description=desc, color=0xD267BA, page_character_limit=3000)
+            fields = tools.convert_list_to_fields(lines)
+            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=title, description=desc, color=0xD267BA, page_character_limit=3000)
 
         else:
             roleCounts = []
