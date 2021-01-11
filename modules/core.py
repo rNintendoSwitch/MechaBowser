@@ -154,6 +154,13 @@ class MainEvents(commands.Cog):
                     elif x['type'] in ['kick', 'ban']:
                         continue # These are not punishments being "restored", instead only status is being tracked
 
+                    elif x['type'] == 'mute':
+                        if x['expiry'] < time.time(): # If the member is rejoining after mute has expired, the task has already quit. Restart it
+                            mod = self.bot.get_cog('Moderation Commands')
+                            await mod.expire_actions(x['_id'], member.guild.id)
+
+                        restoredPuns.append(punTypes[x['type']])
+
                     else:
                         restoredPuns.append(punTypes[x['type']])
 

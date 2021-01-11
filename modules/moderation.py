@@ -595,7 +595,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             userDB.update_one({'_id': doc['user']}, {'$set': {'strike_check': time.time() + 60 * 60 * 24 * 7}})
 
         elif doc['type'] == 'mute' and doc['expiry']: # A mute that has an expiry
-            if doc['active'] == False: return # Mute was set to inactive between checks
             # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
             if doc['expiry'] > time.time():
                 retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
