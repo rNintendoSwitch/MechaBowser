@@ -500,12 +500,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 '* Your warning level will be converted to **{}** strikes.\n'
                 '* __Your strikes will decay at a equivalent as warnings previously did__. Each warning tier is equivalent to four strikes*, where* one strike decays per week instead of one warn level per four weeks\n'
                 '* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
-                'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. Please feel free to send a modmail to '
-                '@Parakarry (<@{}>) if you have any questions or concerns.').format(
+                'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. You may also now view your infraction history '
+                'by using the `!history` command in <#{}>. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.').format(
                 str(member), # Username
                 doc['type'][-1:], # Tier type
                 datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), # Date of warn
                 strikeCount, # How many strikes will replace tier,
+                config.commandsChannel, # Commands channel can only be used for the command
                 config.parakarry # Parakarry mention for DM
             )
 
