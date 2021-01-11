@@ -502,7 +502,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 f'\n```diff\n{punishments}```'
 
             if totalStrikes:
-                embed.description = embed.description + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes > 1 or activeStrikes < 1 else ""} ({totalStrikes} in total)'
+                embed.description = embed.description + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)

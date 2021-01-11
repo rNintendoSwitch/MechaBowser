@@ -538,7 +538,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
         elif dm_channel:
             if current_page >= 10:
                 if len(pages) > 10:
-                    await channel.send(f'Limited to 10 pages in DM channel. {len(pages) - 10} page{"s" if len(pages) == 1 else ""} was not sent')
+                    await channel.send(f'Limited to 10 pages in DM channel. {len(pages) - 10} page{"s were" if len(pages) != 1 else " was"} not sent')
                 break
 
             elif current_page == len(pages):

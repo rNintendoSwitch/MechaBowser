@@ -265,7 +265,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         except (discord.Forbidden, AttributeError):
             if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them of this action')
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them of this action')
 
             await member.kick(reason='Kick action performed by moderator')
             return
@@ -273,7 +273,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -423,7 +423,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         else: # Negative diff, we will need to reduce our strikes
             diff = activeStrikes - count
-            logging.info(f'first {diff}')
+
             puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
             for pun in puns:
                 if pun['active_strike_count'] - diff >= 0:
@@ -438,7 +438,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     }})
                     self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(pun['_id'], ctx.guild.id))) # Check in 12 hours, prevents time drifting
                     diff -= (pun['active_strike_count'] - diff)
-                    logging.info(f'second {diff} after {pun["active_strike_count"]}')
                     break
 
                 elif pun['active_strike_count'] - diff < 0:
@@ -448,7 +447,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         'active': False
                     }})
                     diff -= pun['active_strike_count']
-                    logging.info(f'third {diff} after {pun["active_strike_count"]}')
 
             if diff != 0: # Something has gone horribly wrong
                 raise ValueError('Diff != 0 after full iteration')
@@ -562,7 +560,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             userDB = mclient.bowser.users
             user = userDB.find_one({'_id': doc['user']})
             try:
-                if user['strike_check'] > time.time(): # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
+                if user['strike_check'] > time.time():
+                    # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
                     retryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
                     self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
                     return
@@ -591,7 +590,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         elif doc['type'] == 'mute' and doc['expiry']: # A mute that has an expiry
             if doc['active'] == False: return # Mute was set to inactive between checks
-            if doc['expiry'] > time.time(): # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner. 5 seconds is for drift lienency
+            # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
+            if doc['expiry'] > time.time():
                 retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
                 self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
                 return
