@@ -287,14 +287,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         muteRole = ctx.guild.get_role(config.mute)
         try:
             _duration = tools.resolve_duration(duration)
-            if int(duration):
-                raise TypeError
+            try:
+                if int(duration):
+                    raise TypeError
+
+            except ValueError:
+                pass
 
         except (KeyError, TypeError):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
-
-        except ValueError:
-            pass
 
         docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.add_roles(muteRole, reason='Mute action performed by moderator')
