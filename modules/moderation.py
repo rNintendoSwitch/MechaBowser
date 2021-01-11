@@ -53,7 +53,7 @@ class StrikeRange(commands.Converter):
         except:
             raise commands.BadArgument
 
-        if not 1 <= arg <= 16:
+        if not 0 <= arg <= 16:
             raise commands.BadArgument
 
         return arg
@@ -365,11 +365,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.group(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning(self, ctx):
-        await ctx.send(f':warning: Warns are depreciated. Please use the strike system instead (`!help strike`).')
+        await ctx.send(':warning: Warns are depreciated. Please use the strike system instead (`!help strike`)')
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
     async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
+        if count == 0:
+            return await ctx.send(f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `{ctx.prefix}strike set`')
+
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters')
         punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
@@ -407,7 +410,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     async def _strike_set(self, ctx, member: discord.Member, count: StrikeRange, *, reason):
         punDB = mclient.bowser.puns
         activeStrikes = 0
-        for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
+        puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True}).sort({'timestamp': 1})
+        for pun in puns:
             activeStrikes += pun['active_strike_count']
 
         if activeStrikes == count:
@@ -415,6 +419,29 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         elif count > activeStrikes: # This is going to be a positive diff, lets just do the math and defer work to _strike()
             return await self._strike(ctx, member, count - activeStrikes, reason=reason)
+
+        else: # Negative diff, we will need to reduce our strikes
+            diff = activeStrikes - count
+            for pun in puns:
+                if pun['active_strike_count'] - diff >= 0:
+                    punDB.update_one({'_id': pun['_id']}, {'$set':
+                    {
+                        'active_strike_count': pun['active_strike_count'] - diff,
+                        'active': pun['active_strike_count'] - diff > 0
+                    }})
+                    diff -= pun['active_strike_count']
+                    break
+
+                elif pun['active_strike_count'] - diff < 0:
+                    punDB.update_one({'_id': pun['_id']}, {'$set':
+                    {
+                        'active_strike_count': 0,
+                        'active': False
+                    }})
+                    diff -= pun['active_strike_count']
+
+            if diff != 0: # Something has gone horribly wrong
+                raise ValueError('Diff != 0 after full iteration')
 
 
     @commands.is_owner()

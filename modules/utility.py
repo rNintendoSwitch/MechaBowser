@@ -362,11 +362,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
     
         m = await ctx.send(f'{config.greenTick} Clean action complete')
-        #archiveID = await utils.message_archive(list(reversed(deleted)))
-
-        #embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/archive/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
-        #await self.bot.get_channel(config.logChannel).send(f':printer: New message archive generated for {ctx.channel.mention}', embed=embed)
-
         return await m.delete(delay=5)
 
     @commands.command(name='info')
