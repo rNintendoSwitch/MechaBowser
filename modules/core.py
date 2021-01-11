@@ -26,7 +26,7 @@ class MainEvents(commands.Cog):
         self.private_modules_loaded = False
 
         try:
-            self.bot.load_extension('utils')
+            self.bot.load_extension('tools')
             self.bot.load_extension('modules.moderation')
             self.bot.load_extension('modules.utility')
             self.bot.load_extension('modules.statistics')
