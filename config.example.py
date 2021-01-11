@@ -105,7 +105,7 @@ punStrs = {
 
 punColors = {
     'strike': 0xEDC605,
-    'destrike': 0xEDC605,
+    'destrike': 0xED7E05,
     'tier1': 0xFFFA1C,
     'tier2': 0xFF9000,
     'tier3': 0xD0021B,
