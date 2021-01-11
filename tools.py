@@ -190,7 +190,7 @@ async def store_user(member, messages=0):
     }
     db.insert_one(userData)
 
-async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None, public=True):
+async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=True, context=None, _date=None, public=True, strike_count=None):
     db = mclient.bowser.puns
     timestamp = time.time() if not _date else _date
     docID = str(uuid.uuid4())
@@ -202,6 +202,8 @@ async def issue_pun(user, moderator, _type, reason=None, expiry=None, active=Tru
         'user': user,
         'moderator': moderator,
         'type': _type,
+        'strike_count': strike_count,
+        'active_strike_count': strike_count,
         'timestamp': int(timestamp),
         'reason': reason,
         'expiry': expiry,
@@ -290,15 +292,26 @@ async def mod_cmd_invoke_delete(channel):
     else:
         return True
 
-async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=None, public=False, delay=300):
+async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author=None, timestamp=None, public=False, delay=300):
     if user: # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
         userid = user.id
 
-    author = f'{config.punStrs[_type]} '
-    if extra_author:
-        author += f'({extra_author}) '
+    if _type == 'strike':
+        author = f'{extra_author} ' + config.punStrs[_type]
+        author += 's ' if extra_author > 1 else ' '
+
+    elif _type == 'destrike':
+        author = f'Removed {extra_author} ' + config.punStrs['strike']
+        author += 's ' if extra_author > 1 else ' '
+
+    else:
+        author = f'{config.punStrs[_type]} '
+        if extra_author:
+            author += f'({extra_author}) '
+
     author += f'| {username} ({userid})'
+
     if not timestamp:
         timestamp = datetime.datetime.utcnow()
 
@@ -329,11 +342,20 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
     if not doc:
         return
 
-    user = await bot.fetch_user(doc["user"])
+    user = await bot.fetch_user(doc['user'])
 
     author = f'{config.punStrs[doc["type"]]} '
     if doc['type'] == 'blacklist':
         author += f'({doc["context"]}) '
+
+    elif doc['type'] == 'strike':
+        author = f'{doc["strike_count"]} ' + config.punStrs[doc['type']]
+        author += 's ' if doc['strike_count'] > 1 else ' '
+
+    elif doc['type'] == 'destrike':
+        author = f'Removed {doc["strike_count"]} ' + config.punStrs['strike']
+        author += 's ' if doc['strike_count'] > 1 else ' '
+
     author += f'| {user} ({user.id})'
 
     embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.datetime.utcfromtimestamp(doc['timestamp']))
@@ -362,14 +384,16 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
 
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {
+        'strike': f'You have received **{details} strike{"s" if (_type == "strike") and (details > 1) else ""}** on',
+        'destrike': f'Your **active strikes** have been reduced by **{details} strike{"s" if (_type == "destrike") and (details > 1) else ""}** on',
         'warn': f'You have been **warned (now {details})** on',
         'warnup': f'Your **warning level** has been **increased (now {details})** on',
         'warndown': f'Your **warning level** has been **decreased (now {details})** on',
         'warnclear': f'Your **warning** has been **cleared** on',
         'mute': f'You have been **muted ({details})** on',
         'unmute': f'Your **mute** has been **removed** on',
-        'blacklist': f'Your **posting permissions** have been **restricted** in {details} on',
-        'unblacklist': f'Your **posting permissions** have been **restored** in {details} on',
+        'blacklist': f'Your **{details} permissions** have been **restricted** on',
+        'unblacklist': f'Your **{details} permissions** have been **restored** on',
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on'
@@ -479,7 +503,10 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
     ended_by = None
     message = None
 
-    if len(pages) != 1: # Short circuit: if one page only, we don't need to change pages
+    single_page = len(pages) == 1
+    dm_channel = not isinstance(channel, discord.TextChannel)
+
+    if not (single_page or dm_channel):
         # Setup messages, we wait to update the embed later so users don't click reactions before we're setup 
         message = await channel.send('Please wait...')
         await message.add_reaction('⬅')
@@ -501,13 +528,28 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         embed.title = f'{title} {page_text}'
 
-        if len(pages) == 1: # Short circuit: if one page only, we don't need to change pages
+        if single_page or dm_channel:
             embed.set_footer(text=page_text)
             await channel.send(embed=embed)
+
+        if single_page:
             break
+
+        elif dm_channel:
+            if current_page >= 10:
+                if len(pages) > 10:
+                    await channel.send(f'Limited to 10 pages in DM channel. {len(pages) - 10} page{"s were" if len(pages) != 1 else " was"} not sent')
+                break
+
+            elif current_page == len(pages):
+                break
+            
+            else:
+                current_page += 1
+                continue
+
         else:
             embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
-
             await message.edit(content='', embed=embed)
         
         # Check user reaction
@@ -541,7 +583,7 @@ async def send_paginated_embed(bot:  discord.ext.commands.Bot,
             ended_by = user
             break
 
-    if len(pages) != 1:  # Short circuit: if one page only, we don't need to change pages
+    if not (single_page or dm_channel):
         # Generate ended footer
         page_text = PAGE_TEMPLATE.format(current_page, len(pages))
         footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'

@@ -14,7 +14,7 @@ from discord import Webhook, AsyncWebhookAdapter
 from discord.ext import commands, tasks
 
 import config
-import utils
+import tools
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -155,7 +155,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         #Filter for #mario
         if message.channel.id == config.marioluigiChannel: # #mario
-            if utils.re_match_nonlink(self.SMM2LevelID, message.content):
+            if tools.re_match_nonlink(self.SMM2LevelID, message.content):
                 await message.delete()
                 response = await message.channel.send(f'{config.redTick} <@{message.author.id}> Please do not post Super Mario Maker 2 level codes ' \
                     f'here. Post in <#{config.smm2Channel}> with the pinned template instead.')
@@ -213,7 +213,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         # Filter and clean affiliate links
         # We want to call this last to ensure all above items are complete.
-        links = utils.linkRe.finditer(message.content)
+        links = tools.linkRe.finditer(message.content)
         if links: 
             contentModified = False
             content = message.content
@@ -362,11 +362,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
     
         m = await ctx.send(f'{config.greenTick} Clean action complete')
-        #archiveID = await utils.message_archive(list(reversed(deleted)))
-
-        #embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/archive/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
-        #await self.bot.get_channel(config.logChannel).send(f':printer: New message archive generated for {ctx.channel.mention}', embed=embed)
-
         return await m.delete(delay=5)
 
     @commands.command(name='info')
@@ -384,10 +379,18 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 return await ctx.send(f'{config.redTick} User does not exist')
 
             if not dbUser:
-                embed = discord.Embed(color=discord.Color(0x18EE1C), description=f'Fetched information about {user.mention} from the API because they are not in this server. There is little information to display as they have not been recorded joining the server before.')
+                desc = (f'Fetched information about {user.mention} from the API because they are not in this server. '
+                    'There is little information to display as they have not been recorded joining the server before')
+
+                infractions = mclient.bowser.puns.find({'user': user.id}).count()
+                if infractions:
+                    desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `{ctx.prefix}history {user.id}` to view'
+
+                embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
                 embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
                 embed.set_thumbnail(url=user.avatar_url)
                 embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
+
                 return await ctx.send(embed=embed) # TODO: Return DB info if it exists as well
 
         else:
@@ -397,11 +400,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         messages = mclient.bowser.messages.find({'author': user.id})
         msgCount = 0 if not messages else messages.count()
 
-        desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
-            'from the API because they are not in this server. ' \
-            'Showing last known data from before they left.'
-
-
+        desc = f'Fetched user {user.mention}.' if inServer else (f'Fetched information about previous member {user.mention} '
+            'from the API because they are not in this server. '
+            'Showing last known data from before they left')
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
         embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
@@ -443,7 +444,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
 
         noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
-        fieldValue = 'View history to get full details on all notes.\n\n'
+        fieldValue = 'View history to get full details on all notes\n\n'
         if noteDocs.count():
             noteCnt = noteDocs.count()
             noteList = []
@@ -454,7 +455,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 fieldLength = 0
                 for value in noteList: fieldLength += len(value)
                 if len(noteContent) + fieldLength > 924:
-                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
+                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes ' + fieldValue
                     break
 
                 noteList.append(noteContent)
@@ -468,28 +469,49 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         else:
             puns = 0
+            activeStrikes = 0
+            totalStrikes = 0
             for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
+                if pun['type'] == 'strike':
+                    totalStrikes += pun['strike_count']
+                    activeStrikes += pun['active_strike_count']
+
+                elif pun['type'] == 'destrike':
+                    totalStrikes -= pun['strike_count']
+
                 if puns >= 5:
-                    break
+                    continue
 
                 puns += 1
                 stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
                 punType = config.punStrs[pun['type']]
-                if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
+                if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist', 'destrike']:
+                    if pun['type'] == 'destrike':
+                        punType = f'Removed {pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
+
                     punishments += f'- [{stamp}] {punType}\n'
 
                 else:
+                    if pun['type'] == 'strike':
+                        punType = f'{pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
+
                     punishments += f'+ [{stamp}] {punType}\n'
 
             punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
-                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
+                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history {user.id}`' \
                 f'\n```diff\n{punishments}```'
+
+            if totalStrikes:
+                embed.description = embed.description + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
+
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
 
     @commands.command(name='history')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _history(self, ctx, user: typing.Union[discord.User, int]):
+    async def _history(self, ctx, user: typing.Union[discord.User, int, None] = None):
+        if user is None:
+            user = ctx.author
+
         if type(user) == int:
             # User doesn't share the ctx server, fetch it instead
             try:
@@ -498,53 +520,115 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             except discord.NotFound:
                 return await ctx.send(f'{config.redTick} User does not exist')
 
-        db = mclient.bowser.puns
-        puns = db.find({'user': user.id})
-        if not puns.count():
-            return await ctx.send(f'{config.redTick} User has no punishments on record')
+        if ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.guild.get_role(config.eh) not in ctx.author.roles:
+            self_check = True
 
-        punNames = {
-            'tier1': 'T1 Warn',
-            'tier2': 'T2 Warn',
-            'tier3': 'T3 Warn',
-            'clear': 'Warn Clear',
-            'mute': 'Mute',
-            'unmute': 'Unmute',
-            'kick': 'Kick',
-            'ban': 'Ban',
-            'unban': 'Unban',
-            'blacklist': 'Blacklist ({})',
-            'unblacklist': 'Unblacklist ({})',
-            'appealdeny': 'Denied ban appeal (until {})',
-            'note': 'User note'
+            #  If they are not mod and not running on themselves, they do not have permssion.
+            if user != ctx.author: 
+                await ctx.message.delete()
+                return await ctx.send(f'{config.redTick} You do not have permission to run this command on other users', delete_after=15)
+
+            if ctx.channel.id != config.commandsChannel:
+                await ctx.message.delete()
+                return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use bot commands in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
+                
+        else:  
+            self_check = False
+
+        db = mclient.bowser.puns
+        puns = db.find({'user': user.id, 'type': {'$ne': 'note'}}) if self_check else db.find({'user': user.id})
+
+        deictic_language = {
+            'no_punishments': (
+                'User has no punishments on record',
+                'You have no available punishments on record'
+            ),
+            'single_inf': (
+                'There is **1** infraction record for this user:',
+                'You have **1** available infraction record:'
+            ),
+            'multiple_infs': (
+                'There are **{}** infraction records for this user:',
+                'You have **{}** available infraction records:'
+            ),
+            'total_strikes': (
+                'User currently has **{}** active strikes (**{}** in total.)\n',
+                'You currently have **{}** active strikes (**{}** in total.)\n'
+            )
         }
 
-        if puns.count() == 1:
-            desc = f'There is __1__ infraction record for this user:'
+        if not puns.count():
+            return await ctx.channel.send(f'{config.redTick} {deictic_language["no_punishments"][self_check]}')
 
         else:
-            desc = f'There are __{puns.count()}__ infraction records for this user:'
+            punNames = {
+                'strike': '{} Strike{}',
+                'destrike': 'Removed {} Strike{}',
+                'tier1': 'T1 Warn',
+                'tier2': 'T2 Warn',
+                'tier3': 'T3 Warn',
+                'clear': 'Warn Clear',
+                'mute': 'Mute',
+                'unmute': 'Unmute',
+                'kick': 'Kick',
+                'ban': 'Ban',
+                'unban': 'Unban',
+                'blacklist': 'Blacklist ({})',
+                'unblacklist': 'Unblacklist ({})',
+                'appealdeny': 'Denied ban appeal (until {})',
+                'note': 'User note'
+            }
 
-        fields = []
-        for pun in puns.sort('timestamp', pymongo.DESCENDING):
-            datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
-            moderator = ctx.guild.get_member(pun['moderator'])
-            if not moderator:
-                moderator = await self.bot.fetch_user(pun['moderator'])
+            desc = deictic_language['single_inf'][self_check] if puns.count() == 1 else deictic_language['multiple_infs'][self_check].format(puns.count())
+            fields = []
+            activeStrikes = 0
+            totalStrikes = 0
+            for pun in puns.sort('timestamp', pymongo.DESCENDING):
+                datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
+                moderator = ctx.guild.get_member(pun['moderator'])
+                if not moderator:
+                    moderator = await self.bot.fetch_user(pun['moderator'])
 
-            if pun['type'] in ['blacklist', 'unblacklist']:
-                inf = punNames[pun['type']].format(pun['context'])
+                if pun['type'] == 'strike':
+                    activeStrikes += pun['active_strike_count']
+                    totalStrikes += pun['strike_count']
+                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
-            elif pun['type'] == 'appealdeny':
-                inf = punNames[pun['type']].format(datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
+                elif pun['type'] == 'destrike':
+                    totalStrikes -= pun['strike_count']
+                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
+                elif pun['type'] in ['blacklist', 'unblacklist']:
+                    inf = punNames[pun['type']].format(pun['context'])
+
+                elif pun['type'] == 'appealdeny':
+                    inf = punNames[pun['type']].format(datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
+
+                else:
+                    inf = punNames[pun['type']]
+
+                fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
+
+            if totalStrikes:
+                desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
+
+        try:
+            channel = ctx.author if self_check else ctx.channel
+
+            if self_check:
+                await channel.send('You requested the following copy of your current infraction history. If you have questions concerning your history,' + 
+                    f' you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>)')
+                await ctx.message.add_reaction('📬')
+
+            author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
+            await tools.send_paginated_embed(self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
+
+        except discord.Forbidden:
+            if self_check:
+                await ctx.send(f'{config.redTick} {ctx.author.mention} I was unable to DM you. Please make sure your DMs are open and try again', delete_after=10)
             else:
-                inf = punNames[pun['type']]
-
-            fields.append({'name': datestamp, 'value':f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'})
-
-        author = {'name':f'{user} | {user.id}', 'icon_url': user.avatar_url}
-        return await utils.send_paginated_embed(self.bot, ctx.channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author)
+                raise
+            
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
@@ -625,8 +709,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             else: lines = ['*No results found*']
 
-            fields = utils.convert_list_to_fields(lines, codeblock=False)
-            return await utils.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
+            fields = tools.convert_list_to_fields(lines, codeblock=False)
+            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
 
     @_tag.command(name='edit')
     @commands.has_any_role(config.moderator, config.helpfulUser)
@@ -721,7 +805,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.redTick} An invalid image type, `{img_type_arg}`, was given. Image type must be: {", ". join(IMG_TYPES.keys())}')
 
         url =  ' '.join(url.splitlines())
-        match = utils.linkRe.match(url)
+        match = tools.linkRe.match(url)
         if url and (not match or match.span()[0] != 0): # If url argument does not match or does not begin with a valid url
             return await ctx.send(f'{config.redTick} An invalid url, `{url}`, was given')
 
@@ -780,12 +864,37 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     users.update_one({'_id': member.id}, {'$set': {'modmail': True}})
                     statusText = 'Unblacklisted'
 
+            elif channel in ['reactions', 'reaction', 'react']:
+                context  = 'reaction'
+                mention = context
+                reactionsRole = ctx.guild.get_role(config.noReactions)
+                if reactionsRole in member.roles: # Toggle role off
+                    await member.remove_roles(reactionsRole)
+                    statusText = 'Unblacklisted'
+
+                else: # Toggle role on
+                    await member.add_roles(reactionsRole)
+                    statusText = 'Blacklisted'
+
+            elif channel in ['attach', 'attachments', 'embed', 'embeds']:
+                context  = 'attachment/embed'
+                mention = context
+                noEmbeds = ctx.guild.get_role(config.noEmbeds)
+                if noEmbeds in member.roles: # Toggle role off
+                    await member.remove_roles(noEmbeds)
+                    statusText = 'Unblacklisted'
+
+                else: # Toggle role on
+                    await member.add_roles(noEmbeds)
+                    statusText = 'Blacklisted'
+
             else:
                 return await ctx.send(f'{config.redTick} You cannot blacklist a user from that function')
 
+
         elif channel.id == config.suggestions:
             context = channel.name
-            mention = channel.mention
+            mention = channel.mention + ' channel'
             suggestionsRole = ctx.guild.get_role(config.noSuggestions)
             if suggestionsRole in member.roles: # Toggle role off
                 await member.remove_roles(suggestionsRole)
@@ -797,7 +906,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         elif channel.id == config.spoilers:
             context = channel.name
-            mention = channel.mention
+            mention = channel.mention + ' channel'
             spoilersRole = ctx.guild.get_role(config.noSpoilers)
             if spoilersRole in member.roles: # Toggle role off
                 await member.remove_roles(spoilersRole)
@@ -809,7 +918,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         elif channel.category_id == config.eventCat:
             context = 'events'
-            mention = context
+            mention = 'event'
             eventsRole = ctx.guild.get_role(config.noEvents)
             if eventsRole in member.roles: # Toggle role off
                 await member.remove_roles(eventsRole)
@@ -824,24 +933,24 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         db = mclient.bowser.puns
         if statusText.lower() == 'blacklisted':
-            docID = await utils.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=context)
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=context)
 
         else:
             db.find_one_and_update({'user': member.id, 'type': 'blacklist', 'active': True, 'context': context}, {'$set':{
             'active': False
             }})
-            docID = await utils.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context)
 
-        await utils.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
+        await tools.send_modlog(self.bot, self.modLogs, statusText.lower()[:-2], docID, reason, user=member, moderator=ctx.author, extra_author=context, public=True)
 
         try:
             statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
-            await member.send(utils.format_pundm(statusText, reason, ctx.author, mention))
+            await member.send(tools.format_pundm(statusText, reason, ctx.author, mention))
 
         except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
             pass
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')

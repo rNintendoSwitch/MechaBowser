@@ -4,13 +4,14 @@ import datetime
 import time
 import re
 import copy
+import typing
 
 import pymongo
 import discord
 from discord.ext import commands, tasks
 
 import config
-import utils
+import tools
 
 mclient = pymongo.MongoClient(
 	config.mongoHost,
@@ -41,12 +42,33 @@ class ResolveUser(commands.Converter):
         except discord.NotFound:
             raise commands.BadArgument
 
+class StrikeRange(commands.Converter):
+    async def convert(self, ctx, argument):
+        if not argument:
+            raise commands.BadArgument
+
+        try:
+            arg = int(argument)
+
+        except:
+            raise commands.BadArgument
+
+        if not 0 <= arg <= 16:
+            raise commands.BadArgument
+
+        return arg
+
 class Moderation(commands.Cog, name='Moderation Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.publicModLogs = self.bot.get_channel(config.publicModChannel)
+        self.taskHandles = []
+        self.NS = self.bot.get_guild(config.nintendoswitch)
+        self.roles = {
+            'mute': self.NS.get_role(config.mute)
+        }
 
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
@@ -54,12 +76,38 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         loop = bot.loop
         for log in pendingLogs:
             if log['type'] == 'mute':
-                expires = utils.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
+                expires = tools.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
 
             else:
                 expires = None
 
-            loop.create_task(utils.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+
+        # Run expiration tasks
+        userDB = mclient.bowser.users
+        pendingPuns = db.find({'active': True, 'type': {'$in': ['strike', 'mute']}})
+        twelveHr = 60 * 60 * 12
+        trackedStrikes = [] # List of unique users
+        for pun in pendingPuns:
+            if pun['type'] == 'strike':
+                if pun['user'] in trackedStrikes: continue # We don't want to create many tasks when we only remove one
+                user = userDB.find_one({'_id': pun['user']})
+                trackedStrikes.append(pun['user'])
+                if user['strike_check'] > time.time(): # In the future
+                    tryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
+                    self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)))
+
+                else: # In the past
+                    self.taskHandles.append(self.bot.loop.call_soon(asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)))
+
+            elif pun['type'] == 'mute':
+                tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
+                logging.info(f'using {tryTime} for mute')
+                self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)))
+
+    def cog_unload(self):
+        for task in self.taskHandles:
+            task.cancel()
 
     @commands.command(name='hide', aliases=['unhide'])
     @commands.has_any_role(config.moderator, config.eh)
@@ -146,8 +194,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
             try:
-                await user.send(utils.format_pundm('ban', reason, ctx.author))
-            except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
+                await user.send(tools.format_pundm('ban', reason, ctx.author))
+
+            except (discord.Forbidden, AttributeError):
                 pass
 
             try:
@@ -161,11 +210,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 failedBans += 1
                 continue
 
-            docID = await utils.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
-            await utils.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, username=username, userid=userid, moderator=ctx.author, public=True)
+            docID = await tools.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            await tools.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, username=username, userid=userid, moderator=ctx.author, public=True)
             banCount += 1
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         if len(users) == 1:
@@ -196,10 +245,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
-        docID = await utils.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
+        docID = await tools.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
         await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, username=str(user), userid=user, moderator=ctx.author, public=True)
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        await tools.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, username=str(user), userid=user, moderator=ctx.author, public=True)
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {user} has been unbanned')
@@ -209,14 +258,19 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
         if len(reason) > 990: return await ctx.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters')
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+        await tools.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
         try:
-            await member.send(utils.format_pundm('kick', reason, ctx.author))
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
-        await member.kick(reason='Kick action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True)
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            await member.send(tools.format_pundm('kick', reason, ctx.author))
+
+        except (discord.Forbidden, AttributeError):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them about this action')
+
+            await member.kick(reason='Kick action performed by moderator')
+            return
+
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
@@ -232,28 +286,37 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         muteRole = ctx.guild.get_role(config.mute)
         try:
-            _duration = utils.resolve_duration(duration)
-            if int(duration):
-                raise TypeError
+            _duration = tools.resolve_duration(duration)
+            try:
+                if int(duration):
+                    raise TypeError
+
+            except ValueError:
+                pass
 
         except (KeyError, TypeError):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
-        except ValueError:
-            pass
-
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.add_roles(muteRole, reason='Mute action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'mute', docID, reason, user=member, moderator=ctx.author, expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({utils.humanize_duration(_duration)})', public=True)
+        await tools.send_modlog(self.bot, self.modLogs, 'mute', docID, reason, user=member, moderator=ctx.author, expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({tools.humanize_duration(_duration)})', public=True)
         try:
-            await member.send(utils.format_pundm('mute', reason, ctx.author, utils.humanize_duration(_duration)))
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
+            await member.send(tools.format_pundm('mute', reason, ctx.author, tools.humanize_duration(_duration)))
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+        except (discord.Forbidden, AttributeError):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them about this action')
+
+        else:
+            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted')
+
+        twelveHr = 60 * 60 * 12
+        expireTime = time.mktime(_duration.timetuple())
+        logging.info(f'using {expireTime}')
+        tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
+        self.taskHandles.append(self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
-
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully muted')
 
     @commands.command(name='unmute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -268,350 +331,208 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if not action:
             return await ctx.send(f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted')
 
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
         await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
-        await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True)
+        await tools.send_modlog(self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True)
+
         try:
-            await member.send(utils.format_pundm('unmute', reason, ctx.author))
+            await member.send(tools.format_pundm('unmute', reason, ctx.author))
 
-        except (discord.Forbidden, AttributeError): # User has DMs off, or cannot send to Obj
-            pass
+        except (discord.Forbidden, AttributeError):
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them about this action')
 
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+            return
+
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
 
-    @commands.group(name='warn', invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _warning(self, ctx, member: discord.Member, *, reason):
-        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
-        db = mclient.bowser.puns
-        warnLevel = 0
-        tierLevel = {
-            0: ctx.guild.get_role(config.warnTier1),
-            1: ctx.guild.get_role(config.warnTier2),
-            2: ctx.guild.get_role(config.warnTier3)
-        }
-
-        puns = db.find_one({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-        _warnType = 'warn'
-        if puns: # Active punishments, give tier 2/3
-            if puns['type'] == 'tier3':
-                return await ctx.send(f'{config.redTick} That user is already warn tier 3')
-
-            _warnType = 'warnup'
-            db.update_one({'_id': puns['_id']}, {'$set': {
-                'active': False
-            }})
-            warnLevel = 2 if puns['type'] == 'tier2' else 1
-
-        embedWarnType = ''
-        if _warnType == 'warnup':
-            embedWarnType = f'was Tier {warnLevel}'
-
-        for role in member.roles:
-            if role in [tierLevel[0], tierLevel[1], tierLevel[2]]:
-                await member.remove_roles(role, reason='Warn action performed by moderator')
-
-        await member.add_roles(tierLevel[warnLevel], reason='Warn action performed by moderator')
-        docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{warnLevel + 1}', reason, int(utils.resolve_duration('30d').timestamp()))
-        await utils.send_modlog(self.bot, self.modLogs, f'tier{warnLevel+1}', docID, reason, user=member, moderator=ctx.author, extra_author=embedWarnType, public=True)
-        try:
-            await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {warnLevel + 1}'))
-        except discord.Forbidden: # User has DMs off
-            pass
-
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        depre = discord.Embed(title='⚠️', description='The warning system is depreciated and will soon be superceded by strikes. [Click here for more info](https://canary.discordapp.com/channels/238080556708003851/238081192019099650/797315679048564768)')
-        await ctx.send(f'{config.greenTick} {str(member)} ({member.id}) has been successfully warned; they are now tier {warnLevel + 1}', embed=depre)
-
-    @_warning.command(name='clear')
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _warning_clear(self, ctx, member: discord.Member, *, reason):
-        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn clear reason is too long, reduce it by at least {len(reason) - 990} characters')
-        db = mclient.bowser.puns
-        tierLevel = {
-            1: ctx.guild.get_role(config.warnTier1),
-            2: ctx.guild.get_role(config.warnTier2),
-            3: ctx.guild.get_role(config.warnTier3)
-        }
-        puns = db.find({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-
-        if not puns.count():
-            return await ctx.send(f'{config.redTick} That user has no active warnings')
-
-        for x in puns:
-            db.update_one({'_id': x['_id']}, {'$set': {
-                'active': False
-            }})
-            tierInt = int(x['type'][-1:])
-            await member.remove_roles(tierLevel[tierInt])
-
-        docID = await utils.issue_pun(member.id, ctx.author.id, 'clear', reason, active=False)
-        await utils.send_modlog(self.bot, self.modLogs, f'clear', docID, reason, user=member, moderator=ctx.author, public=True)
-        try:
-            await member.send(utils.format_pundm('warnclear', reason, ctx.author))
-        except discord.Forbidden: # User has DMs off
-            pass
-
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        depre = discord.Embed(title='⚠️', description='The warning system is depreciated and will soon be superceded by strikes. [Click here for more info](https://canary.discordapp.com/channels/238080556708003851/238081192019099650/797315679048564768)')
-        await ctx.send(f'{config.greenTick} Warnings have been marked as inactive for {member} ({member.id})', embed=depre)
-
-    @_warning.command(name='level')
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _warning_setlevel(self, ctx, member: discord.Member, tier: int, *, reason):
-        if len(reason) > 990: return await ctx.send(f'{config.redTick} Warn reason is too long, reduce it by at least {len(reason) - 990} characters')
-        if tier not in [1, 2, 3]:
-            return await ctx.send(f'{config.redTick} Invalid tier number provided')
-    
-        db = mclient.bowser.puns
-        tierLevel = {
-            1: ctx.guild.get_role(config.warnTier1),
-            2: ctx.guild.get_role(config.warnTier2),
-            3: ctx.guild.get_role(config.warnTier3)
-        }
-        embedColor = {
-            1: discord.Color(0xFFFA1C),
-            2: discord.Color(0xFF9000),
-            3: discord.Color(0xD0021B)
-        }
-        warnText = {
-            1: 'First warning',
-            2: 'Second warning',
-            3: 'Third warning'
-        }
-
-        puns = db.find({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-        _warnType = 'warn'
-        oldTierInt = 0
-        if puns:
-            for x in puns:
-                if oldTierInt == tier:
-                    return await ctx.send(f'{config.redTick} User is already warned at that tier')
-
-                db.update_one({'_id': x['_id']}, {'$set': {
-                    'active': False
-                }})
-                oldTierInt = int(x['type'][-1:])
-
-                await member.remove_roles(tierLevel[oldTierInt])
-                if oldTierInt > tier:
-                    _warnType = 'warndown'
-
-                else:
-                    _warnType = 'warnup'
-
-        embedWarnType = ''
-        if _warnType in ['warnup', 'warndown']:
-            embedWarnType = f'was Tier {oldTierInt}'
-
-        await member.add_roles(tierLevel[tier])
-        docID = await utils.issue_pun(member.id, ctx.author.id, f'tier{tier}', reason, int(utils.resolve_duration('30d').timestamp()), context='level_set')
-        await utils.send_modlog(self.bot, self.modLogs, f'tier{tier}', docID, reason, user=member, moderator=ctx.author, extra_author=embedWarnType, public=True)
-        try:
-            await member.send(utils.format_pundm(_warnType, reason, ctx.author, f'tier {tier}'))
-        except discord.Forbidden: # User has DMs off
-            pass
-
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        depre = discord.Embed(title='⚠️', description='The warning system is depreciated and will soon be superceded by strikes. [Click here for more info](https://canary.discordapp.com/channels/238080556708003851/238081192019099650/797315679048564768)')
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully warned; they are now tier {tier}', embed=depre)
-
-    @_warning.command(name='review')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _warning_review(self, ctx, member: discord.Member):
-        db = mclient.bowser.puns
-        warnPun = db.find_one({'user': member.id, 'active': True, 'type': {
-                    '$in': [
-                        'tier1',
-                        'tier2',
-                        'tier3'
-                    ]
-                }
-            }
-        )
-
-        if not warnPun:
-            return await ctx.send(f'{config.redTick} No warnings are currently active for {str(member)} ({member.id})')
-
-        issueTime = datetime.datetime.utcfromtimestamp(warnPun['timestamp']).strftime('%B %d, %Y %H:%M:%S UTC')
-
-        embed = discord.Embed(title="Warning review", colour=discord.Color(0xea4345), description="To change the status of the warning, react with the following emoji. You must react to make a choice.\n\n:track_next: Re-review in 30 days\n:fast_forward: Re-review in 14 days\n:arrow_forward: Re-review in 7 days\n:small_red_triangle_down: Reduce warn tier (or remove if tier1)\n:octagonal_sign: Make warning permanent", timestamp=utils.resolve_duration('15m'))
-        embed.set_thumbnail(url=member.avatar_url)
-        embed.set_author(name=f"{member} ({member.id})")
-        embed.set_footer(text="This message will expire in 15 minutes")
-        embed.add_field(name="Warning details", value=f'**Type:** {config.punStrs[warnPun["type"]]}\n**Issued by:** <@{warnPun["moderator"]}>\n**Issued at:** {issueTime}\n**Reason**: {warnPun["reason"]}')
-
-        resp = await ctx.send(embed=embed)
-        await resp.add_reaction(config.nextTrack) # track_next
-        await resp.add_reaction(config.fastForward) # fast_forward
-        await resp.add_reaction(config.playButton) # arrow_forward
-        await resp.add_reaction(config.downTriangle) # small_red_triangle_down
-        await resp.add_reaction(config.stopSign) # octagonal_sign
-
-        metaReactions = {
-            config.nextTrack: 0,
-            config.fastForward: 0,
-            config.playButton: 0,
-            config.downTriangle: 0,
-            config.stopSign: 0
-        }
-        tierLevel = {
-            'tier1': ctx.guild.get_role(config.warnTier1),
-            'tier2': ctx.guild.get_role(config.warnTier2),
-            'tier3': ctx.guild.get_role(config.warnTier3)
-        }
-        renew = False
-        perm = False
-
-        def check(reaction, user):
-            if user.bot:
-                return False
-            #print(reaction.emoji)
-
-            if ctx.guild.get_role(config.moderator) in user.roles and str(reaction.emoji) in [config.nextTrack, config.fastForward, config.playButton, config.downTriangle, config.stopSign]:
-                metaReactions[str(reaction.emoji)] += 1
-                #print(metaReactions)
-                if metaReactions[str(reaction.emoji)] >= 1:
-                    return True
-
-            else:
-                return False
-
-        try:
-            reaction = await self.bot.wait_for('reaction_add', timeout=900.0, check=check)
-            #print(reaction[0])
-            emoji = str(reaction[0])
-
-            if emoji == config.nextTrack:
-                renew = utils.resolve_duration('30d')
-
-            elif emoji == config.fastForward:
-                renew = utils.resolve_duration('2w')
-
-            elif emoji == config.playButton:
-                renew = utils.resolve_duration('1w')
-
-            elif emoji == config.stopSign:
-                renew = True
-                perm = True
-
-            if not renew:
-                if warnPun['type'] == 'tier1':
-                    await member.remove_roles(tierLevel[warnPun['type']])
-                    db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}})
-                    try:
-                        await member.send(utils.format_pundm('warnclear', 'A moderator has reviewed your warning', None, auto=True))
-
-                    except (discord.Forbidden, discord.HTTPException):
-                        pass
-
-                    # Because this does not generate a pun document, this will not be pushed to the pub modlog due to strike overhaul soon
-                    embed = discord.Embed(color=0x18EE1C, timestamp=datetime.datetime.utcnow())
-                    embed.set_author(name=f'Warning reduced | {member} ({member.id})')
-                    embed.set_footer(text=warnPun['_id'])
-                    embed.add_field(name='User', value=member.mention, inline=True)
-                    embed.add_field(name='New tier', value='\*No longer under a warning*', inline=True) # pylint: disable=anomalous-backslash-in-string
-                    embed.add_field(name='Moderator', value=ctx.author.mention, inline=False)
-                    embed.add_field(name='Reason', value='Moderator decision to reduce level', inline=True)
-                    await self.modLogs.send(embed=embed)
-                    await resp.delete()
-                    return await ctx.send(f'{config.greenTick} Warning review complete for {member} ({member.id}). Will be reduced one tier')
-
-                else:
-                    await member.remove_roles(tierLevel[warnPun['type']])
-                    newTier = 'tier1' if warnPun['type'] == 'tier2' else 'tier2' # If tier2, make it tier1 else tier3 make it tier2
-                    await member.add_roles(tierLevel[newTier])
-
-                    db.update_one({'_id': warnPun['_id']}, {'$set': {'active': False}}) # Mark old warn as inactive and resubmit new warn tier
-                    convertStr = f'(T{int(newTier[-1]) + 1}->T{newTier[-1]}) ' # Example return: "(T3->T2) "
-                    docID = await utils.issue_pun(member.id, ctx.author.id, newTier, convertStr + warnPun['reason'], int(utils.resolve_duration('30d').timestamp()), context='vote')
-                    await utils.send_modlog(self.bot, self.modLogs, newTier, docID, 'Warning tier decayed', user=member, moderator=ctx.author, extra_author=convertStr[1:-2], public=True)
-
-                    try:
-                        await member.send(utils.format_pundm('warndown', 'A moderator has reviewed your warning', None, newTier, True))
-
-                    except (discord.Forbidden, discord.HTTPException):
-                        pass
-
-                    await resp.delete()
-                    return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be reduced one tier')
-
-            elif renew and perm:
-                db.update_one({'_id': warnPun['_id']}, {'$set': {'expiry': None}})
-
-                embed = discord.Embed(color=0xD0021B, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Warning made permanent | {member} ({member.id})')
-                embed.set_footer(text=warnPun['_id'])
-                embed.add_field(name='User', value=member.mention, inline=True)
-                embed.add_field(name='Reason', value='Moderator decision to make warning permanent')
-                await self.modLogs.send(embed=embed)
-                await resp.delete()
-                return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be made permanent; no further warning review reminders will be sent.')
-
-            else:
-                db.update_one({'_id': warnPun['_id']}, {'$set': {'expiry': int(renew.timestamp())}})
-                await resp.delete()
-                return await ctx.send(f'{config.greenTick} Warning review complete for {str(member)} ({member.id}). Will be delayed {utils.humanize_duration(renew)}')
-
-        except asyncio.TimeoutError:
-            await resp.delete()
-            return await ctx.send(content=f'{config.redTick} Command timed out. Rerun to continue.')
-
     @commands.has_any_role(config.moderator, config.eh)
     @commands.command(name='note')
-    async def _note(self, ctx, user: discord.User, *, content):
-        if len(content) > 900: return await ctx.send(f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters')
-        await utils.issue_pun(user.id, ctx.author.id, 'note', content, active=False, public=False)
-        if await utils.mod_cmd_invoke_delete(ctx.channel):
+    async def _note(self, ctx, user: ResolveUser, *, content):
+        userid = user if (type(user) is int) else user.id
+
+        if len(content) > 900:
+            return await ctx.send(f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters')
+
+        await tools.issue_pun(userid, ctx.author.id, 'note', content, active=False, public=False)
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
 
+    @commands.group(name='warn', invoke_without_command=True)
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _warning(self, ctx):
+        await ctx.send(':warning: Warns are depreciated. Please use the strike system instead (`!help strike`)')
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @commands.group(name='strike', invoke_without_command=True)
+    async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
+        if count == 0:
+            return await ctx.send(f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `{ctx.prefix}strike set`')
+
+        if len(reason) > 990: return await ctx.send(f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters')
+        punDB = mclient.bowser.puns
+        userDB = mclient.bowser.users
+
+        activeStrikes = 0
+        for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
+            activeStrikes += pun['active_strike_count']
+
+        if activeStrikes + count > 16: # Max of 16 active strikes
+            return await ctx.send(f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes + count - 16} or consider banning the user instead')
+
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
+        userDB.update_one({'_id': member.id}, {'$set': {
+            'strike_check': time.time() + (60 * 60 * 24 * 7) # 7 days
+        }})
+
+        self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))) # Check in 12 hours, prevents time drifting
+        await tools.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, extra_author=count, public=True)
+        try:
+            await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
+
+        except discord.Forbidden:
+            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck. I was not able to DM them about this action')
+
+            return
+
+        if await tools.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck')
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @_strike.command(name='set')
+    async def _strike_set(self, ctx, member: discord.Member, count: StrikeRange, *, reason):
+        punDB = mclient.bowser.puns
+        activeStrikes = 0
+        puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True})
+        for pun in puns:
+            activeStrikes += pun['active_strike_count']
+
+        if activeStrikes == count:
+            return await ctx.send(f'{config.redTick} That user already has {activeStrikes} active strikes')
+
+        elif count > activeStrikes: # This is going to be a positive diff, lets just do the math and defer work to _strike()
+            return await self._strike(ctx, member, count - activeStrikes, reason=reason)
+
+        else: # Negative diff, we will need to reduce our strikes
+            diff = activeStrikes - count
+
+            puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
+            for pun in puns:
+                if pun['active_strike_count'] - diff >= 0:
+                    userDB = mclient.bowser.users
+                    punDB.update_one({'_id': pun['_id']}, {'$set':
+                    {
+                        'active_strike_count': pun['active_strike_count'] - diff,
+                        'active': pun['active_strike_count'] - diff > 0
+                    }})
+                    userDB.update_one({'_id': member.id}, {'$set': {
+                        'strike_check': time.time() + (60 * 60 * 24 * 7)
+                    }})
+                    self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(pun['_id'], ctx.guild.id))) # Check in 12 hours, prevents time drifting
+                    diff -= (pun['active_strike_count'] - diff)
+                    break
+
+                elif pun['active_strike_count'] - diff < 0:
+                    punDB.update_one({'_id': pun['_id']}, {'$set':
+                    {
+                        'active_strike_count': 0,
+                        'active': False
+                    }})
+                    diff -= pun['active_strike_count']
+
+            if diff != 0: # Something has gone horribly wrong
+                raise ValueError('Diff != 0 after full iteration')
+
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count)
+            await tools.send_modlog(self.bot, self.modLogs, 'destrike', docID, reason, user=member, moderator=ctx.author, extra_author=(activeStrikes - count), public=True)
+            try:
+                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
+
+            except discord.Forbidden:
+                if not await tools.mod_cmd_invoke_delete(ctx.channel):
+                    await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. I was not able to DM them about this action')
+
+                return
+
+            if await tools.mod_cmd_invoke_delete(ctx.channel):
+                return await ctx.message.delete()
+
+            await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed')
+
+    @commands.is_owner()
+    @commands.command()
+    async def migratewarns(self, ctx):
+        """
+        Temporary command for debugging and migration. To be removed upon full migration completion.
+        """
+        db = mclient.bowser.puns
+        userDB = mclient.bowser.users
+        loop = self.bot.loop
+        punCount = db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}})
+        if not punCount > 0:
+            return await ctx.send('nothing to do!')
+
+        failures = 0
+        for doc in db.find({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}}):
+            strikeCount = int(doc['type'][-1:]) * 4
+            try:
+                member = await ctx.guild.fetch_member(doc['user'])
+
+            except discord.NotFound:
+                userDB.update_one({'_id': doc['user']}, {'$set': {'migrate_unnotified': True}}) # Set flag for on_member_join to instruct of new system should they return
+                continue # TODO: handle this in core
+
+            db.update_one({'_id': doc['_id']}, {'$set': {'active': False}})
+            docID = await tools.issue_pun(doc['user'], self.bot.user.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
+            self.taskHandles.append(loop.call_later(5, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
+            userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
+
+            explanation = ('Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
+                'The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n'
+                '* Your warning level will be converted to **{}** strikes.\n'
+                '* __Your strikes will decay at a equivalent as warnings previously did__. Each warning tier is equivalent to four strikes*, where* one strike decays per week instead of one warn level per four weeks\n'
+                '* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
+                'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. You may also now view your infraction history '
+                'by using the `!history` command in <#{}>. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.').format(
+                str(member), # Username
+                doc['type'][-1:], # Tier type
+                datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), # Date of warn
+                strikeCount, # How many strikes will replace tier,
+                config.commandsChannel, # Commands channel can only be used for the command
+                config.parakarry # Parakarry mention for DM
+            )
+
+            try:
+                await member.send(explanation)
+
+            except discord.Forbidden:
+                failures += 1
+                continue
+
+            except discord.HTTPException as e:
+                failures += 1
+                logging.error(f'[Warn Migration] Failed to migrate {member.id}, {e}')
+                continue
+
+        await ctx.send(f'Completed action. Unable to notify {failures} users')
+
     @_banning.error
     @_unbanning.error
     @_kicking.error
+    @_strike.error
+    @_strike_set.error
     @_muting.error
     @_unmuting.error
     @_warning.error
-    @_warning_clear.error
-    @_warning_setlevel.error
-    @_warning_review.error
+    @_strike.error
     @_note.error
     @_hide_modlog.error
     async def mod_error(self, ctx, error):
@@ -629,126 +550,92 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
             raise error
 
-class LoopTasks(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.NS = self.bot.get_guild(config.nintendoswitch)
-        self.modLogs = self.bot.get_channel(config.modChannel)
-        self.adminChannel = self.bot.get_channel(config.adminChannel)
-        self.expiryWarnNotified = {}
-        self.roles = {
-            'tier1': self.NS.get_role(config.warnTier1),
-            'tier2': self.NS.get_role(config.warnTier2),
-            'tier3': self.NS.get_role(config.warnTier3),
-            'mute': self.NS.get_role(config.mute)
-        }
-        self.expiry_check.start() #pylint: disable=no-member
-        self.expiry_check.add_exception_type(discord.errors.DiscordServerError) #pylint: disable=no-member
-        logging.info('[Cog] Moderation tasks cog loaded')
-
-    def cog_unload(self):
-        logging.info('[Cog] Attempting to stop task expiry_check...')
-        self.expiry_check.stop() #pylint: disable=no-member
-        logging.info('[Cog] Task expiry_check exited')
-        logging.info('[Cog] Moderation tasks cog unloaded')
-
-    @tasks.loop(seconds=30)
-    async def expiry_check(self):
-        logging.debug('[Moderation] Starting expiry check')
+    async def expire_actions(self, _id, guild):
         db = mclient.bowser.puns
-        activePuns = db.find({'active': True, 'expiry': {'$ne': None}})
-        if not activePuns.count():
-            #logging.info('[Moderation] No active puns to cycle through')
+        doc = db.find_one({'_id': _id})
+        if not doc:
+            logging.error(f'[Moderation] Expiry failed. Doc {_id} does not exist!')
             return
-        #print(f'{activePuns.count()}')
 
-        warns = ['tier1', 'tier2', 'tier3']
-        for pun in activePuns:
-            await asyncio.sleep(0.01) # Give some breathing room to the rest of the thread as this is more long running
-            #print('processing pun')
+        # Lets do a sanity check.
+        if not doc['active']:
+            logging.debug(f'[Moderation] Expiry failed. Doc {_id} is not active but was scheduled to expire!')
+            return
+
+        twelveHr = 60 * 60 * 12
+        if doc['type'] == 'strike':
+            userDB = mclient.bowser.users
+            user = userDB.find_one({'_id': doc['user']})
             try:
-                member = await self.NS.fetch_member(pun['user'])
+                if user['strike_check'] > time.time():
+                    # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
+                    retryTime = twelveHr if user['strike_check'] - time.time() > twelveHr else user['strike_check'] - time.time()
+                    self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
+                    return
 
-            except discord.NotFound: # User not in guild
-                continue
+            except KeyError: # This is a rare edge case, but if a pun is manually created the user may not have the flag yet. More a dev handler than not
+                logging.error(f'[Moderation] Expiry failed. Could not get strike_check from db.users resolving for pun {_id}, was it manually added?')
 
+            # Start logic
+            if doc['active_strike_count'] - 1 == 0:
+                db.update_one({'_id': doc['_id']}, {'$set': {'active': False}, '$inc': {'active_strike_count': -1}})
+                strikes = [x for x in db.find({'user': doc['user'], 'type': 'strike', 'active': True}).sort('timestamp', 1)]
+                if not strikes: # Last active strike expired, no additional
+                    return
+
+                self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(strikes[0]['_id'], guild)))
+
+            elif doc['active_strike_count'] > 0:
+                db.update_one({'_id': doc['_id']}, {'$inc': {'active_strike_count': -1}})
+                self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(doc['_id'], guild)))
+
+            else:
+                logging.warning(f'[Moderation] Expiry failed. Doc {_id} had a negative active strike count and was skipped')
+                return
+
+            userDB.update_one({'_id': doc['user']}, {'$set': {'strike_check': time.time() + 60 * 60 * 24 * 7}})
+
+        elif doc['type'] == 'mute' and doc['expiry']: # A mute that has an expiry
+            # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
+            if doc['expiry'] > time.time():
+                retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
+                self.taskHandles.append(self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild)))
+                return
+
+            punGuild = self.bot.get_guild(guild)
             try:
-                moderator = await self.NS.fetch_member(pun['moderator'])
+                member = await punGuild.fetch_member(doc['user'])
 
-            except:
-                logging.debug(f'[expiry_check] Moderator not in server for pun {pun["_id"]}, fetching instead')
-                moderator = await self.bot.fetch_user(pun['moderator'])
+            except discord.NotFound:
+                # User has left the server after the mute was issued. Lets just move on and let on_member_join handle on return
+                return
 
-            if pun['type'] == 'mute' and pun['expiry']: # A mute that has an expiry, for member in currently in guild
-                if int(time.time()) < pun['expiry']: continue # Has not expired yet
+            except discord.HTTPException:
+                # Issue with API, lets just try again later in 30 seconds
+                self.taskHandles.append(self.bot.loop.call_later(30, asyncio.create_task, self.expire_actions(_id, guild)))
+                return
 
-                newPun = db.find_one_and_update({'_id': pun['_id']}, {'$set': {
-                    'active': False
-                }})
-                docID = await utils.issue_pun(member.id, self.bot.user.id, 'unmute', 'Mute expired', active=False, context=pun['_id'])
+            newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {
+                'active': False
+            }})
+            docID = await tools.issue_pun(doc['user'], self.bot.user.id, 'unmute', 'Mute expired', active=False, context=doc['_id'])
 
-                if not newPun: # There is near zero reason this would ever hit, but in case...
-                    logging.error(f'[expiry_check] Database failed to update user on pun expiration of {pun["_id"]}')
-                    continue
+            if not newPun: # There is near zero reason this would ever hit, but in case...
+                logging.error(f'[Moderation] Expiry failed. Database failed to update user on pun expiration of {doc["_id"]}')
 
-                await member.remove_roles(self.roles[pun['type']])
-                try:
-                     await member.send(utils.format_pundm('unmute', 'Mute expired', None, auto=True))
+            await member.remove_roles(self.roles[doc['type']])
+            try:
+                await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
 
-                except discord.Forbidden: # User has DMs off
-                    pass
+            except discord.Forbidden: # User has DMs off
+                pass
 
-                await utils.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
-
-            elif pun['type'] in warns and member:
-                if int(time.time()) < (pun['expiry']):
-                    #print('warn not review ready')
-                    continue
-
-                if pun['_id'] in self.expiryWarnNotified.keys():
-                    if time.time() <= self.expiryWarnNotified[pun['_id']] + (60 * 60 * 24): # Only send one review message every 24 hours max
-                        #print('warn already notified')
-                        continue
-
-                punsCol = db.find({'user': member.id})
-                puns = 0
-                punishments = ''
-                for n in punsCol.sort('timestamp',pymongo.DESCENDING):
-                    if puns >= 5:
-                        break
-
-                    puns += 1
-                    stamp = datetime.datetime.utcfromtimestamp(n['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
-                    punType = config.punStrs[n['type']]
-                    if n['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
-                        punishments += f'- [{stamp}] {punType}\n'
-
-                    else:
-                        punishments += f'+ [{stamp}] {punType}\n'
-
-                punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
-                    f'For a full history, use `!history {member.id}`' \
-                    f'\n```diff\n{punishments}```'
-                issueDate = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y')
-                description = f"A warning for <@{pun['user']}> was issued over **30 days ago** ({issueDate}) and is now due for moderator review. This can either be __postponed__ to be re-reviewed at a later date or __reduced__ to the tier directly below (removed in the case of tier 1).\n\n**Infraction ID:** __{pun['_id']}__"
-
-                embed = discord.Embed(title="Warning due for staff review", colour=discord.Color(0xddbe2d), description=description, timestamp=datetime.datetime.utcfromtimestamp(pun['timestamp']))
-                embed.set_thumbnail(url=member.avatar_url)
-                embed.set_author(name=f"{member} ({member.id})", icon_url=member.avatar_url)
-                embed.add_field(name="Responsible moderator", value=f"{str(moderator)} ({moderator.id})", inline=True)
-                embed.add_field(name="Reason", value=pun['reason'], inline=True)
-                embed.add_field(name="Previous punishments", value=punishments, inline=False)
-                embed.add_field(name="Making a decision", value=f"An action is required for this review. Please use the `!warn review {member.id}` command to proceed", inline=False)
-
-                await self.adminChannel.send(content=":warning::alarm_clock:", embed=embed)
-                self.expiryWarnNotified[pun['_id']] = time.time()
+            await tools.send_modlog(self.bot, self.modLogs, 'unmute', docID, 'Mute expired', user=member, moderator=self.bot.user, public=True)
 
 def setup(bot):
     bot.add_cog(Moderation(bot))
-    bot.add_cog(LoopTasks(bot))
     logging.info('[Extension] Moderation module loaded')
 
 def teardown(bot):
     bot.remove_cog('Moderation')
-    bot.remove_cog('LoopTasks')
     logging.info('[Extension] Moderation module unloaded')

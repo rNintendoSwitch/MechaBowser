@@ -11,7 +11,7 @@ import discord
 from discord.ext import commands, tasks
 
 import config
-import utils
+import tools
 
 startTime = int(time.time())
 mclient = pymongo.MongoClient(
@@ -26,7 +26,7 @@ class MainEvents(commands.Cog):
         self.private_modules_loaded = False
 
         try:
-            self.bot.load_extension('utils')
+            self.bot.load_extension('tools')
             self.bot.load_extension('modules.moderation')
             self.bot.load_extension('modules.utility')
             self.bot.load_extension('modules.statistics')
@@ -103,7 +103,7 @@ class MainEvents(commands.Cog):
         restored = False
 
         if not doc:
-            await utils.store_user(member)
+            await tools.store_user(member)
 
         else:
             db.update_one({'_id': member.id}, {'$push': {'joins': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
@@ -115,7 +115,7 @@ class MainEvents(commands.Cog):
         embed = discord.Embed(color=0x417505, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
         created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
-        created_at += '' if not new else '\n' + utils.humanize_duration(member.created_at)
+        created_at += '' if not new else '\n' + tools.humanize_duration(member.created_at)
         embed.add_field(name='Created at', value=created_at)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
 
@@ -153,6 +153,13 @@ class MainEvents(commands.Cog):
 
                     elif x['type'] in ['kick', 'ban']:
                         continue # These are not punishments being "restored", instead only status is being tracked
+
+                    elif x['type'] == 'mute':
+                        if x['expiry'] < time.time(): # If the member is rejoining after mute has expired, the task has already quit. Restart it
+                            mod = self.bot.get_cog('Moderation Commands')
+                            await mod.expire_actions(x['_id'], member.guild.id)
+
+                        restoredPuns.append(punTypes[x['type']])
 
                     else:
                         restoredPuns.append(punTypes[x['type']])
@@ -218,9 +225,9 @@ class MainEvents(commands.Cog):
 
             if audited:
                 reason = '-No reason specified-' if not audited.reason else audited.reason
-                docID = await utils.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
+                docID = await tools.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 
-                await utils.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, user=user, moderator=audited.user, public=True)
+                await tools.send_modlog(self.bot, self.modLogs, 'ban', docID, reason, user=user, moderator=audited.user, public=True)
 
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
@@ -244,12 +251,12 @@ class MainEvents(commands.Cog):
 
             if audited:
                 reason = '-No reason specified-' if not audited.reason else audited.reason
-                docID = await utils.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
+                docID = await tools.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
                 db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set':{
                     'active': False
                 }})
 
-                await utils.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, user=user, moderator=audited.user, public=True)
+                await tools.send_modlog(self.bot, self.modLogs, 'unban', docID, reason, user=user, moderator=audited.user, public=True)
 
         embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
@@ -296,7 +303,7 @@ class MainEvents(commands.Cog):
                 if messages[0].id in x['messages']:
                     return
 
-        archiveID = await utils.message_archive(messages)
+        archiveID = await tools.message_archive(messages)
 
         #log = f':printer: New message archive has been generated, view it at {config.baseUrl}/archive/{archiveID}'
         embed = discord.Embed(description=f'Archive URL: {config.baseUrl}/logs/{archiveID}', color=0xF5A623, timestamp=datetime.datetime.utcnow())
@@ -357,7 +364,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='After', value=after.content, inline=False)
 
         else:
-            embed = discord.Embed(description=f'[Jump to message]({before.jump_url})\nMessage diff exceeds character limit, view at {config.baseUrl}/logs/{await utils.message_archive([before, after], True)}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
+            embed = discord.Embed(description=f'[Jump to message]({before.jump_url})\nMessage diff exceeds character limit, view at {config.baseUrl}/logs/{await tools.message_archive([before, after], True)}', color=0xF8E71C, timestamp=datetime.datetime.utcnow())
         
         embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar_url)
         embed.add_field(name='Mention', value=f'<@{before.author.id}>')
@@ -493,7 +500,7 @@ class MainEvents(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException):
                     await ctx.send(f'Failed to syncronize <#{channel.id}>')
 
-            timeToComplete = utils.humanize_duration(utils.resolve_duration(f'{int(time.time() - funcStart)}s'))
+            timeToComplete = tools.humanize_duration(tools.resolve_duration(f'{int(time.time() - funcStart)}s'))
             return await ctx.send(f'<@{ctx.author.id}> Syncronization completed. Took {timeToComplete}')
 
         else:
@@ -504,7 +511,7 @@ class MainEvents(commands.Cog):
     async def _pundb(self, ctx, _type, user, moderator, strTime, active: typing.Optional[bool], *, reason='-No reason specified-'):
         date = datetime.datetime.strptime(strTime, '%m/%d/%y')
         expiry = None if not active else int(date.timestamp() + (60 * 60 * 24 * 30))
-        await utils.issue_pun(int(user), int(moderator), _type, reason, expiry, active, 'old', date.timestamp())
+        await tools.issue_pun(int(user), int(moderator), _type, reason, expiry, active, 'old', date.timestamp())
         await ctx.send(f'{config.greenTick} Done')
 
     @commands.command(name='shutdown')

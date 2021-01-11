@@ -8,7 +8,7 @@ from discord.ext import commands
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
-import utils
+import tools
 
 try:
     import config
@@ -49,7 +49,7 @@ class BotCache(commands.Cog):
                 logging.debug(f'[Cache] Syncronizing user {userCount}/{guildCount}')
                 doc = db.find_one({'_id': member.id})
                 if not doc:
-                    await utils.store_user(member)
+                    await tools.store_user(member)
                     continue
 
                 roleList = []
