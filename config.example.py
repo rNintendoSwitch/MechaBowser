@@ -106,18 +106,14 @@ punStrs = {
 }
 
 punColors = {
-    'strike': 0xEDC605,
-    'destrike': 0xED7E05,
-    'tier1': 0xFFFA1C,
-    'tier2': 0xFF9000,
-    'tier3': 0xD0021B,
-    'mute': 0xB4A6EF,
-    'unmute': 0x4A90E2,
-    'clear': 0x18EE1C,
-    'kick': 0xD18407,
-    'ban': 0xD0021B,
-    'unban': 0x4A90E2,
-    'blacklist': 0xF5A623,
-    'unblacklist': 0xF5A623,
-    'appealdeny': 0x4A90E2
+    'strike': 0xFF9C8F,
+    'destrike': 0xFFCB8F,
+    'mute': 0x3680A4,
+    'unmute': 0x39C05D,
+    'kick': 0xFFBA6B,
+    'ban': 0xFF614C,
+    'unban': 0xFFAC4C,
+    'blacklist': 0x7EBBD9,
+    'unblacklist': 0x80E59A,
+    'appealdeny': 0xFF7C6B
 }
