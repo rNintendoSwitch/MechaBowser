@@ -292,15 +292,26 @@ async def mod_cmd_invoke_delete(channel):
     else:
         return True
 
-async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author='', timestamp=None, public=False, delay=300):
+async def send_modlog(bot, channel, _type, footer, reason, user=None, username=None, userid=None, moderator=None, expires=None, extra_author=None, timestamp=None, public=False, delay=300):
     if user: # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
         userid = user.id
 
-    author = f'{config.punStrs[_type]} '
-    if extra_author:
-        author += f'({extra_author}) '
+    if _type == 'strike':
+        author = f'{extra_author} ' + config.punStrs[_type]
+        author += 's ' if extra_author > 1 else ' '
+
+    elif _type == 'destrike':
+        author = f'Removed {extra_author} ' + config.punStrs['strike']
+        author += 's ' if extra_author > 1 else ' '
+
+    else:
+        author = f'{config.punStrs[_type]} '
+        if extra_author:
+            author += f'({extra_author}) '
+
     author += f'| {username} ({userid})'
+
     if not timestamp:
         timestamp = datetime.datetime.utcnow()
 
@@ -331,11 +342,20 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
     if not doc:
         return
 
-    user = await bot.fetch_user(doc["user"])
+    user = await bot.fetch_user(doc['user'])
 
     author = f'{config.punStrs[doc["type"]]} '
     if doc['type'] == 'blacklist':
         author += f'({doc["context"]}) '
+
+    elif doc['type'] == 'strike':
+        author = f'{doc["strike_count"]} ' + config.punStrs[doc['type']]
+        author += 's ' if doc['strike_count'] > 1 else ' '
+
+    elif doc['type'] == 'destrike':
+        author = f'Removed {doc["strike_count"]} ' + config.punStrs['strike']
+        author += 's ' if doc['strike_count'] > 1 else ' '
+
     author += f'| {user} ({user.id})'
 
     embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.datetime.utcfromtimestamp(doc['timestamp']))
@@ -365,6 +385,7 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
 def format_pundm(_type, reason, moderator, details=None, auto=False):
     infoStrs = {
         'strike': f'You have received **{details} strike{"s" if (_type == "strike") and (details > 1) else ""}** on',
+        'destrike': f'Your **active strikes** have been reduced by **{details} strike{"s" if (_type == "destrike") and (details > 1) else ""}** on',
         'warn': f'You have been **warned (now {details})** on',
         'warnup': f'Your **warning level** has been **increased (now {details})** on',
         'warndown': f'Your **warning level** has been **decreased (now {details})** on',
