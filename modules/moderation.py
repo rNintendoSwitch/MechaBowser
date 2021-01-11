@@ -265,7 +265,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         except (discord.Forbidden, AttributeError):
             if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them of this action')
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them about this action')
 
             await member.kick(reason='Kick action performed by moderator')
             return
@@ -305,7 +305,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         except (discord.Forbidden, AttributeError):
             if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them of this action')
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them about this action')
 
         else:
             await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted')
@@ -340,7 +340,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         except (discord.Forbidden, AttributeError):
             if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them of this action')
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them about this action')
 
             return
 
@@ -397,7 +397,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         except discord.Forbidden:
             if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck. I was not able to DM them of this action')
+                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck. I was not able to DM them about this action')
 
             return
 
@@ -458,7 +458,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             except discord.Forbidden:
                 if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                    await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. I was not able to DM them of this action')
+                    await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. I was not able to DM them about this action')
 
                 return
 
@@ -495,7 +495,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             self.taskHandles.append(loop.call_later(5, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
             userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
 
-            explanation = """Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\nThe **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n\* Your warning level will be converted to **{}** strikes.\n\* __Your strikes will decay at the same rate as warnings previously did__. Each warning tier is the same as four strikes with one strike decaying per-week instead of one warn level per four weeks.\n\* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\nStrikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.""".format(
+            explanation = ('Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
+                'The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n'
+                '* Your warning level will be converted to **{}** strikes.\n'
+                '* __Your strikes will decay at a equivalent as warnings previously did__. Each warning tier is equivalent to four strikes*, where* one strike decays per week instead of one warn level per four weeks\n'
+                '* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
+                'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. Please feel free to send a modmail to '
+                '@Parakarry (<@{}>) if you have any questions or concerns.').format(
                 str(member), # Username
                 doc['type'][-1:], # Tier type
                 datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), # Date of warn
