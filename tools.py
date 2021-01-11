@@ -392,8 +392,8 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
         'warnclear': f'Your **warning** has been **cleared** on',
         'mute': f'You have been **muted ({details})** on',
         'unmute': f'Your **mute** has been **removed** on',
-        'blacklist': f'Your **posting permissions** have been **restricted** in {details} on',
-        'unblacklist': f'Your **posting permissions** have been **restored** in {details} on',
+        'blacklist': f'Your **{details} permissions** have been **restricted** on',
+        'unblacklist': f'Your **{details} permissions** have been **restored** on',
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on'

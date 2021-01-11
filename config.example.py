@@ -53,6 +53,8 @@ warnTier3 = int: warning tier 3
 mute = int: timeout
 noSpoilers = int: spoiler restricted
 noSuggestions = int: suggestion restricted
+noReactions = int: reaction restricted
+noEmbeds = int: attachments and embeds restricted
 noEvents = int: event restricted
 voiceTextAccess = int: voice chat
 

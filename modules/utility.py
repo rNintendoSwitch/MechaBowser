@@ -864,12 +864,37 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     users.update_one({'_id': member.id}, {'$set': {'modmail': True}})
                     statusText = 'Unblacklisted'
 
+            elif channel in ['reactions', 'reaction', 'react']:
+                context  = 'reaction'
+                mention = context
+                reactionsRole = ctx.guild.get_role(config.noReactions)
+                if reactionsRole in member.roles: # Toggle role off
+                    await member.remove_roles(reactionsRole)
+                    statusText = 'Unblacklisted'
+
+                else: # Toggle role on
+                    await member.add_roles(reactionsRole)
+                    statusText = 'Blacklisted'
+
+            elif channel in ['attach', 'attachments', 'embed', 'embeds']:
+                context  = 'attachment/embed'
+                mention = context
+                noEmbeds = ctx.guild.get_role(config.noEmbeds)
+                if noEmbeds in member.roles: # Toggle role off
+                    await member.remove_roles(noEmbeds)
+                    statusText = 'Unblacklisted'
+
+                else: # Toggle role on
+                    await member.add_roles(noEmbeds)
+                    statusText = 'Blacklisted'
+
             else:
                 return await ctx.send(f'{config.redTick} You cannot blacklist a user from that function')
 
+
         elif channel.id == config.suggestions:
             context = channel.name
-            mention = channel.mention
+            mention = channel.mention + ' channel'
             suggestionsRole = ctx.guild.get_role(config.noSuggestions)
             if suggestionsRole in member.roles: # Toggle role off
                 await member.remove_roles(suggestionsRole)
@@ -881,7 +906,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         elif channel.id == config.spoilers:
             context = channel.name
-            mention = channel.mention
+            mention = channel.mention + ' channel'
             spoilersRole = ctx.guild.get_role(config.noSpoilers)
             if spoilersRole in member.roles: # Toggle role off
                 await member.remove_roles(spoilersRole)
@@ -893,7 +918,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         elif channel.category_id == config.eventCat:
             context = 'events'
-            mention = context
+            mention = 'event'
             eventsRole = ctx.guild.get_role(config.noEvents)
             if eventsRole in member.roles: # Toggle role off
                 await member.remove_roles(eventsRole)
