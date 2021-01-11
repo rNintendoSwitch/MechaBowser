@@ -437,7 +437,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         'strike_check': time.time() + (60 * 60 * 24 * 7)
                     }})
                     self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(pun['_id'], ctx.guild.id))) # Check in 12 hours, prevents time drifting
-                    diff -= (pun['active_strike_count'] - diff)
+
+                    # Matt would like this to actually recalculate diff to double check, but thats enirely pointless because this logic would simplify to 0:
+                    # new_diff = diff - removed_strikes
+                    #          = diff - (old_strike_amount - new_strike_amount)
+                    #          = diff - (old_strike_amount - (old_strike_amount - diff))
+                    #          = diff - old_strike_amount + old_strike_amount - diff
+                    #          = 0
+                    diff = 0
                     break
 
                 elif pun['active_strike_count'] - diff < 0:
