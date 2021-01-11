@@ -7,8 +7,7 @@ the end user
 * Super Mario Maker 2 level sharing
 * Auto-filtering and reposting of sanitized affiliate links
 * Message archiving
-* Full warn tier system
-* Moderator review of old warnings automatically
+* Full strike system
 * A social system with user profile cards to facilitate users looking-for-group
 * Automatic posting of current eShop deals and eShop new-releases
 * Tag system to create and post pre-made messages
