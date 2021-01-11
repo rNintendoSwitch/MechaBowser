@@ -391,7 +391,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         }})
 
         self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))) # Check in 12 hours, prevents time drifting
-        await tools.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, public=True)
+        await tools.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, extra_author=count, public=True)
         try:
             await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
@@ -411,7 +411,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     async def _strike_set(self, ctx, member: discord.Member, count: StrikeRange, *, reason):
         punDB = mclient.bowser.puns
         activeStrikes = 0
-        puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True}).sort({'timestamp': 1})
+        puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True})
         for pun in puns:
             activeStrikes += pun['active_strike_count']
 
@@ -423,14 +423,22 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         else: # Negative diff, we will need to reduce our strikes
             diff = activeStrikes - count
+            logging.info(f'first {diff}')
+            puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
             for pun in puns:
                 if pun['active_strike_count'] - diff >= 0:
+                    userDB = mclient.bowser.users
                     punDB.update_one({'_id': pun['_id']}, {'$set':
                     {
                         'active_strike_count': pun['active_strike_count'] - diff,
                         'active': pun['active_strike_count'] - diff > 0
                     }})
-                    diff -= pun['active_strike_count']
+                    userDB.update_one({'_id': member.id}, {'$set': {
+                        'strike_check': time.time() + (60 * 60 * 24 * 7)
+                    }})
+                    self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(pun['_id'], ctx.guild.id))) # Check in 12 hours, prevents time drifting
+                    diff -= (pun['active_strike_count'] - diff)
+                    logging.info(f'second {diff} after {pun["active_strike_count"]}')
                     break
 
                 elif pun['active_strike_count'] - diff < 0:
@@ -440,10 +448,26 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         'active': False
                     }})
                     diff -= pun['active_strike_count']
+                    logging.info(f'third {diff} after {pun["active_strike_count"]}')
 
             if diff != 0: # Something has gone horribly wrong
                 raise ValueError('Diff != 0 after full iteration')
 
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count)
+            await tools.send_modlog(self.bot, self.modLogs, 'destrike', docID, reason, user=member, moderator=ctx.author, extra_author=(activeStrikes - count), public=True)
+            try:
+                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
+
+            except discord.Forbidden:
+                if not await tools.mod_cmd_invoke_delete(ctx.channel):
+                    await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. I was not able to DM them of this action')
+
+                return
+
+            if await tools.mod_cmd_invoke_delete(ctx.channel):
+                return await ctx.message.delete()
+
+            await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed')
 
     @commands.is_owner()
     @commands.command()
@@ -530,7 +554,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         # Lets do a sanity check.
         if not doc['active']:
-            logging.error(f'[Moderation] Expiry failed. Doc {_id} is not active but was scheduled to expire!')
+            logging.debug(f'[Moderation] Expiry failed. Doc {_id} is not active but was scheduled to expire!')
+            return
 
         twelveHr = 60 * 60 * 12
         if doc['type'] == 'strike':
@@ -548,7 +573,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             # Start logic
             if doc['active_strike_count'] - 1 == 0:
                 db.update_one({'_id': doc['_id']}, {'$set': {'active': False}, '$inc': {'active_strike_count': -1}})
-                strikes = [x for x in db.find({'user': doc['user'], 'type': 'strike', 'active': True}).sort({'timestamp': 1})]
+                strikes = [x for x in db.find({'user': doc['user'], 'type': 'strike', 'active': True}).sort('timestamp', 1)]
                 if not strikes: # Last active strike expired, no additional
                     return
 
@@ -685,7 +710,7 @@ class LoopTasks(commands.Cog):
                 punsCol = db.find({'user': member.id})
                 puns = 0
                 punishments = ''
-                for n in punsCol.sort('timestamp',pymongo.DESCENDING):
+                for n in punsCol.sort('timestamp', pymongo.DESCENDING):
                     if puns >= 5:
                         break
 

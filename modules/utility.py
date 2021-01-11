@@ -476,16 +476,25 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     totalStrikes += pun['strike_count']
                     activeStrikes += pun['active_strike_count']
 
+                elif pun['type'] == 'destrike':
+                    totalStrikes -= pun['strike_count']
+
                 if puns >= 5:
                     continue
 
                 puns += 1
                 stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
                 punType = config.punStrs[pun['type']]
-                if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
+                if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist', 'destrike']:
+                    if pun['type'] == 'destrike':
+                        punType = f'Removed {pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
+
                     punishments += f'- [{stamp}] {punType}\n'
 
                 else:
+                    if pun['type'] == 'strike':
+                        punType = f'{pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
+
                     punishments += f'+ [{stamp}] {punType}\n'
 
             punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
@@ -554,6 +563,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             punNames = {
                 'strike': '{} Strike{}',
+                'destrike': 'Removed {} Strike{}',
                 'tier1': 'T1 Warn',
                 'tier2': 'T2 Warn',
                 'tier3': 'T3 Warn',
@@ -582,7 +592,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if pun['type'] == 'strike':
                     activeStrikes += pun['active_strike_count']
                     totalStrikes += pun['strike_count']
-                    inf = punNames[pun['type']].format(totalStrikes, "s" if totalStrikes > 1 else "")
+                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
+
+                elif pun['type'] == 'destrike':
+                    totalStrikes -= pun['strike_count']
+                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
                 elif pun['type'] in ['blacklist', 'unblacklist']:
                     inf = punNames[pun['type']].format(pun['context'])
