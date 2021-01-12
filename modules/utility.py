@@ -664,7 +664,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await self._tag_list(ctx)
 
     @_tag.command(name='list')
-    async def _tag_list(self, ctx, prefix: typing.Optional[str] = ''):
+    async def _tag_list(self, ctx, search: typing.Optional[str] = ''):
         db = mclient.bowser.tags
         EMBED_TITLE = 'Tag List'
         EMBED_DESC_TEMPLATE = 'Here is a list of tags you can access{0}:'
@@ -672,7 +672,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         tagList = []
         for tag in db.find({'active': True}):
             description = '' if not 'desc' in tag else tag['desc']
-            tagList.append({'name': tag['_id'].lower(), 'desc': description})
+            tagList.append({'name': tag['_id'].lower(), 'desc': description, 'content': tag['content']})
 
         tagList.sort(key=lambda x: x['name'])
 
@@ -693,10 +693,33 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if not (ctx.guild.get_role(config.moderator) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
-            embed_desc = EMBED_DESC_TEMPLATE.format(f' beginning with `{prefix}`' if prefix else '')
+            embed_desc = EMBED_DESC_TEMPLATE.format(f' matching query `{search}`' if search else '')
 
-            if prefix: tagList = list(filter(lambda x: x['name'].startswith(prefix), tagList) )
+            if search:
+                search = search.lower()
+                searchRanks = [0] * len(tagList) # Init search rankings to 0
 
+                # Search name first
+                for i, name in enumerate([tag['name'] for tag in tagList]):
+                    if name.startswith(search):
+                        searchRanks[i] = 1000
+                    elif search in name:
+                        searchRanks[i] = 800
+
+                # Search descriptions and tag bodies next
+                for i, tag in enumerate(tagList):
+                    # add 15 * number of matches in desc
+                    searchRanks[i] += tag['desc'].lower().count(search) * 15
+                    # add 1 * number of matches in content
+                    searchRanks[i] += tag['content'].lower().count(search) * 1
+
+                sort_joined_list = [(searchRanks[i], tagList[i]) for i in range(0, len(tagList))] 
+                sort_joined_list.sort(key=lambda e: e[0], reverse=True) # Sort from highest rank to lowest
+
+                matches = list(filter(lambda x: x[0] > 0, sort_joined_list) ) # Filter to those with matches
+
+                tagList = [x[1] for x in matches] # Resolve back to tags
+                
             if tagList:
                 longest_name = len(max([tag['name'] for tag in tagList], key=len))
                 lines = []
