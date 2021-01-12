@@ -666,8 +666,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @_tag.command(name='list')
     async def _tag_list(self, ctx, search: typing.Optional[str] = ''):
         db = mclient.bowser.tags
-        EMBED_TITLE = 'Tag List'
-        EMBED_DESC_TEMPLATE = 'Here is a list of tags you can access{0}:'
 
         tagList = []
         for tag in db.find({'active': True}):
@@ -680,11 +678,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
 
-            embed_desc = EMBED_DESC_TEMPLATE.format('') + '\n\n'
             tags = ', '.join( [tag['name'] for tag in tagList] )
 
-            embed = discord.Embed(title=EMBED_TITLE, description=embed_desc + tags)
-            embed.set_footer(text=f'Type \'{ctx.prefix}tag <name>\' to request a tag or \'{ctx.prefix}tag list (search)\' to view tag descriptions')
+            embed = discord.Embed(title='Tag List', description=(
+                f'Here is a list of tags you can access:\n\n> {tags}\n\nType `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag list` to view tags with their descriptions'))
             return await ctx.send(embed=embed)
 
         else: # Complex list
@@ -693,7 +690,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if not (ctx.guild.get_role(config.moderator) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
-            embed_desc = EMBED_DESC_TEMPLATE.format(f' matching query `{search}`' if search else '')
+            if search:
+                embed_desc = f'Here is a list of tags you can access matching query `{search}`:'
+            else:
+                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <search>` to search tags)*'
+                
 
             if search:
                 search = search.lower()
@@ -733,7 +734,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             else: lines = ['*No results found*']
 
             fields = tools.convert_list_to_fields(lines, codeblock=False)
-            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
+            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title='Tag List', description=embed_desc, page_character_limit=1500)
 
     @_tag.command(name='edit')
     @commands.has_any_role(config.moderator, config.helpfulUser)
