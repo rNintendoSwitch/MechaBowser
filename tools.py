@@ -344,7 +344,7 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
 
     user = await bot.fetch_user(doc['user'])
 
-    author = f'{config.punStrs[doc["type"]]}'
+    author = f'{config.punStrs[doc["type"]]} '
 
     if doc['type'] == 'strike':
         author = f'{doc["strike_count"]} ' + config.punStrs[doc['type']]
@@ -354,7 +354,7 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
         author = f'Removed {doc["strike_count"]} ' + config.punStrs['strike']
         author += 's ' if doc['strike_count'] > 1 else ' '
 
-    elif doc["context"]:
+    elif doc['type'] in ['blacklist', 'unblacklist']:
         author += f' ({doc["context"]}) '
 
     author += f'| {user} ({user.id})'
