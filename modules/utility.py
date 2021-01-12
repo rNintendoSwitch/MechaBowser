@@ -664,7 +664,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await self._tag_list(ctx)
 
     @_tag.command(name='list')
-    async def _tag_list(self, ctx, search: typing.Optional[str] = ''):
+    async def _tag_list(self, ctx, *, search: typing.Optional[str] = ''):
         db = mclient.bowser.tags
 
         tagList = []
