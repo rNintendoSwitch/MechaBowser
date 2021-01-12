@@ -664,15 +664,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await self._tag_list(ctx)
 
     @_tag.command(name='list')
-    async def _tag_list(self, ctx, prefix: typing.Optional[str] = ''):
+    async def _tag_list(self, ctx, search: typing.Optional[str] = ''):
         db = mclient.bowser.tags
-        EMBED_TITLE = 'Tag List'
-        EMBED_DESC_TEMPLATE = 'Here is a list of tags you can access{0}:'
 
         tagList = []
         for tag in db.find({'active': True}):
             description = '' if not 'desc' in tag else tag['desc']
-            tagList.append({'name': tag['_id'].lower(), 'desc': description})
+            tagList.append({'name': tag['_id'].lower(), 'desc': description, 'content': tag['content']})
 
         tagList.sort(key=lambda x: x['name'])
 
@@ -680,11 +678,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
 
-            embed_desc = EMBED_DESC_TEMPLATE.format('') + '\n\n'
             tags = ', '.join( [tag['name'] for tag in tagList] )
 
-            embed = discord.Embed(title=EMBED_TITLE, description=embed_desc + tags)
-            embed.set_footer(text=f'Type \'{ctx.prefix}tag <name>\' to request a tag or \'{ctx.prefix}tag list (search)\' to view tag descriptions')
+            embed = discord.Embed(title='Tag List', description=(
+                f'Here is a list of tags you can access:\n\n> {tags}\n\nType `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag list` to view tags with their descriptions'))
             return await ctx.send(embed=embed)
 
         else: # Complex list
@@ -693,10 +690,37 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if not (ctx.guild.get_role(config.moderator) in ctx.author.roles or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles):
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
-            embed_desc = EMBED_DESC_TEMPLATE.format(f' beginning with `{prefix}`' if prefix else '')
+            if search:
+                embed_desc = f'Here is a list of tags you can access matching query `{search}`:'
+            else:
+                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <search>` to search tags)*'
+                
 
-            if prefix: tagList = list(filter(lambda x: x['name'].startswith(prefix), tagList) )
+            if search:
+                search = search.lower()
+                searchRanks = [0] * len(tagList) # Init search rankings to 0
 
+                # Search name first
+                for i, name in enumerate([tag['name'] for tag in tagList]):
+                    if name.startswith(search):
+                        searchRanks[i] = 1000
+                    elif search in name:
+                        searchRanks[i] = 800
+
+                # Search descriptions and tag bodies next
+                for i, tag in enumerate(tagList):
+                    # add 15 * number of matches in desc
+                    searchRanks[i] += tag['desc'].lower().count(search) * 15
+                    # add 1 * number of matches in content
+                    searchRanks[i] += tag['content'].lower().count(search) * 1
+
+                sort_joined_list = [(searchRanks[i], tagList[i]) for i in range(0, len(tagList))] 
+                sort_joined_list.sort(key=lambda e: e[0], reverse=True) # Sort from highest rank to lowest
+
+                matches = list(filter(lambda x: x[0] > 0, sort_joined_list) ) # Filter to those with matches
+
+                tagList = [x[1] for x in matches] # Resolve back to tags
+                
             if tagList:
                 longest_name = len(max([tag['name'] for tag in tagList], key=len))
                 lines = []
@@ -710,7 +734,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             else: lines = ['*No results found*']
 
             fields = tools.convert_list_to_fields(lines, codeblock=False)
-            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=EMBED_TITLE, description=embed_desc, page_character_limit=1500)
+            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title='Tag List', description=embed_desc, page_character_limit=1500)
 
     @_tag.command(name='edit')
     @commands.has_any_role(config.moderator, config.helpfulUser)
