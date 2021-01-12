@@ -382,8 +382,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
             activeStrikes += pun['active_strike_count']
 
-        if activeStrikes + count > 16: # Max of 16 active strikes
-            return await ctx.send(f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes + count - 16} or consider banning the user instead')
+        activeStrikes =+ count
+        if activeStrikes > 16: # Max of 16 active strikes
+            return await ctx.send(f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead')
 
         docID = await tools.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
         userDB.update_one({'_id': member.id}, {'$set': {
@@ -392,19 +393,27 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         self.taskHandles.append(self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))) # Check in 12 hours, prevents time drifting
         await tools.send_modlog(self.bot, self.modLogs, 'strike', docID, reason, user=member, moderator=ctx.author, extra_author=count, public=True)
+        content = f'{config.greenTick} {member} ({member.id}) has been successfully struck, they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""}'
         try:
             await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
         except discord.Forbidden:
             if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck. I was not able to DM them about this action')
+                content += '. I was not able to DM them about this action'
+                if activeStrikes == 16:
+                    content += '.\n:exclamation: You may want to consider a ban'
+
+                await ctx.send(content)
 
             return
 
         if await tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully struck')
+        if activeStrikes == 16:
+            content += '.\n:exclamation: You may want to consider a ban'
+
+        await ctx.send(content)
 
     @commands.has_any_role(config.moderator, config.eh)
     @_strike.command(name='set')
