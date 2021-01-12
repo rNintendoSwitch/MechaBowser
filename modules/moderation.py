@@ -514,9 +514,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             explanation = ('Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
                 'The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n'
-                '* Your warning level will be converted to **{}** strikes.\n'
-                '* __Your strikes will decay at a equivalent as warnings previously did__. Each warning tier is equivalent to four strikes*, where* one strike decays per week instead of one warn level per four weeks\n'
-                '* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
+                '\* Your warning level will be converted to **{}** strikes.\n'
+                '\* __Your strikes will decay at a equivalent rate as warnings previously did__. Each warning tier is equivalent to four strikes, where one strike decays once per week instead of one warn level per four weeks\n'
+                '\* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
                 'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. You may also now view your infraction history '
                 'by using the `!history` command in <#{}>. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.').format(
                 str(member), # Username
