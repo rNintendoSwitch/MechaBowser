@@ -104,6 +104,7 @@ class MainEvents(commands.Cog):
 
         if not doc:
             await tools.store_user(member)
+            doc = db.find_one({'_id': member.id})
 
         else:
             db.update_one({'_id': member.id}, {'$push': {'joins': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}})
