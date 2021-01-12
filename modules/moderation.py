@@ -488,6 +488,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await ctx.send('nothing to do!')
 
         failures = 0
+        totalCount = db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}})
         for doc in db.find({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}}):
             strikeCount = int(doc['type'][-1:]) * 4
             try:
@@ -529,7 +530,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 logging.error(f'[Warn Migration] Failed to migrate {member.id}, {e}')
                 continue
 
-        await ctx.send(f'Completed action. Unable to notify {failures} users')
+        await ctx.send(f'Completed {totalCount} actions. Unable to notify {failures} users')
 
     @_banning.error
     @_unbanning.error

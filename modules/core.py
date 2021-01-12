@@ -172,6 +172,37 @@ class MainEvents(commands.Cog):
             embed.add_field(name='Mention', value=f'<@{member.id}>')
             await self.serverLogs.send(':shield: Member restored', embed=embed)
 
+        if 'migrate_unnotified' in doc.keys() and doc['migrate_unnotified'] == True: # Migration of warnings to strikes for returning members
+            for pun in mclient.bowser.puns.find({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}, 'user': member.id}): # Should only be one, it's mutually exclusive
+                strikeCount = int(pun['type'][-1:]) * 4
+
+                mclient.bowser.puns.update_one({'_id': pun['_id']}, {'$set': {'active': False}})
+                docID = await tools.issue_pun(member.id, self.bot.user.id, 'strike', f'[Migrated] {pun["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
+                db.update_one({'_id': member.id}, {'$set': {'migrate_unnotified': False, 'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
+                mod = self.bot.get_cog('Moderation Commands')
+                await mod.expire_actions(docID, member.guild.id)
+
+                explanation = ('Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
+                    'The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n'
+                    '* Your warning level will be converted to **{}** strikes.\n'
+                    '* __Your strikes will decay at a equivalent as warnings previously did__. Each warning tier is equivalent to four strikes*, where* one strike decays per week instead of one warn level per four weeks\n'
+                    '* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
+                    'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. You may also now view your infraction history '
+                    'by using the `!history` command in <#{}>. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.').format(
+                    str(member), # Username
+                    pun['type'][-1:], # Tier type
+                    datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y'), # Date of warn
+                    strikeCount, # How many strikes will replace tier,
+                    config.commandsChannel, # Commands channel can only be used for the command
+                    config.parakarry # Parakarry mention for DM
+                )
+
+                try:
+                    await member.send(explanation)
+
+                except:
+                    pass
+
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         #log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
