@@ -107,13 +107,13 @@ punStrs = {
 
 punColors = {
     'strike': 0xFF9C8F,
+    'appealdeny': 0xFF7C6B,
+    'ban': 0xE93C25,
     'destrike': 0xFFCB8F,
-    'mute': 0x3680A4,
-    'unmute': 0x39C05D,
     'kick': 0xFFBA6B,
-    'ban': 0xFF614C,
-    'unban': 0xFFAC4C,
+    'unban': 0xE98E25,
     'blacklist': 0x7EBBD9,
+    'mute': 0x3680A4,
     'unblacklist': 0x80E59A,
-    'appealdeny': 0xFF7C6B
+    'unmute': 0x39C05D,
 }
