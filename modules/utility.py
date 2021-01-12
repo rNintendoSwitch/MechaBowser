@@ -842,7 +842,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
-
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
     async def _roles_set(self, ctx, member: discord.Member, channel: typing.Union[discord.TextChannel, discord.CategoryChannel, str], *, reason='-No reason specified-'):
@@ -866,7 +865,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             elif channel in ['reactions', 'reaction', 'react']:
                 context  = 'reaction'
-                mention = context
+                mention = 'reactions'
                 reactionsRole = ctx.guild.get_role(config.noReactions)
                 if reactionsRole in member.roles: # Toggle role off
                     await member.remove_roles(reactionsRole)
@@ -878,7 +877,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             elif channel in ['attach', 'attachments', 'embed', 'embeds']:
                 context  = 'attachment/embed'
-                mention = context
+                mention = 'attachments/embeds'
                 noEmbeds = ctx.guild.get_role(config.noEmbeds)
                 if noEmbeds in member.roles: # Toggle role off
                     await member.remove_roles(noEmbeds)
