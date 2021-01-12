@@ -344,7 +344,7 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
 
     user = await bot.fetch_user(doc['user'])
 
-    author = f'{config.punStrs[doc["type"]]}'
+    author = f'{config.punStrs[doc["type"]]} '
 
     if doc['type'] == 'strike':
         author = f'{doc["strike_count"]} ' + config.punStrs[doc['type']]
