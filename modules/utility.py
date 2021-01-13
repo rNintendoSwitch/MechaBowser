@@ -693,7 +693,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if search:
                 embed_desc = f'Here is a list of tags you can access matching query `{search}`:'
             else:
-                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <search>` to search tags)*'
+                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag list <search>` to search tags)*'
                 
 
             if search:
