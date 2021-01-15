@@ -484,62 +484,19 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await ctx.send(f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed')
 
     @commands.is_owner()
-    @commands.command()
-    async def migratewarns(self, ctx):
-        """
-        Temporary command for debugging and migration. To be removed upon full migration completion.
-        """
+    @commands.group(name='inf', invoke_without_command=True)
+    async def _inf(self, ctx):
+        return
+
+    @commands.is_owner()
+    @_inf.command('remove')
+    async def _inf_revoke(self, ctx, _id):
         db = mclient.bowser.puns
-        userDB = mclient.bowser.users
-        loop = self.bot.loop
-        punCount = db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}})
-        if not punCount > 0:
-            return await ctx.send('nothing to do!')
+        doc = db.find_one_and_delete({'_id': _id})
+        if not doc: # Delete did nothing if doc is None
+            return ctx.send(f'{config.redTick} No matching infraction found')
 
-        failures = 0
-        totalCount = db.count_documents({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}})
-        for doc in db.find({'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}}):
-            strikeCount = int(doc['type'][-1:]) * 4
-            try:
-                member = await ctx.guild.fetch_member(doc['user'])
-
-            except discord.NotFound:
-                userDB.update_one({'_id': doc['user']}, {'$set': {'migrate_unnotified': True}}) # Set flag for on_member_join to instruct of new system should they return
-                continue # TODO: handle this in core
-
-            db.update_one({'_id': doc['_id']}, {'$set': {'active': False}})
-            docID = await tools.issue_pun(doc['user'], self.bot.user.id, 'strike', f'[Migrated] {doc["reason"]}', strike_count=strikeCount, context='strike-migration', public=False)
-            self.taskHandles.append(loop.call_later(5, asyncio.create_task, self.expire_actions(docID, ctx.guild.id)))
-            userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}) # Setting the next expiry check time
-
-            explanation = ('Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
-                'The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n'
-                '\* Your warning level will be converted to **{}** strikes.\n'
-                '\* __Your strikes will decay at a equivalent rate as warnings previously did__. Each warning tier is equivalent to four strikes, where one strike decays once per week instead of one warn level per four weeks\n'
-                '\* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
-                'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. You may also now view your infraction history '
-                'by using the `!history` command in <#{}>. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.').format(
-                str(member), # Username
-                doc['type'][-1:], # Tier type
-                datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime('%B %d, %Y'), # Date of warn
-                strikeCount, # How many strikes will replace tier,
-                config.commandsChannel, # Commands channel can only be used for the command
-                config.parakarry # Parakarry mention for DM
-            )
-
-            try:
-                await member.send(explanation)
-
-            except discord.Forbidden:
-                failures += 1
-                continue
-
-            except discord.HTTPException as e:
-                failures += 1
-                logging.error(f'[Warn Migration] Failed to migrate {member.id}, {e}')
-                continue
-
-        await ctx.send(f'Completed {totalCount} actions. Unable to notify {failures} users')
+        await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
 
     @_banning.error
     @_unbanning.error
