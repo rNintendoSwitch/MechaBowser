@@ -22,7 +22,7 @@ class Splatfest(commands.Cog):
         try:
             # Team 1 logic
             await ctx.send('Welcome to Splatfest setup! Lets get the teams down for this event -- what is the name of team 1?')
-            _team1 = await self.bot.wait_for('message', check=check)
+            _team1 = await self.bot.wait_for('message', check=check).content
 
             msg = await ctx.send(f'What emote represents team {_team1}?')
             while True:
@@ -48,7 +48,7 @@ class Splatfest(commands.Cog):
 
             # Team 2 logic
             await ctx.send(f'Team 1 has been set as {_team1}! What is the name of team 2?')
-            _team2 = await self.bot.wait_for('message', check=check)
+            _team2 = await self.bot.wait_for('message', check=check).content
 
             msg = await ctx.send(f'What emote represents team {_team2}?')
             while True:
@@ -108,7 +108,7 @@ class Splatfest(commands.Cog):
                 # If the user puts both roles in the same message, toss it
                 return
 
-            try:    
+            try:
                 if re.search(team1Emote, message.content):
                     if team2Role in message.author.roles:
                         await message.author.remove_roles(team2Role)
