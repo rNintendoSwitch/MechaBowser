@@ -37,7 +37,7 @@ class Splatfest(commands.Cog):
                     await msg.remove_reaction(_team1_emote, self.bot.user)
                     break
 
-                except (discord.NotFound, discord.InvalidArgument):
+                except (discord.NotFound, discord.InvalidArgument, discord.HTTPException):
                     await ctx.send(f'{config.redTick} That is not a valid emoji, please send a valid unicode or custom emoji')
 
             await ctx.send(f'What role represents team {_team1}? (Please send the ID)')
@@ -69,7 +69,7 @@ class Splatfest(commands.Cog):
                     await msg.remove_reaction(_team2_emote, self.bot.user)
                     break
 
-                except (discord.NotFound, discord.InvalidArgument):
+                except (discord.NotFound, discord.InvalidArgument, discord.HTTPException):
                     await ctx.send(f'{config.redTick} That is not a valid emoji, please send a valid unicode or custom emoji')
 
             await ctx.send(f'What role represents team {_team2}? (Please send the ID)')
@@ -94,12 +94,12 @@ class Splatfest(commands.Cog):
         self.team1 = {
             'name': _team1,
             'emote': _team1_emote,
-            'role': _team1_role
+            'role': _team1_role.id
         }
         self.team2 = {
             'name': _team2,
             'emote': _team2_emote,
-            'role': _team2_role
+            'role': _team2_role.id
         }
         self.ACTIVE = True
         await ctx.send(f'{config.greenTick} Team 2 has been set as {_team2}. The event is now activated! To end the event, run `{ctx.prefix}splatfest end`')
@@ -144,7 +144,7 @@ class Splatfest(commands.Cog):
                         await message.author.add_roles(team2Role)
 
             except (discord.Forbidden, discord.HTTPException):
-                pass
+                raise
 
 def setup(bot):
     bot.add_cog(Splatfest(bot))
