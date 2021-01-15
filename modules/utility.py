@@ -663,7 +663,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             await self._tag_list(ctx)
 
-    @_tag.command(name='list')
+    @_tag.command(name='list', aliases=['search']) 
     async def _tag_list(self, ctx, *, search: typing.Optional[str] = ''):
         db = mclient.bowser.tags
 
@@ -693,7 +693,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if search:
                 embed_desc = f'Here is a list of tags you can access matching query `{search}`:\n*(Type `{ctx.prefix}tag <name>` to request a tag)*'
             else:
-                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag list <search>` to search tags)*'
+                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag {ctx.invoked_with} <search>` to search tags)*'
                 
             if search:
                 search = search.lower()
