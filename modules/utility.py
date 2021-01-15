@@ -663,8 +663,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             await self._tag_list(ctx)
 
-    @_tag.command(name='list')
-    async def _tag_list(self, ctx, search: typing.Optional[str] = ''):
+    @_tag.command(name='list', aliases=['search']) 
+    async def _tag_list(self, ctx, *, search: typing.Optional[str] = ''):
         db = mclient.bowser.tags
 
         tagList = []
@@ -676,7 +676,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if not tagList: return await ctx.send('{config.redTick} This server has no tags!')
 
-        if ctx.invoked_with == 'tag': # Called from the !tag command instead of !tag list, so we print the simple list
+        if ctx.invoked_with in ['tag', 'tags']: # Called from the !tag command instead of !tag list, so we print the simple list
 
             tags = ', '.join( [tag['name'] for tag in tagList] )
 
@@ -691,11 +691,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     return await ctx.send(f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}', delete_after=15)
 
             if search:
-                embed_desc = f'Here is a list of tags you can access matching query `{search}`:'
+                embed_desc = f'Here is a list of tags you can access matching query `{search}`:\n*(Type `{ctx.prefix}tag <name>` to request a tag)*'
             else:
-                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <search>` to search tags)*'
+                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag {ctx.invoked_with} <search>` to search tags)*'
                 
-
             if search:
                 search = search.lower()
                 searchRanks = [0] * len(tagList) # Init search rankings to 0
@@ -742,7 +741,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-        if name in ['list', 'edit', 'delete', 'source', 'setdesc', 'setimg']: # Name blacklist
+        if name in ['list', 'search', 'edit', 'delete', 'source', 'setdesc', 'setimg']: # Name blacklist
             return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
 
         if tag:
