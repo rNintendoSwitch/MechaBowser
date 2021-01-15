@@ -30,6 +30,7 @@ voiceTextChannel = int: voice text
 smm2Channel = int: smm2 
 commandsChannel = int: commands 
 marioluigiChannel = int: mario and luigi 
+splatoon2Channel = int: splatoon2
 automodChannel = int: automod alerts
 
 # Category IDs

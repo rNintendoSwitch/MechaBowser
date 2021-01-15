@@ -114,7 +114,7 @@ class Splatfest(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.channel.id == config.commandsChannel and self.ACTIVE:
+        if message.channel.id in [config.commandsChannel, config.splatoon2Channel] and self.ACTIVE:
             team1Emote = re.compile(f'({self.team1["emote"]})+', re.I)
             team1Role = message.guild.get_role(self.team1['role'])
             team2Emote = re.compile(f'({self.team2["emote"]})+', re.I)
