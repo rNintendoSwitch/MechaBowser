@@ -741,7 +741,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-        if name in ['list', 'edit', 'delete', 'source', 'setdesc', 'setimg']: # Name blacklist
+        if name in ['list', 'search', 'edit', 'delete', 'source', 'setdesc', 'setimg']: # Name blacklist
             return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
 
         if tag:
