@@ -23,13 +23,15 @@ class Splatfest(commands.Cog):
         try:
             # Team 1 logic
             await ctx.send('Welcome to Splatfest setup! You may respond "cancel" at any time to cancel setup. Now, lets get the teams down for this event -- what is the name of team 1?')
-            _team1 = await self.bot.wait_for('message', check=check, timeout=30.0).content
+            _team1 = await self.bot.wait_for('message', check=check, timeout=30.0)
+            _team1 = _team1.content
             if _team1 == 'cancel': return await ctx.send('Canceled setup. Rerun command to try again')
 
             msg = await ctx.send(f'What emote represents team {_team1}?')
             while True:
                 try:
-                    _team1_emote = await self.bot.wait_for('message', check=check, timeout=30.0).content
+                    _team1_emote = await self.bot.wait_for('message', check=check, timeout=30.0)
+                    _team1_emote = _team1_emote.content
                     if _team1_emote == 'cancel': return await ctx.send('Canceled setup. Rerun command to try again')
                     await msg.add_reaction(_team1_emote)
                     await msg.remove_reaction(_team1_emote, self.bot.user)
@@ -41,7 +43,8 @@ class Splatfest(commands.Cog):
             await ctx.send(f'What role represents team {_team1}? (Please send the ID)')
             while True:
                 try:
-                    _role = await self.bot.wait_for('message', check=check, timeout=30.0).content
+                    _role = await self.bot.wait_for('message', check=check, timeout=30.0)
+                    _role = _role.content
                     if _role == 'cancel': return await ctx.send('Canceled setup. Rerun command to try again')
                     _team1_role = ctx.guild.get_role(int(_role))
                     if not _team1_role: raise ValueError
@@ -52,13 +55,15 @@ class Splatfest(commands.Cog):
 
             # Team 2 logic
             await ctx.send(f'Team 1 has been set as {_team1}! What is the name of team 2?')
-            _team2 = await self.bot.wait_for('message', check=check, timeout=30.0).content
+            _team2 = await self.bot.wait_for('message', check=check, timeout=30.0)
+            _team2 = _team2.content
             if _team2 == 'cancel': return await ctx.send('Canceled setup. Rerun command to try again')
 
             msg = await ctx.send(f'What emote represents team {_team2}?')
             while True:
                 try:
-                    _team2_emote = await self.bot.wait_for('message', check=check, timeout=30.0).content
+                    _team2_emote = await self.bot.wait_for('message', check=check, timeout=30.0)
+                    _team2_emote = _team2_emote.content
                     if _team2_emote == 'cancel': return await ctx.send('Canceled setup. Rerun command to try again')
                     await msg.add_reaction(_team2_emote)
                     await msg.remove_reaction(_team2_emote, self.bot.user)
@@ -70,7 +75,8 @@ class Splatfest(commands.Cog):
             await ctx.send(f'What role represents team {_team2}? (Please send the ID)')
             while True:
                 try:
-                    _role = await self.bot.wait_for('message', check=check, timeout=30.0).content
+                    _role = await self.bot.wait_for('message', check=check, timeout=30.0)
+                    _role = _role.content
                     if _role == 'cancel': return await ctx.send('Canceled setup. Rerun command to try again')
                     _team2_role = ctx.guild.get_role(int(_role))
                     if not _team2_role: raise ValueError
