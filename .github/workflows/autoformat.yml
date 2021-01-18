@@ -3,7 +3,7 @@ name: "Autoformat Black & isort"
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  build:
+  autoformat:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
