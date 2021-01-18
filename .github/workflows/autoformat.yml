@@ -1,9 +1,6 @@
 name: "Autoformat Black & isort"
 
-on:
-  push
-  pull_request
-  workflow_dispatch
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
@@ -18,13 +15,13 @@ jobs:
 
       - name: Install pip modules
         run: pip install black isort
-		
+
       - name: Run isort 
-	      run: isort .
+        run: isort .
 
       - name: Run Black 
-	      run: black .
-		
+        run: black .
+
       - name: Commit and push changes
         run: |
           git config user.name github-actions
