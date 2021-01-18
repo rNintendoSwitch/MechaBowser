@@ -4,12 +4,12 @@ import logging
 import time
 import typing
 
+import config
 import discord
 import pymongo
 import pytz
 from discord.ext import commands
 
-import config
 import tools
 
 

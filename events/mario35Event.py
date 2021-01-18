@@ -5,11 +5,10 @@ import random
 import urllib.request
 
 import aiohttp
+import config
 import pymongo
 from discord import AsyncWebhookAdapter, Embed, File, NotFound, Webhook
 from discord.ext import commands
-
-import config
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)

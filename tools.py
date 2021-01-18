@@ -6,10 +6,9 @@ import time
 import typing
 import uuid
 
+import config
 import discord
 import pymongo
-
-import config
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)

@@ -22,11 +22,11 @@ import math
 import random
 import typing
 
+import config
 import pymongo
 from discord import Embed, File, Member, NotFound
 from discord.ext import commands, tasks
 
-import config
 import tools
 from events.resources.lm3 import qte
 

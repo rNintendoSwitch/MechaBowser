@@ -8,12 +8,12 @@ import typing
 import urllib
 
 import aiohttp
+import config
 import discord
 import pymongo
 from discord import AsyncWebhookAdapter, Webhook
 from discord.ext import commands, tasks
 
-import config
 import tools
 
 

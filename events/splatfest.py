@@ -2,10 +2,9 @@ import asyncio
 import logging
 import re
 
+import config
 import discord
 from discord.ext import commands
-
-import config
 
 
 class Splatfest(commands.Cog):

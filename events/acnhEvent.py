@@ -4,12 +4,11 @@ import random
 import time
 import typing
 
+import config
 import discord
 import PIL
 import pymongo
 from discord.ext import commands, tasks
-
-import config
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)

@@ -6,11 +6,11 @@ import re
 import time
 import typing
 
+import config
 import discord
 import pymongo
 from discord.ext import commands, tasks
 
-import config
 import tools
 
 

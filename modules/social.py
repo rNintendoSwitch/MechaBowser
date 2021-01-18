@@ -8,6 +8,7 @@ import typing
 from pathlib import Path
 
 import codepoints
+import config
 import discord
 import gridfs
 import numpy as np
@@ -19,7 +20,6 @@ from emoji import UNICODE_EMOJI
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
 
-import config
 import tools
 
 
