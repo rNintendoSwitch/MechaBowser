@@ -1,21 +1,19 @@
 import asyncio
-import aiohttp
+import io
 import logging
 import random
-import io
 import urllib.request
 
-from discord.ext import commands
-from discord import Webhook, AsyncWebhookAdapter, File, Embed, NotFound
+import aiohttp
 import pymongo
+from discord import AsyncWebhookAdapter, Embed, File, NotFound, Webhook
+from discord.ext import commands
 
 import config
 
-mclient = pymongo.MongoClient(
-	config.mongoHost,
-	username=config.mongoUser,
-	password=config.mongoPass
-)
+
+mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+
 
 class GooseGame(commands.Cog):
     def __init__(self, bot):
@@ -27,40 +25,32 @@ class GooseGame(commands.Cog):
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-03.png',
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-06.png',
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-07.png',
-                'https://www.goose.game/presskit/screenshots/goose_screenshot-13.png'
+                'https://www.goose.game/presskit/screenshots/goose_screenshot-13.png',
             ],
             'two': [
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-08.png',
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-04.png',
-                'https://www.goose.game/presskit/screenshots/goose_screenshot-02.png'
+                'https://www.goose.game/presskit/screenshots/goose_screenshot-02.png',
             ],
             'three': [
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-14.png',
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-11.png',
-                'https://www.goose.game/presskit/screenshots/goose_screenshot-05.png'
+                'https://www.goose.game/presskit/screenshots/goose_screenshot-05.png',
             ],
             'four': [
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-12.png',
                 'https://www.goose.game/presskit/screenshots/goose_screenshot-09.png',
-                'https://www.goose.game/presskit/screenshots/goose_screenshot-10.png'
+                'https://www.goose.game/presskit/screenshots/goose_screenshot-10.png',
             ],
-            'five': [
-                'https://www.goose.game/presskit/screenshots/goose_screenshot-01.png'
-            ]
+            'five': ['https://www.goose.game/presskit/screenshots/goose_screenshot-01.png'],
         }
-        self.gooseNumberInts = {
-            'one': 1,
-            'two': 2,
-            'three': 3,
-            'four': 4,
-            'five': 5
-        }
+        self.gooseNumberInts = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5}
         self.gooseEmotes = [
             '<:srfetched:624356488395227136>',
             '<:goose:623968870805405753>',
             '<:swan:624357453324091412>',
             '🦆',
-            '🐓'
+            '🐓',
         ]
 
     async def calculate_place(self, user=None):
@@ -93,10 +83,14 @@ class GooseGame(commands.Cog):
 
         points = db.find_one({'_id': ctx.author.id})
         if not points:
-            return await goose.send(f'{ctx.author.mention}, you don\'t have any points! Find some geese, and scare them off!')
+            return await goose.send(
+                f'{ctx.author.mention}, you don\'t have any points! Find some geese, and scare them off!'
+            )
 
         placing = await self.calculate_place(ctx.author.id)
-        await goose.send(f'{ctx.author.mention}, You have {points["points"]} points and are #{placing[0]} on the leaderboard! Keep up the good work, and scare off more geese!')
+        await goose.send(
+            f'{ctx.author.mention}, You have {points["points"]} points and are #{placing[0]} on the leaderboard! Keep up the good work, and scare off more geese!'
+        )
 
     @_event.command(name='leaderboard')
     async def _group_leaderboard(self, ctx):
@@ -104,7 +98,9 @@ class GooseGame(commands.Cog):
         if ctx.channel.id != 624221034194665482:
             await ctx.message.delete()
 
-        embed = Embed(title='Leaderboard', description='Here is the current standings all geese finders', color=0x4A90E2)
+        embed = Embed(
+            title='Leaderboard', description='Here is the current standings all geese finders', color=0x4A90E2
+        )
         embed.set_thumbnail(url='https://catwithmonocle.com/wp-content/uploads/2019/08/featured-untitledgoosegame.jpg')
         rankings = await self.calculate_place()
 
@@ -117,7 +113,7 @@ class GooseGame(commands.Cog):
             try:
                 user = self.bot.get_user(value['user'])
 
-            except NotFound: # Left server
+            except NotFound:  # Left server
                 user = await self.bot.fetch_user(value['user'])
 
             points = f'__{value["points"]} points__' if value['points'] > 1 else '__1 point__'
@@ -125,15 +121,19 @@ class GooseGame(commands.Cog):
 
         if maxEntries == 10:
             # No scores yet
-            embed.add_field(name='Scores', value='Hm, it looks like no one has a score yet. User scores will show up here after at least one person scores a point. Keep an eye out for geese!')
+            embed.add_field(
+                name='Scores',
+                value='Hm, it looks like no one has a score yet. User scores will show up here after at least one person scores a point. Keep an eye out for geese!',
+            )
 
         return await goose.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot: return
+        if message.author.bot:
+            return
         if message.channel.id not in [238081135865757696, 238080668347662336, 238081280632160257, 624221034194665482]:
-            return # discussion, gaming, offtopic, goose
+            return  # discussion, gaming, offtopic, goose
 
         if random.choices(['y', 'n'], weights=[1.75, 98.25])[0] == 'n':
             return
@@ -144,7 +144,10 @@ class GooseGame(commands.Cog):
         with urllib.request.urlopen(image) as url:
             imageFile = File(io.BytesIO(url.read()), filename='goosescene.png')
 
-        gameMessage = await message.channel.send(content='A wild goose is attacking! First person to react with <:goose:623968870805405753> will chase it away!', file=imageFile)
+        gameMessage = await message.channel.send(
+            content='A wild goose is attacking! First person to react with <:goose:623968870805405753> will chase it away!',
+            file=imageFile,
+        )
         self.gooseMessages[gameMessage.id] = pointValue
 
         random.shuffle(self.gooseEmotes)
@@ -154,7 +157,8 @@ class GooseGame(commands.Cog):
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
-        if user.bot: return # No bot reactions (i.e. us) should be counted
+        if user.bot:
+            return  # No bot reactions (i.e. us) should be counted
 
         if reaction.message.id in self.gooseMessages.keys() and reaction.emoji.id == 623968870805405753:
             gameMessage = self.gooseMessages[reaction.message.id]
@@ -162,18 +166,17 @@ class GooseGame(commands.Cog):
 
             db = mclient.bowser.gooseEvent
             if not db.find_one_and_update({'_id': user.id}, {'$inc': {'points': self.gooseNumberInts[gameMessage]}}):
-                db.insert_one({
-                    '_id': user.id,
-                    'points': self.gooseNumberInts[gameMessage]
-                })
+                db.insert_one({'_id': user.id, 'points': self.gooseNumberInts[gameMessage]})
 
             points = f'**{gameMessage}** points' if gameMessage != 'one' else '**one** point'
             await reaction.message.edit(content=f'{user.mention} chased the goose away and gained {points}!')
             await reaction.message.clear_reactions()
 
+
 def setup(bot):
     bot.add_cog(GooseGame(bot))
     logging.info('[Extension] gooseGameEvent module loaded')
+
 
 def teardown(bot):
     bot.remove_cog('GooseGame')
