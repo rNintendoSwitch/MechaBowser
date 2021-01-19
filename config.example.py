@@ -3,58 +3,58 @@
 token = 'token'
 command_prefixes = ['!', ',', '.']
 
-#Mongo Credentials
+# Mongo Credentials
 mongoUser = 'user'
 mongoPass = 'password'
 mongoHost = 'host'
 
 # Users
-parakarry = int: bot
+parakarry: int = bot
 
 # Guild IDs
-nintendoswitch = int: guild
+nintendoswitch: int = guild
 
 # Channel IDs
-modChannel = int: modlog
-publicModChannel = int: public modlog
-logChannel = int: loglog 
-debugChannel = int: testing 
-adminChannel = int: admin 
-trialModChannel = int: trialmod 
-boostChannel = int: nitro booster 
-offclockChannel = int: admin offtopic id
-switchHelp = int: switch help 
-spoilers = int: spoilers 
-suggestions = int: suggestions 
-voiceTextChannel = int: voice text 
-smm2Channel = int: smm2 
-commandsChannel = int: commands 
-marioluigiChannel = int: mario and luigi 
-splatoon2Channel = int: splatoon2
-automodChannel = int: automod alerts
+modChannel: int = modlog
+publicModChannel: int = public_modlog
+logChannel: int = loglog
+debugChannel: int = testing
+adminChannel: int = admin
+trialModChannel: int = trialmod
+boostChannel: int = nitro_booster
+offclockChannel: int = admin_offtopic_id
+switchHelp: int = switch_help
+spoilers: int = spoilers
+suggestions: int = suggestions
+voiceTextChannel: int = voice_text
+smm2Channel: int = smm2
+commandsChannel: int = commands
+marioluigiChannel: int = mario_and_luigi
+splatoon2Channel: int = splatoon2
+automodChannel: int = automod_alerts
 
 # Category IDs
-eventCat = int: server events
-modmailCat = int: modmail category
+eventCat: int = server_events
+modmailCat: int = modmail_category
 
 showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel, modmailCat]
 
 # Role IDs
-boostRole = int: nitro boosters
-chatmod = int: chat moderator
-submod = int: subreddit moderator
-moderator = int: moderator
-modemeritus = int: moderator emeritus
-submodemeritus = int: sub moderator emeritus
-eh = int: test server mod
-helpfulUser = int: helpful user
-mute = int: timeout
-noSpoilers = int: spoiler restricted
-noSuggestions = int: suggestion restricted
-noReactions = int: reaction restricted
-noEmbeds = int: attachments and embeds restricted
-noEvents = int: event restricted
-voiceTextAccess = int: voice chat
+boostRole: int = nitro_boosters
+chatmod: int = chat_moderator
+submod: int = subreddit_moderator
+moderator: int = moderator
+modemeritus: int = moderator_emeritus
+submodemeritus: int = sub_moderator_emeritus
+eh: int = test_server_mod
+helpfulUser: int = helpful_user
+mute: int = timeout
+noSpoilers: int = spoiler_restricted
+noSuggestions: int = suggestion_restricted
+noReactions: int = reaction_restricted
+noEmbeds: int = attachments_and_embeds_restricted
+noEvents: int = event_restricted
+voiceTextAccess: int = voice_chat
 
 # Emoji IDs
 loading = '<a:loading:659107120419045403>'
@@ -73,17 +73,19 @@ downTriangle = '🔻'
 stopSign = '🛑'
 
 # Invites
-banAppealInvite = str: invite to ban appeal server
+banAppealInvite: str = invite_to_ban_appeal_server
 
 # Web
 baseUrl = 'https://example.com'
 # Text constants
-punDM = 'You have received a moderation action on the /r/NintendoSwitch Discord server.\n' \
-    'Action: **{}**\n' \
-    'Reason:\n```{}```\n' \
-    'Responsible moderator: {}\n' \
-    'If you have questions concerning this matter, please feel free to contact the respective moderator that took this action or another member of the moderation team.\n\n' \
+punDM = (
+    'You have received a moderation action on the /r/NintendoSwitch Discord server.\n'
+    'Action: **{}**\n'
+    'Reason:\n```{}```\n'
+    'Responsible moderator: {}\n'
+    'If you have questions concerning this matter, please feel free to contact the respective moderator that took this action or another member of the moderation team.\n\n'
     'Please do not respond to this message, I cannot reply.'
+)
 
 punStrs = {
     'strike': 'Strike',
@@ -100,7 +102,7 @@ punStrs = {
     'blacklist': 'Blacklist',
     'unblacklist': 'Unblacklist',
     'note': 'Note',
-    'appealdeny': 'Denied ban appeal'
+    'appealdeny': 'Denied ban appeal',
 }
 
 punColors = {
