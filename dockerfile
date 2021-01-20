@@ -1,7 +1,7 @@
 FROM gorialis/discord.py:master
 
 WORKDIR /app
-ADD ./MechaBowser /app
+ADD . /app
 
 EXPOSE 8880
 
