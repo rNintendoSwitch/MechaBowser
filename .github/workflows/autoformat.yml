@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:  # https://github.com/stefanzweifel/git-auto-commit-action#checkout-the-correct-branch
-            ref: ${{ github.head_ref }}
+          ref: ${{ github.head_ref }}
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v1
