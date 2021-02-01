@@ -91,6 +91,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 delete_after=15,
             )
 
+        if ctx.channel == '670999043740270602':
+            await ctx.send(f'<@123879073972748290> `debug: {ctx.author.id} requested {member} with {ctx.args}`')
+
         card = await self._generate_profile_card(member)
         await ctx.send(file=card)
 
