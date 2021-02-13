@@ -60,13 +60,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         ]
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
 
-        self.friendCodeRegex = {  # Friend Code Regexs (\u2014 = em-dash)
+        # Friend Code Regexs (\u2014 = em-dash)
+        self.friendCodeRegex = {  
             # Profile setup/editor (lenient)
-            "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
+            "profile": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
             # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
             "chatFilter": re.compile(
-                r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014]?\d{4}[ \-\u2014]\d{4}[ \-\u2014]\d{4}', re.I + re.M
+                r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014_]?\d{4}[ \-\u2014_]\d{4}[ \-\u2014_]\d{4}', re.I + re.M
             ),
         }
 
