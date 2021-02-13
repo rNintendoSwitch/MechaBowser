@@ -61,7 +61,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
 
         # Friend Code Regexs (\u2014 = em-dash)
-        self.friendCodeRegex = {  
+        self.friendCodeRegex = {
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
