@@ -252,7 +252,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
             banCount += 1
 
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         if len(users) == 1:
@@ -300,7 +300,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             moderator=ctx.author,
             public=True,
         )
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {user} has been unbanned')
@@ -321,7 +321,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await member.send(tools.format_pundm('kick', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError):
-            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+            if not tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(
                     f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them about this action'
                 )
@@ -329,7 +329,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await member.kick(reason='Kick action performed by moderator')
             return
 
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
@@ -372,17 +372,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({tools.humanize_duration(_duration)})',
             public=True,
         )
+        error = ""
         try:
             await member.send(tools.format_pundm('mute', reason, ctx.author, tools.humanize_duration(_duration)))
 
         except (discord.Forbidden, AttributeError):
-            if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(
-                    f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them about this action'
-                )
+            error = '. I was not able to DM them about this action'
 
-        else:
-            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted')
+        if not tools.mod_cmd_invoke_delete(ctx.channel):
+            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted{error}')
 
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())
@@ -391,7 +389,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.taskHandles.append(
             self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
         )
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
     @commands.command(name='unmute')
@@ -424,14 +422,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await member.send(tools.format_pundm('unmute', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError):
-            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+            if not tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(
                     f'{config.greenTick} {member} ({member.id}) has been successfully unmuted. I was not able to DM them about this action'
                 )
 
             return
 
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted')
@@ -447,7 +445,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
 
         await tools.issue_pun(userid, ctx.author.id, 'note', content, active=False, public=False)
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
@@ -507,7 +505,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
         except discord.Forbidden:
-            if not await tools.mod_cmd_invoke_delete(ctx.channel):
+            if not tools.mod_cmd_invoke_delete(ctx.channel):
                 content += '. I was not able to DM them about this action'
                 if activeStrikes == 16:
                     content += '.\n:exclamation: You may want to consider a ban'
@@ -516,7 +514,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             return
 
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         if activeStrikes == 16:
@@ -600,7 +598,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             except discord.Forbidden:
                 error = 'I was not able to DM them about this action'
 
-            if await tools.mod_cmd_invoke_delete(ctx.channel):
+            if tools.mod_cmd_invoke_delete(ctx.channel):
                 return await ctx.message.delete()
 
             await ctx.send(

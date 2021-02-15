@@ -1112,7 +1112,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         except (discord.Forbidden, AttributeError):  # User has DMs off, or cannot send to Obj
             pass
 
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
