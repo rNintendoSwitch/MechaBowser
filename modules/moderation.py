@@ -372,17 +372,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({tools.humanize_duration(_duration)})',
             public=True,
         )
+        error = ""
         try:
             await member.send(tools.format_pundm('mute', reason, ctx.author, tools.humanize_duration(_duration)))
 
         except (discord.Forbidden, AttributeError):
-            if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(
-                    f'{config.greenTick} {member} ({member.id}) has been successfully muted. I was not able to DM them about this action'
-                )
+            error = '. I was not able to DM them about this action'
 
-        else:
-            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted')
+        if not await tools.mod_cmd_invoke_delete(ctx.channel):
+            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted{error}')
 
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())

@@ -296,11 +296,7 @@ def humanize_duration(duration):
 
 
 async def mod_cmd_invoke_delete(channel):
-    if channel.id in config.showModCTX or channel.category_id in config.showModCTX:
-        return False
-
-    else:
-        return True
+    return not (channel.id in config.showModCTX or channel.category_id in config.showModCTX)
 
 
 async def send_modlog(
