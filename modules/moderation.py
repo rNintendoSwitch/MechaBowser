@@ -604,7 +604,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{member} ({member.id}) has been destuken, '
+                f'{member} ({member.id}) has had strikes removed, '
                 f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} '
                 f'({activeStrikes+count} - {count}) {error}'
             )
