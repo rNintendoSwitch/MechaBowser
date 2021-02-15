@@ -594,23 +594,19 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 extra_author=(activeStrikes - count),
                 public=True,
             )
+            error = ""
             try:
                 await member.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
-
             except discord.Forbidden:
-                if not await tools.mod_cmd_invoke_delete(ctx.channel):
-                    await ctx.send(
-                        f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed, '
-                        f' they now have {count} strikes now. I was not able to DM them about this action'
-                    )
-
-                return
+                error = 'I was not able to DM them about this action'
 
             if await tools.mod_cmd_invoke_delete(ctx.channel):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed, they now have {count} strikes'
+                f'{member} ({member.id}) has been destuken, '
+                f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} '
+                f'({activeStrikes+count} - {count}) {error}'
             )
 
     @commands.is_owner()
