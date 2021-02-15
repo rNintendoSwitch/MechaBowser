@@ -852,7 +852,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one(
                 {'_id': tag['_id']},
                 {
-                    '$push': {'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}},
+                    '$push': {
+                        'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}
+                    },
                     '$set': {'content': content, 'active': True},
                 },
             )
@@ -1112,7 +1114,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         except (discord.Forbidden, AttributeError):  # User has DMs off, or cannot send to Obj
             pass
 
-        if await tools.mod_cmd_invoke_delete(ctx.channel):
+        if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
