@@ -476,7 +476,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
             activeStrikes += pun['active_strike_count']
 
-        activeStrikes = +count
+        activeStrikes += count
         if activeStrikes > 16:  # Max of 16 active strikes
             return await ctx.send(
                 f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead'
@@ -499,7 +499,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             extra_author=count,
             public=True,
         )
-        content = f'{config.greenTick} {member} ({member.id}) has been successfully struck, they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""}'
+        content = (
+            f'{config.greenTick} {member} ({member.id}) has been successfully struck, '
+            f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count})'
+        )
         try:
             await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
@@ -578,7 +581,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 raise ValueError('Diff != 0 after full iteration')
 
             docID = await tools.issue_pun(
-                member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count
+                member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=diff
             )
             await tools.send_modlog(
                 self.bot,
@@ -588,16 +591,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 reason,
                 user=member,
                 moderator=ctx.author,
-                extra_author=(activeStrikes - count),
+                extra_author=diff,
                 public=True,
             )
             try:
-                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
+                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=diff))
 
             except discord.Forbidden:
                 if not await tools.mod_cmd_invoke_delete(ctx.channel):
                     await ctx.send(
-                        f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. I was not able to DM them about this action'
+                        f'{config.greenTick} {diff} strikes for {member} ({member.id}) have been successfully removed. '
+                        f'They now have {activeStrikes + diff} strikes. I was not able to DM them about this action'
                     )
 
                 return
@@ -606,7 +610,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed'
+                f'{config.greenTick} {diff} strikes for {member} ({member.id}) have been successfully removed. '
+                f'They now have {activeStrikes + diff} strikes.'
             )
 
     @commands.is_owner()
