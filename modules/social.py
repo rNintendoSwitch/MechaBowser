@@ -59,14 +59,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             '1f1ff',
         ]
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
-
-        self.friendCodeRegex = {  # Friend Code Regexs (\u2014 = em-dash)
+        self.bot_contributors = [
+            125233822760566784,  # MattBSG
+            123879073972748290,  # Lyrus
+            108429628560924672,  # Alex from Alaska
+        ]
+        # Friend Code Regexs (\u2014 = em-dash)
+        self.friendCodeRegex = {
             # Profile setup/editor (lenient)
-            "profile": re.compile(r'(?:sw)?[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})[ \-\u2014]?(\d{4})', re.I),
+            "profile": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
             # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
             "chatFilter": re.compile(
-                r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014]?\d{4}[ \-\u2014]\d{4}[ \-\u2014]\d{4}', re.I + re.M
+                r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014_]?\d{4}[ \-\u2014_]\d{4}[ \-\u2014_]\d{4}', re.I + re.M
             ),
         }
 
@@ -225,9 +230,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if member.id == guild.owner.id:  # Server owner
             trophies.append('owner')
 
-        app_info = await self.bot.application_info()
-
-        if member.id in [app_info.owner.id, 123879073972748290]:  # Developer
+        if member.id in self.bot_contributors:  # Developer
             trophies.append('developer')
 
         if guild.get_role(config.chatmod) in member.roles:  # Chat-mod role
