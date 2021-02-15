@@ -581,7 +581,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 raise ValueError('Diff != 0 after full iteration')
 
             docID = await tools.issue_pun(
-                member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=diff
+                member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count
             )
             await tools.send_modlog(
                 self.bot,
@@ -591,17 +591,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 reason,
                 user=member,
                 moderator=ctx.author,
-                extra_author=diff,
+                extra_author=(activeStrikes - count),
                 public=True,
             )
             try:
-                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=diff))
+                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
 
             except discord.Forbidden:
                 if not await tools.mod_cmd_invoke_delete(ctx.channel):
                     await ctx.send(
-                        f'{config.greenTick} {diff} strikes for {member} ({member.id}) have been successfully removed. '
-                        f'They now have {activeStrikes + diff} strikes. I was not able to DM them about this action'
+                        f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. '
+                        f' They now have {count} strikes now. I was not able to DM them about this action'
                     )
 
                 return
@@ -610,8 +610,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{config.greenTick} {diff} strikes for {member} ({member.id}) have been successfully removed. '
-                f'They now have {activeStrikes + diff} strikes.'
+                f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. they now have {count}.'
             )
 
     @commands.is_owner()
