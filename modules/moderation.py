@@ -600,8 +600,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             except discord.Forbidden:
                 if not await tools.mod_cmd_invoke_delete(ctx.channel):
                     await ctx.send(
-                        f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. '
-                        f' They now have {count} strikes now. I was not able to DM them about this action'
+                        f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed, '
+                        f' they now have {count} strikes now. I was not able to DM them about this action'
                     )
 
                 return
@@ -610,7 +610,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed. they now have {count}.'
+                f'{config.greenTick} {activeStrikes - count} strikes for {member} ({member.id}) have been successfully removed, they now have {count} strikes'
             )
 
     @commands.is_owner()
