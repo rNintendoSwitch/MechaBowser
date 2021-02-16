@@ -77,14 +77,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @commands.group(name='profile', invoke_without_command=True)
     @commands.cooldown(2, 60, commands.BucketType.channel)
-<<<<<<< HEAD
     async def _profile(self, ctx, member: typing.Optional[discord.User]):
         if not member: member = ctx.author
-=======
-    async def _profile(self, ctx, member: typing.Optional[discord.Member]):
-        if not member:
-            member = ctx.author
->>>>>>> 6a26f6295d89d3c60c5fdb58c8b6aa9f20d82f9d
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
