@@ -1,22 +1,20 @@
 import asyncio
+import datetime
 import logging
 import time
 import typing
-import datetime
-
-import pymongo
-import pytz
-import discord
-from discord.ext import commands
 
 import config
+import discord
+import pymongo
+import pytz
+from discord.ext import commands
+
 import tools
 
-mclient = pymongo.MongoClient(
-	config.mongoHost,
-	username=config.mongoUser,
-	password=config.mongoPass
-)
+
+mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+
 
 class StatCommands(commands.Cog, name='Statistic Commands'):
     def __init__(self, bot):
@@ -25,13 +23,15 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     @commands.group(name='stats', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats(self, ctx):
-        return await ctx.send("Valid subcommands:```\n" \
-        "stats server\n    -Returns server activity statistics\n\n" \
-        "stats users\n    -Returns most active users\n\n" \
-        "stats roles\n    -Returns statistics on the ownership of roles\n\n" \
-        "stats emoji\n    -Returns stats on emoji usage\n\n" \
-        "stats channels\n    -Returns most active channels" \
-        "stats statuses\n    -Returns user statuses over the last 24 hours```")
+        return await ctx.send(
+            "Valid subcommands:```\n"
+            "stats server\n    -Returns server activity statistics\n\n"
+            "stats users\n    -Returns most active users\n\n"
+            "stats roles\n    -Returns statistics on the ownership of roles\n\n"
+            "stats emoji\n    -Returns stats on emoji usage\n\n"
+            "stats channels\n    -Returns most active channels"
+            "stats statuses\n    -Returns user statuses over the last 24 hours```"
+        )
 
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
@@ -39,26 +39,36 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         msg = await ctx.send('One moment, crunching message and channel data...')
 
         try:
-            searchDate = datetime.datetime.utcnow() if not start_date else datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            searchDate = (
+                datetime.datetime.utcnow()
+                if not start_date
+                else datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            )
             searchDate = searchDate.replace(hour=0, minute=0, second=0)
-            endDate = searchDate + datetime.timedelta(days=30) if not end_date else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            endDate = (
+                searchDate + datetime.timedelta(days=30)
+                if not end_date
+                else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+            )
             endDate = endDate.replace(hour=23, minute=59, second=59)
 
         except ValueError:
-            return await msg.edit(content=f'{config.redTick} Invalid date provided. Please make sure it is in the format of `yyyy-mm-dd`')
+            return await msg.edit(
+                content=f'{config.redTick} Invalid date provided. Please make sure it is in the format of `yyyy-mm-dd`'
+            )
 
         if not start_date:
-            messages = mclient.bowser.messages.find({
-                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}
-                })
+            messages = mclient.bowser.messages.find({'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}})
 
         else:
             if endDate <= searchDate:
-                return await msg.edit(content=f'{config.redTick} Invalid dates provided. The end date is before the starting date. `{ctx.prefix}stats server [starting date] [ending date]`')
+                return await msg.edit(
+                    content=f'{config.redTick} Invalid dates provided. The end date is before the starting date. `{ctx.prefix}stats server [starting date] [ending date]`'
+                )
 
-            messages = mclient.bowser.messages.find({
-                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}
-                })
+            messages = mclient.bowser.messages.find(
+                {'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}}
+            )
 
         msgCount = messages.count()
         channelCounts = {}
@@ -76,21 +86,25 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             else:
                 userCounts[message['author']] += 1
 
-
-
         if not start_date:
-            puns = mclient.bowser.puns.find({
-                        'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))},
-                        'type': {'$nin': ['unmute', 'unblacklist', 'note']}
-                }).count()
+            puns = mclient.bowser.puns.find(
+                {
+                    'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))},
+                    'type': {'$nin': ['unmute', 'unblacklist', 'note']},
+                }
+            ).count()
 
         else:
-            puns = mclient.bowser.puns.find({
-                        'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()},
-                        'type': {'$nin': ['unmute', 'unblacklist', 'note']}
-                }).count()
+            puns = mclient.bowser.puns.find(
+                {
+                    'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()},
+                    'type': {'$nin': ['unmute', 'unblacklist', 'note']},
+                }
+            ).count()
 
-        topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[0:5] # Get a list of tuple sorting by most active channel to least, and only include top 5
+        topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[
+            0:5
+        ]  # Get a list of tuple sorting by most active channel to least, and only include top 5
         topChannelsList = []
         for x in topChannels:
             channelObj = self.bot.get_channel(x[0])
@@ -121,16 +135,31 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         activeChannels = ', '.join(topChannelsList)
         premiumTier = 'No tier' if ctx.guild.premium_tier == 0 else f'Tier {ctx.guild.premium_tier}'
 
-        dayStr = 'In the last 30 days' if not start_date else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
+        dayStr = (
+            'In the last 30 days'
+            if not start_date
+            else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
+        )
         netMembers = netJoins - netLeaves
-        netMemberStr = f':chart_with_upwards_trend: **+{netMembers}** net members joined\n' if netMembers >= 0 else f':chart_with_downwards_trend: **{netMembers}** net members left\n'
+        netMemberStr = (
+            f':chart_with_upwards_trend: **+{netMembers}** net members joined\n'
+            if netMembers >= 0
+            else f':chart_with_downwards_trend: **{netMembers}** net members left\n'
+        )
 
-        embed = discord.Embed(title=f'{ctx.guild.name} Statistics', description=f'Current member count is **{ctx.guild.member_count}**\n*__{dayStr}...__*\n\n' \
-            f':incoming_envelope: **{msgCount}** messages have been sent\n:information_desk_person: **{len(userCounts)}** members were active\n' \
-            f'{netMemberStr}:hammer: **{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}', color=0xD267BA)
+        embed = discord.Embed(
+            title=f'{ctx.guild.name} Statistics',
+            description=f'Current member count is **{ctx.guild.member_count}**\n*__{dayStr}...__*\n\n'
+            f':incoming_envelope: **{msgCount}** messages have been sent\n:information_desk_person: **{len(userCounts)}** members were active\n'
+            f'{netMemberStr}:hammer: **{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}',
+            color=0xD267BA,
+        )
         embed.set_thumbnail(url=ctx.guild.icon_url)
-        embed.add_field(name='Guild features', value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n' \
-            f'**Boost level:** {premiumTier}\n**Number of boosters:** {ctx.guild.premium_subscription_count}')
+        embed.add_field(
+            name='Guild features',
+            value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n'
+            f'**Boost level:** {premiumTier}\n**Number of boosters:** {ctx.guild.premium_subscription_count}',
+        )
 
         return await msg.edit(content=None, embed=embed)
 
@@ -138,9 +167,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_users(self, ctx):
         msg = await ctx.send('One moment, crunching the numbers...')
-        messages = mclient.bowser.messages.find({
-                    'timestamp': {'$gt': (int(time.time()) - (60 * 60 * 24 * 30))}
-            })
+        messages = mclient.bowser.messages.find({'timestamp': {'$gt': (int(time.time()) - (60 * 60 * 24 * 30))}})
         msgCounts = {}
         for message in messages:
             if message['author'] not in msgCounts.keys():
@@ -149,8 +176,14 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             else:
                 msgCounts[message['author']] += 1
 
-        topSenders = sorted(msgCounts.items(), key=lambda x: x[1], reverse=True)[0:25] # Get a list of tuple sorting by most message to least, and only include top 25
-        embed = discord.Embed(title='Top User Statistics', description='List of the 25 highest message senders and their count during the last 30 days\n', color=0xD267BA)
+        topSenders = sorted(msgCounts.items(), key=lambda x: x[1], reverse=True)[
+            0:25
+        ]  # Get a list of tuple sorting by most message to least, and only include top 25
+        embed = discord.Embed(
+            title='Top User Statistics',
+            description='List of the 25 highest message senders and their count during the last 30 days\n',
+            color=0xD267BA,
+        )
         for x in topSenders:
             msgUser = ctx.guild.get_member(x[0])
             if not msgUser:
@@ -162,8 +195,10 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
 
     @_stats.command(name='roles', aliases=['role'])
     @commands.has_any_role(config.moderator, config.eh)
-    async def _stats_roles(self, ctx, *, role: typing.Optional[typing.Union[discord.Role, int, str]]): # TODO: create and pull role add/remove data from events
-        
+    async def _stats_roles(
+        self, ctx, *, role: typing.Optional[typing.Union[discord.Role, int, str]]
+    ):  # TODO: create and pull role add/remove data from events
+
         if role:
             if type(role) is int:
                 role = ctx.guild.get_role(role)
@@ -182,7 +217,16 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
 
             title = f'{ctx.guild.name} Role Statistics'
             fields = tools.convert_list_to_fields(lines)
-            return await tools.send_paginated_embed(self.bot, ctx.channel, fields, owner=ctx.author, title=title, description=desc, color=0xD267BA, page_character_limit=3000)
+            return await tools.send_paginated_embed(
+                self.bot,
+                ctx.channel,
+                fields,
+                owner=ctx.author,
+                title=title,
+                description=desc,
+                color=0xD267BA,
+                page_character_limit=3000,
+            )
 
         else:
             roleCounts = []
@@ -190,7 +234,11 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
                 roleCounts.append(f'**{role.name}:** {len(role.members)}')
 
             roleList = '\n'.join(roleCounts)
-            embed = discord.Embed(title=f'{ctx.guild.name} Role Statistics', description=f'Server role list and respective member count\n\n{roleList}', color=0xD267BA)
+            embed = discord.Embed(
+                title=f'{ctx.guild.name} Role Statistics',
+                description=f'Server role list and respective member count\n\n{roleList}',
+                color=0xD267BA,
+            )
 
             return await ctx.send(embed=embed)
 
@@ -207,21 +255,32 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     async def stat_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
+            return await ctx.send(
+                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
 
         elif isinstance(error, commands.BadArgument):
-            return await ctx.send(f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`', delete_after=15)
+            return await ctx.send(
+                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
 
         elif isinstance(error, commands.CheckFailure):
             return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
 
         else:
-            await ctx.send(f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.', delete_after=15)
+            await ctx.send(
+                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+                delete_after=15,
+            )
             raise error
+
 
 def setup(bot):
     bot.add_cog(StatCommands(bot))
     logging.info('[Extension] Statistics module loaded')
+
 
 def teardown(bot):
     bot.remove_cog('ChatControl')
