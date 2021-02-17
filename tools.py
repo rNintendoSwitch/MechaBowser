@@ -222,7 +222,7 @@ async def issue_pun(
     return docID
 
 
-def resolve_duration(data):
+def resolve_duration(data, include_seconds=False):
     """
     Takes a raw input string formatted 1w1d1h1m1s (any order)
     and converts to timedelta
@@ -244,7 +244,11 @@ def resolve_duration(data):
         value += timeUnits[char](int(digits))
         digits = ''
 
-    return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
+    if include_seconds:
+        return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1), value
+
+    else:
+        return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
 
 
 def humanize_duration(duration):

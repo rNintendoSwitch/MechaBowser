@@ -404,6 +404,54 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         m = await ctx.send(f'{config.greenTick} Clean action complete')
         return await m.delete(delay=5)
 
+    @commands.group(name='slowmode', invoke_without_command=True)
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _slowmode(self, ctx, channel: typing.Optional[discord.TextChannel], duration):
+        if not channel:
+            channel = ctx.channel
+
+        try:
+            time, seconds = tools.resolve_duration(duration, include_seconds=True)
+            time = tools.humanize_duration(time)
+            seconds = int(seconds)
+            if seconds < 1:
+                return ctx.send(
+                    f'{config.redTick} You cannot set the duration to less than one second. If you would like to clear the slowmode, use the `{ctx.prefix}slowmode clear` command'
+                )
+
+            elif seconds > 60 * 60 * 6:  # Six hour API limit
+                return ctx.send(f'{config.redTick} You cannot set the duration greater than six hours')
+
+        except KeyError:
+            return await ctx.send(f'{config.redTick} Invalid duration passed')
+
+        await channel.edit(slowmode_delay=seconds, reason=f'{ctx.author} has changed the slowmode delay')
+        await channel.send(
+            f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
+        )
+        if channel.id == ctx.channel.id or tools.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        await ctx.send(f'{config.greenTick} {channel.mention} now has a {time} slowmode')
+
+    @_slowmode.command(name='clear')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _slowmode_clear(self, ctx, channel: typing.Optional[discord.TextChannel]):
+        if not channel:
+            channel = ctx.channel
+
+        if channel.slowmode_delay == 0:
+            return await ctx.send(f'{config.redTick} {channel.mention} is not under a slowmode')
+
+        await channel.edit(slowmode_delay=0, reason=f'{ctx.author} has removed the slowmode delay')
+        await channel.send(
+            f':stopwatch: Slowmode for this channel is no longer in effect. Please be mindful of spam per the server rules'
+        )
+        if channel.id == ctx.channel.id or tools.mod_cmd_invoke_delete(ctx.channel):
+            return await ctx.message.delete()
+
+        return await ctx.send(f'{config.greenTick} {channel.mention} no longer has slowmode')
+
     @commands.command(name='info')
     @commands.has_any_role(config.moderator, config.eh)
     async def _info(self, ctx, user: typing.Union[discord.Member, int]):
