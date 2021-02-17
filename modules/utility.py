@@ -406,7 +406,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @commands.group(name='slowmode', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
-    async def _slowmode(self, ctx, channel: typing.Optional[discord.TextChannel], duration):
+    async def _slowmode(self, ctx, duration, channel: typing.Optional[discord.TextChannel]):
         if not channel:
             channel = ctx.channel
 
