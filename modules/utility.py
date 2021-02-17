@@ -425,6 +425,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         except KeyError:
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
+        if channel.slowmode_delay == seconds:
+            return await ctx.send(f'{config.redTick} The slowmode is already set to {time}')
+
         await channel.edit(slowmode_delay=seconds, reason=f'{ctx.author} has changed the slowmode delay')
         await channel.send(
             f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
