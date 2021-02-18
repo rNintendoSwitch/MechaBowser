@@ -561,7 +561,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 for value in noteList:
                     fieldLength += len(value)
                 if len(noteContent) + fieldLength > 924:
-                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes ' + fieldValue
+                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
                     break
 
                 noteList.append(noteContent)
