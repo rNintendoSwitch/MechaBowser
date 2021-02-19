@@ -80,6 +80,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile(self, ctx, member: typing.Optional[discord.User]):
         if not member:
             member = ctx.author
+        else:
+            member = ctx.guild.get_member(member.id)
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
