@@ -80,6 +80,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile(self, ctx, member: typing.Optional[discord.User]):
         if not member:
             member = ctx.author
+        else:
+            member = ctx.guild.get_member(member.id)
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -503,7 +505,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             backgrounds.remove('default')
 
             if not backgrounds:
-                await message.channel.send('Since you don\'t have any background themes unlocked we\'ll skip this step')
+                await message.channel.send(
+                    'Since you don\'t have any background themes unlocked we\'ll skip this step'
+                )
                 return True
 
             else:
@@ -515,7 +519,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     content = response.content.lower().strip()
                     if response.content.lower().strip() == 'reset':
                         db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default'}})
-                        await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
+                        await message.channel.send(
+                            'I\'ve gone ahead and reset your setting for **profile background**'
+                        )
                         return True
 
                     elif content != 'skip':
