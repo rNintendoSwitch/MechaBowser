@@ -139,7 +139,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                     'avatar_url': '',
                     'mod': False,
                 },
-                'closer': {'id': str(0), 'name': 'message edited', 'discriminator': 0, 'avatar_url': ''},
+                'closer': {'id': str(0), 'name': 'message archived', 'discriminator': 0, 'avatar_url': ''},
                 'messages': messages,
             }
         )
