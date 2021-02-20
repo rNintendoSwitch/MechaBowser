@@ -78,11 +78,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @commands.group(name='profile', invoke_without_command=True)
     @commands.cooldown(2, 60, commands.BucketType.channel)
-    async def _profile(self, ctx, member: typing.Optional[discord.User]):
-        if not member:
-            member = ctx.author
+    async def _profile(self, ctx, user: typing.Optional[discord.User]):
+        if user:
+            member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
         else:
-            member = ctx.guild.get_member(member.id)
+            member = ctx.author
+
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -231,7 +232,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 505), joinDateF, (80, 80, 80), fonts['medium'])
 
         if not dbUser['timezone']:
-            self._draw_text(draw, 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (800, 505), 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
             tzOffset = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%z')
