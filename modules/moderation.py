@@ -189,6 +189,57 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         await ctx.send(f'{config.greenTick} Successfully toggled the sensitive status for that infraction')
 
+    @commands.group(name='infraction', aliases=['inf'], invoke_without_command=True)
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _infraction(self, ctx):
+        return
+
+    @_infraction.command(name='reason')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _infraction_reason(self, ctx, infraction, *, reason):
+        if len(reason) > 990:
+            return await ctx.send(
+                f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters'
+            )
+
+    @_infraction.command(name='duration', aliases=['dur', 'time'])
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _infraction_duration(self, ctx, infraction, duration):
+        db = mclient.bowser.puns
+        doc = db.find_one({'_id': infraction})
+        if not doc:
+            return await ctx.send(f'{config.redTick} An invalid infraction id was provided')
+
+        if doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
+            return ctx.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}')
+
+        try:
+            _duration = tools.resolve_duration(duration)
+            humanized = tools.humanize_duration(_duration)
+            stamp = _duration.timestamp()
+            try:
+                if int(duration):
+                    raise TypeError
+
+            except ValueError:
+                pass
+
+        except (KeyError, TypeError):
+            return await ctx.send(f'{config.redTick} Invalid duration passed')
+
+        if stamp - time.time() < 60:  # Less than a minute
+            return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
+
+        db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
+
+        try:
+            member = await ctx.guild.fetch_member(doc['user'])
+
+        except:
+            await ctx.send(
+                f'{config.greenTick} The {doc["type"]} duration has been successfully updated for {doc["user"]} '
+            )  # TODO LANG HERE AND FIGURE OUT MODLOG EDITING
+
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
