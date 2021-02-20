@@ -903,9 +903,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one(
                 {'_id': tag['_id']},
                 {
-                    '$push': {
-                        'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}
-                    },
+                    '$push': {'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}},
                     '$set': {'content': content, 'active': True},
                 },
             )
