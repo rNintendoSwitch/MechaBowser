@@ -809,7 +809,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if not tagList:
             return await ctx.send('{config.redTick} This server has no tags!')
 
-        if ctx.invoked_with in [
+        if ctx.invoked_with.lower() in [
             'tag',
             'tags',
         ]:  # Called from the !tag command instead of !tag list, so we print the simple list
