@@ -382,26 +382,62 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):  # TODO: Work with archives channel attribute to list channels
-        await asyncio.sleep(10)  # Give chance for clean command to finish and discord to process delete
-        db = mclient.bowser.archive
-        checkStamp = int(
-            time.time() - 600
-        )  # Rate limiting, instability, and being just slow to fire are other factors that could delay the event
-        archives = db.find({'timestamp': {'$gt': checkStamp}})
-        if archives:  # If the bulk delete is the result of us, exit
-            for x in archives:
-                if messages[0].id in x['messages']:
-                    return
+        # Lets do some processing and gather meta data
+        db = mclient.modmail.pending
+        authors = []
+        channels = []
+        for msg in messages:
+            if msg.author.id not in authors:
+                authors.append(msg.author.id)
+            if msg.channel.id not in channels:
+                channels.append(msg.channel.id)
 
-        archiveID = await tools.message_archive(messages)
+        if len(authors) == 1:
+            # This is likely: a) a ban or b) user specified clean. Lets rule out a)
+            try:
+                await messages[0].guild.fetch_ban(messages[0].author.id)
 
-        # log = f':printer: New message archive has been generated, view it at {config.baseUrl}/archive/{archiveID}'
-        embed = discord.Embed(
-            description=f'Archive URL: {config.baseUrl}/logs/{archiveID}',
-            color=0xF5A623,
-            timestamp=datetime.datetime.utcnow(),
-        )
-        return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
+            except (discord.Forbidden, discord.NotFound):
+                # Not banned, continue on
+                pass
+
+            except:
+                # This is a discord.HTTPException derivitive or bad exception. Just push the bulk_delete since we do not know
+                archiveID = await tools.message_archive(messages)
+                embed = discord.Embed(
+                    description=f'Archive URL: {config.baseUrl}/logs/{archiveID}',
+                    color=0xF5A623,
+                    timestamp=datetime.datetime.utcnow(),
+                )
+                return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
+
+            else:
+                # User got banned.
+                user = messages[0].author.id
+                pending = db.find({'type': 'ban', 'users': {'$elemMatch': {'$eq': user}}})
+                if pending:
+                    db.update_one({'type': 'ban', 'users': {'$elemMatch': {'$eq': user}}}, {'$push'})
+
+    #        await asyncio.sleep(10)  # Give chance for clean command to finish and discord to process delete
+    #        db = mclient.bowser.archive
+    #        checkStamp = int(
+    #            time.time() - 600
+    #        )  # Rate limiting, instability, and being just slow to fire are other factors that could delay the event
+    #        archives = db.find({'timestamp': {'$gt': checkStamp}})
+    #        if archives:  # If the bulk delete is the result of us, exit
+    #            for x in archives:
+    #                if messages[0].id in x['messages']:
+    #                    return
+    #
+    #        archiveID = await tools.message_archive(messages)
+    #
+    #        # log = f':printer: New message archive has been generated, view it at {config.baseUrl}/archive/{archiveID}'
+    #        embed = discord.Embed(
+    #            description=f'Archive URL: {config.baseUrl}/logs/{archiveID}',
+    #            color=0xF5A623,
+    #            timestamp=datetime.datetime.utcnow(),
+    #        )
+    #        return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
