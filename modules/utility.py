@@ -903,7 +903,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one(
                 {'_id': tag['_id']},
                 {
-                    '$push': {'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}},
+                    '$push': {
+                        'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}
+                    },
                     '$set': {'content': content, 'active': True},
                 },
             )
@@ -1168,19 +1170,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
 
-    @_clean.error
-    @_info.error
-    @_history.error
-    @_roles.error
-    @_roles_set.error
-    @_tag.error
-    @_tag_list.error
-    @_tag_create.error
-    @_tag_delete.error
-    @_tag_setdesc.error
-    @_tag_setimg.error
-    @_tag_source.error
-    async def utility_error(self, ctx, error):
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(
