@@ -673,18 +673,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
 
-    @_banning.error
-    @_unbanning.error
-    @_kicking.error
-    @_strike.error
-    @_strike_set.error
-    @_muting.error
-    @_unmuting.error
-    @_warning.error
-    @_strike.error
-    @_note.error
-    @_hide_modlog.error
-    async def mod_error(self, ctx, error):
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(
