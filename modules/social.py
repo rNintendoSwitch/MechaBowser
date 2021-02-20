@@ -175,8 +175,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
         self._draw_text(draw, (440, 470), 'Messages sent', (126, 126, 126), fonts['small'])
         self._draw_text(draw, (800, 470), 'Timezone', (126, 126, 126), fonts['small'])
-        # self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
-        self._draw_text(draw, (60, 595), 'ファンタシースターオンライン2 クラウド', (45, 45, 45), fonts['medium'])
+        self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
         self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
 
         # Start customized content -- userinfo
