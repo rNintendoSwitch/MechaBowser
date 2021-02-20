@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import io
 import logging
+import os
 import re
 import time
 import typing
@@ -101,17 +102,52 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card = await self._generate_profile_card(member)
         await ctx.send(file=card)
 
+    def _load_fonts(self, fonts_defs):
+        '''Load normal and CJK versions of given dict of fonts'''
+        font_paths = {
+            None: 'resources/notosans/NotoSans-{0}.ttf',
+            'jp': 'resources/notosans/NotoSansCJKjp-{0}.otf',
+        }
+        fonts = {}
+
+        for name, (weight, size) in fonts_defs.items():
+            fonts[name] = {}
+            for font, path in font_paths.items():
+                font_path = path.format(weight)
+
+                if not os.path.isfile(font_path):
+                    raise Exception('Font file not found: ' + font_path)
+
+                fonts[name][font] = ImageFont.truetype(font_path, size)
+
+        return fonts
+
+    # https://medium.com/the-artificial-impostor/4ac839ba313a
+    def _determine_cjk_font(self, text):
+        '''Determine correct CJK font, if needed'''
+        if re.search("[\u3040-\u30ff\u4e00-\u9FFF]", text):
+            return 'jp'
+        return None
+
+    def _draw_text(self, draw: ImageDraw, xy, text: str, fill, fonts: dict):
+        font = fonts[self._determine_cjk_font(text)]
+        return draw.text(xy, text, fill, font)
+
     async def _generate_profile_card(self, member: discord.Member) -> discord.File:
         db = mclient.bowser.users
         fs = gridfs.GridFS(mclient.bowser)
         dbUser = db.find_one({'_id': member.id})
         guild = member.guild
 
-        metaFont = ImageFont.truetype('resources/OpenSans-Regular.ttf', 36)
-        userFont = ImageFont.truetype('resources/OpenSans-Regular.ttf', 48)
-        subtextFont = ImageFont.truetype('resources/OpenSans-Light.ttf', 48)
-        mediumFont = ImageFont.truetype('resources/OpenSans-Light.ttf', 36)
-        smallFont = ImageFont.truetype('resources/OpenSans-Light.ttf', 30)
+        fonts = self._load_fonts(
+            {
+                'meta': ('Regular', 36),
+                'user': ('Regular', 48),
+                'subtext': ('Light', 48),
+                'medium': ('Light', 36),
+                'small': ('Light', 30),
+            }
+        )
 
         # Start construction of key features
         pfp = (
@@ -134,14 +170,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Start header/static text
         draw = ImageDraw.Draw(card)
-        draw.text((150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), font=metaFont)
-        draw.text((150, 90), 'User Profile', (126, 126, 126), font=metaFont)
-        draw.text((60, 470), 'Member since', (126, 126, 126), font=smallFont)
-        draw.text((440, 470), 'Messages sent', (126, 126, 126), font=smallFont)
-        draw.text((800, 470), 'Timezone', (126, 126, 126), font=smallFont)
-        draw.text((60, 595), 'Favorite games', (45, 45, 45), font=mediumFont)
-        # draw.text((800, 600), 'Looking for group', (126, 126, 126), font=smallFont) # TODO: Find a way to see if game is online enabled
-        draw.text((1150, 45), 'Trophy case', (45, 45, 45), font=mediumFont)
+        self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), fonts['meta'])
+        self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
+        self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (440, 470), 'Messages sent', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (800, 470), 'Timezone', (126, 126, 126), fonts['small'])
+        # self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
+        self._draw_text(draw, (60, 595), 'ファンタシースターオンライン2 クラウド', (45, 45, 45), fonts['medium'])
+        self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
 
         # Start customized content -- userinfo
         memberName = ''
@@ -153,8 +189,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             else:
                 if memberName:
-                    W, nameH = draw.textsize(memberName, font=userFont)
-                    draw.text((nameW, 215), memberName, (80, 80, 80), font=userFont)
+                    member_name_font = fonts['users'][self._determine_cjk_font(memberName)]
+                    W, nameH = draw.textsize(memberName, font=member_name_font)
+                    self._draw_text(draw, (nameW, 215), memberName, (80, 80, 80), fonts['user'])
                     nameW += W
                     memberName = ''
 
@@ -169,9 +206,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW += 46
 
         if memberName:  # Leftovers, text
-            draw.text((nameW, 215), memberName, (80, 80, 80), font=userFont)
+            self._draw_text(draw, (nameW, 215), memberName, (80, 80, 80), fonts['user'])
 
-        draw.text((350, 275), '#' + member.discriminator, (126, 126, 126), font=subtextFont)
+        self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
 
         if dbUser['regionFlag']:
             regionImg = Image.open(self.twemojiPath + dbUser['regionFlag'] + '.png').convert('RGBA')
@@ -179,15 +216,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Friend code
         if dbUser['friendcode']:
-            draw.text((350, 330), dbUser['friendcode'], (87, 111, 251), font=subtextFont)
+            self._draw_text(draw, (350, 330), dbUser['friendcode'], (87, 111, 251), fonts['subtext'])
 
         # Start customized content -- stats
-        draw.text(
-            (440, 505),
-            f'{mclient.bowser.messages.find({"author": member.id}).count():,}',
-            (80, 80, 80),
-            font=mediumFont,
-        )
+        message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
+        self._draw_text(draw, (440, 505), message_count, (80, 80, 80), fonts['medium'])
 
         joins = dbUser['joins']
         joins.sort()
@@ -196,14 +229,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             joinDateF = joinDate.strftime('%b. %-d, %Y')
         except:
             joinDateF = joinDate.strftime('%b. %d, %Y')
-        draw.text((60, 505), joinDateF, (80, 80, 80), font=mediumFont)
+        self._draw_text(draw, (60, 505), joinDateF, (80, 80, 80), fonts['medium'])
 
         if not dbUser['timezone']:
-            draw.text((800, 505), 'Not specified', (126, 126, 126), font=mediumFont)
+            self._draw_text(draw, 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
             tzOffset = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%z')
-            draw.text((800, 505), 'GMT' + tzOffset, (80, 80, 80), font=mediumFont)
+            self._draw_text(draw, (800, 505), 'GMT' + tzOffset, (80, 80, 80), fonts['medium'])
 
         # Start trophies
         trophyLocations = {
@@ -269,7 +302,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         # Start favorite games
         setGames = dbUser['favgames']
         if not setGames:
-            draw.text((60, 665), 'Not specified', (126, 126, 126), font=mediumFont)
+            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
             gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
@@ -299,13 +332,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW = 120
                 nameWMax = 950
 
+                game_name_font = fonts['medium'][self._determine_cjk_font(gameName)]
+
                 for char in gameName:
                     if nameW >= nameWMax:
-                        draw.text((nameW, gameTextLocations[gameCount]), '...', (80, 80, 80), font=mediumFont)
+                        draw.text((nameW, gameTextLocations[gameCount]), '...', (80, 80, 80), font=game_name_font)
                         break
 
-                    draw.text((nameW, gameTextLocations[gameCount]), char, (80, 80, 80), font=mediumFont)
-                    nameW += mediumFont.getsize(char)[0]
+                    draw.text((nameW, gameTextLocations[gameCount]), char, (80, 80, 80), font=game_name_font)
+                    nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
 
         bytesFile = io.BytesIO()
