@@ -152,9 +152,6 @@ class MainEvents(commands.Cog):
             punTypes = {
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',
-                'tier1': 'Tier 1 Warning',
-                'tier2': 'Tier 2 Warning',
-                'tier3': 'Tier 3 Warning',
             }
             puns = mclient.bowser.puns.find({'user': member.id, 'active': True})
             restoredPuns = []
@@ -163,7 +160,7 @@ class MainEvents(commands.Cog):
                     if x['type'] == 'blacklist':
                         restoredPuns.append(punTypes[x['type']].format(x['context']))
 
-                    elif x['type'] in ['kick', 'ban']:
+                    elif x['type'] in ['strike', 'kick', 'ban']:
                         continue  # These are not punishments being "restored", instead only status is being tracked
 
                     elif x['type'] == 'mute':
@@ -185,6 +182,30 @@ class MainEvents(commands.Cog):
                 embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
             embed.add_field(name='Mention', value=f'<@{member.id}>')
             await self.serverLogs.send(':shield: Member restored', embed=embed)
+
+        if mclient.bowser.puns.count_documents(
+            {'user': member.id, 'active': True, 'type': {'$in': ['mute', 'strike', 'blacklist']}}
+        ):
+            activeHist = []
+            strikes = 0
+            for pun in mclient.bowser.puns.find(
+                {'user': member.id, 'active': True, 'type': {'$in': ['mute', 'strike', 'blacklist']}}
+            ):
+                if pun['type'] == 'strike':
+                    strikes += pun['active_strike_count']
+
+                elif pun['type'] == 'mute':
+                    activeHist.append('Mute')
+
+                elif pun['type'] == 'blacklist':
+                    activeHist.append(f'Blacklist ({pun["context"]})')
+
+            if strikes:
+                activeHist.append(f'{strikes} Strike{"s" if strikes > 1 else ""}')
+
+            await self.adminChannel.send(
+                f':grey_exclamation: **{member}** ({member.id}) has returned to the server after leaving with the following active punishments:\n{", ".join(activeHist)}'
+            )
 
         if (
             'migrate_unnotified' in doc.keys() and doc['migrate_unnotified'] == True
