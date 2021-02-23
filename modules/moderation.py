@@ -240,6 +240,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'{config.greenTick} The {doc["type"]} duration has been successfully updated for {doc["user"]} '
             )  # TODO LANG HERE AND FIGURE OUT MODLOG EDITING
 
+    @commands.is_owner()
+    @_infraction.command('remove')
+    async def _inf_revoke(self, ctx, _id):
+        db = mclient.bowser.puns
+        doc = db.find_one_and_delete({'_id': _id})
+        if not doc:  # Delete did nothing if doc is None
+            return ctx.send(f'{config.redTick} No matching infraction found')
+
+        await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
+
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
@@ -657,21 +667,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} '
                 f'({activeStrikes+count} - {count}) {error}'
             )
-
-    @commands.is_owner()
-    @commands.group(name='inf', invoke_without_command=True)
-    async def _inf(self, ctx):
-        return
-
-    @commands.is_owner()
-    @_inf.command('remove')
-    async def _inf_revoke(self, ctx, _id):
-        db = mclient.bowser.puns
-        doc = db.find_one_and_delete({'_id': _id})
-        if not doc:  # Delete did nothing if doc is None
-            return ctx.send(f'{config.redTick} No matching infraction found')
-
-        await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
