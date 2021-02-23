@@ -183,15 +183,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         memberName = ''
         nameW = 350
         nameH = 0
+
+        # Member name may be rendered in parts, so we want to ensure the font stays the same for the entire thing
+        member_name_font = fonts['user'][self._determine_cjk_font(memberName)]
+
         for char in member.name:
             if char not in UNICODE_EMOJI:
                 memberName += char
 
             else:
                 if memberName:
-                    member_name_font = fonts['users'][self._determine_cjk_font(memberName)]
                     W, nameH = draw.textsize(memberName, font=member_name_font)
-                    self._draw_text(draw, (nameW, 215), memberName, (80, 80, 80), fonts['user'])
+                    draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
                     nameW += W
                     memberName = ''
 
@@ -206,7 +209,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW += 46
 
         if memberName:  # Leftovers, text
-            self._draw_text(draw, (nameW, 215), memberName, (80, 80, 80), fonts['user'])
+            draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
 
         self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
 
