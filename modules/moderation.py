@@ -73,13 +73,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         pendingLogs = db.find({'public': True, 'public_log_message': None, 'type': {'$ne': 'note'}})
         loop = bot.loop
         for log in pendingLogs:
-            if log['type'] == 'mute':
-                expires = tools.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
-
-            else:
-                expires = None
-
-            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs))
 
         # Run expiration tasks
         userDB = mclient.bowser.users
@@ -159,7 +153,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             embed = message.embeds[0]
             embedDict = embed.to_dict()
-            print(embedDict['fields'])
             newEmbedDict = copy.deepcopy(embedDict)
             listIndex = 0
             for field in embedDict['fields']:
@@ -178,8 +171,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     break
 
                 listIndex += 1
-            print(embedDict['fields'][listIndex]['value'])
-            print(newEmbedDict['fields'][listIndex]['value'])
+
             assert (
                 embedDict['fields'] != newEmbedDict['fields']
             )  # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow

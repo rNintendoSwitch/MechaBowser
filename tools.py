@@ -368,7 +368,7 @@ async def send_modlog(
         return post_action
 
 
-async def send_public_modlog(bot, id, channel, expires=None, mock_document=None):
+async def send_public_modlog(bot, id, channel, mock_document=None):
     db = mclient.bowser.puns
     doc = mock_document if not id else db.find_one({'_id': id})
 
@@ -398,8 +398,11 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
     embed.set_author(name=author)
     embed.set_footer(text=id)
     embed.add_field(name='User', value=user.mention, inline=True)
-    if expires:
-        embed.add_field(name='Expires', value=expires)
+    if doc['expiry']:
+        expires = datetime.datetime.utcfromtimestamp(doc['expiry'])
+        embed.add_field(
+            name='Expires', value=f'{expires.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanize_duration(expires)})'
+        )
     if doc['sensitive']:
         embed.add_field(
             name='Reason',
