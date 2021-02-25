@@ -430,22 +430,25 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
 
 def format_pundm(_type, reason, moderator=None, details=None, auto=False):
+    details_int = details if isinstance(details, int) else 0
+    details_str = details if isinstance(details, str) else ""
+    details_tup = details if isinstance(details, tuple) else ("", "")
     infoStrs = {
-        'strike': f'You have received **{details} strike{"s" if (_type == "strike") and (details > 1) else ""}** on',
-        'destrike': f'Your **active strikes** have been reduced by **{details} strike{"s" if (_type == "destrike") and (details > 1) else ""}** on',
-        'warn': f'You have been **warned (now {details})** on',
-        'warnup': f'Your **warning level** has been **increased (now {details})** on',
-        'warndown': f'Your **warning level** has been **decreased (now {details})** on',
+        'strike': f'You have received **{details_int} strike{"s" if details_int > 1 else ""}** on',
+        'destrike': f'Your **active strikes** have been reduced by **{details_int} strike{"s" if details_int > 1 else ""}** on',
+        'warn': f'You have been **warned (now {details_str})** on',
+        'warnup': f'Your **warning level** has been **increased (now {details_str})** on',
+        'warndown': f'Your **warning level** has been **decreased (now {details_str})** on',
         'warnclear': f'Your **warning** has been **cleared** on',
-        'mute': f'You have been **muted ({details})** on',
+        'mute': f'You have been **muted ({details_str})** on',
         'unmute': f'Your **mute** has been **removed** on',
-        'blacklist': f'Your **{details} permissions** have been **restricted** on',
-        'unblacklist': f'Your **{details} permissions** have been **restored** on',
+        'blacklist': f'Your **{details_str} permissions** have been **restricted** on',
+        'unblacklist': f'Your **{details_str} permissions** have been **restored** on',
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on',
-        'duration-update': f'The duration for your {details[0]} has been updated and will now expire on {details[1]} on',
-        'reason-update': f'The reasoning for your {details[0]} issued on {details[1]} has been updated on',
+        'duration-update': f'The duration for your {details_tup[0]} has been updated and will now expire on {details_tup[0]} on',
+        'reason-update': f'The reasoning for your {details_tup[0]} issued on {details_tup[1]} has been updated on',
     }
 
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
