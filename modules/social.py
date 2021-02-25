@@ -18,7 +18,6 @@ import pymongo
 import pytz
 import requests
 from discord.ext import commands
-from emoji import UNICODE_EMOJI
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
 
@@ -161,7 +160,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         member_name_font = fonts['user'][self._determine_cjk_font(memberName)]
 
         for char in member.name:
-            if char not in UNICODE_EMOJI:
+            if char not in emoji_data.EmojiSequence:
                 memberName += char
 
             else:

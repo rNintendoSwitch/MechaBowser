@@ -10,7 +10,6 @@ fuzzywuzzy[speedup]
 pillow
 pytz
 codepoints
-emoji
 emoji_data
 
 # Workaround for numpy issue on windows. https://stackoverflow.com/a/64661876
