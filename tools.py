@@ -318,25 +318,29 @@ async def send_modlog(
     timestamp=None,
     public=False,
     delay=300,
+    updated=None,
 ):
-    if (
-        user
-    ):  # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
+    if user:
+        # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
         userid = user.id
 
-    if _type == 'strike':
-        author = f'{extra_author} ' + config.punStrs[_type]
-        author += 's ' if extra_author > 1 else ' '
-
-    elif _type == 'destrike':
-        author = f'Removed {extra_author} ' + config.punStrs['strike']
-        author += 's ' if extra_author > 1 else ' '
+    if _type in ['duration-update', 'reason-update']:
+        author = config.punStrs[_type] + f' ({extra_author}) '
 
     else:
-        author = f'{config.punStrs[_type]} '
-        if extra_author:
-            author += f'({extra_author}) '
+        if _type == 'strike':
+            author = f'{extra_author} ' + config.punStrs[_type]
+            author += 's ' if extra_author > 1 else ' '
+
+        elif _type == 'destrike':
+            author = f'Removed {extra_author} ' + config.punStrs['strike']
+            author += 's ' if extra_author > 1 else ' '
+
+        else:
+            author = f'{config.punStrs[_type]} '
+            if extra_author:
+                author += f'({extra_author}) '
 
     author += f'| {username} ({userid})'
 
@@ -354,8 +358,11 @@ async def send_modlog(
         embed.add_field(name='Moderator', value=moderator, inline=True)
 
     if expires:
-        embed.add_field(name='Expires', value=expires)
-    embed.add_field(name='Reason', value=reason)
+        embed.add_field(name='Expires' if _type != 'duration-update' else 'Now expires', value=expires)
+
+    embed.add_field(name='Reason' if _type != 'reason-update' else 'New reason', value=reason)
+    if _type == 'reason-update':
+        embed.add_field(name='Old reason', value=updated)
 
     await channel.send(embed=embed)
     if public:
@@ -422,7 +429,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
         db.update_one({'_id': id}, {'$set': {'public_log_message': message.id, 'public_log_channel': channel.id}})
 
 
-def format_pundm(_type, reason, moderator, details=None, auto=False):
+def format_pundm(_type, reason, moderator=None, details=None, auto=False):
     infoStrs = {
         'strike': f'You have received **{details} strike{"s" if (_type == "strike") and (details > 1) else ""}** on',
         'destrike': f'Your **active strikes** have been reduced by **{details} strike{"s" if (_type == "destrike") and (details > 1) else ""}** on',
@@ -437,12 +444,20 @@ def format_pundm(_type, reason, moderator, details=None, auto=False):
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on',
+        'duration-update': f'The duration for your {details[0]} has been updated and will now expire on {details[1]} on',
+        'reason-update': f'The reasoning for your {details[0]} issued on {details[1]} has been updated on',
     }
-    mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
 
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
-    punDM += f'Reason:```{reason}```'
-    punDM += f'Responsible moderator: {mod}\n\n'
+    if _type == 'reason-update':
+        punDM += f'Updated reason:```{reason}```'
+    else:
+        punDM += f'Reason:```{reason}```'
+
+    if moderator:
+        mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
+        punDM += f'Responsible moderator: {mod}\n\n'
+
     if details == 'modmail':
         punDM += 'If you have questions concerning this matter, please feel free to contact the moderator that took this action or another member of the moderation team.\n'
 

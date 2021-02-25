@@ -196,11 +196,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @_infraction.command(name='duration', aliases=['dur', 'time'])
     @commands.has_any_role(config.moderator, config.eh)
-    async def _infraction_duration(self, ctx, infraction, duration):
+    async def _infraction_duration(self, ctx, infraction, duration, *, reason):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': infraction})
         if not doc:
             return await ctx.send(f'{config.redTick} An invalid infraction id was provided')
+
+        if not doc['active']:
+            return await ctx.send(
+                f'{config.redTick} That infraction has already expired and the duration cannot be edited'
+            )
 
         if doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
             return ctx.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}')
@@ -208,6 +213,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         try:
             _duration = tools.resolve_duration(duration)
             humanized = tools.humanize_duration(_duration)
+            expireStr = f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanized})'
             stamp = _duration.timestamp()
             try:
                 if int(duration):
@@ -223,14 +229,57 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
 
         db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
+        user = await self.bot.fetch_user(doc['user'])
+        await tools.send_modlog(
+            self.bot,
+            self.modLogs,
+            'duration-update',
+            doc['_id'],
+            reason,
+            user=user,
+            moderator=ctx.author,
+            expires=expireStr,
+            extra_author=doc['type'].capitalize(),
+        )
+        try:
+            pubChannel = self.bot.get_channel(doc['public_log_channel'])
+            pubMessage = await pubChannel.fetch_message(doc['public_log_message'])
+            embed = pubMessage.embeds[0]
+            embedDict = embed.to_dict()
+            newEmbedDict = copy.deepcopy(embedDict)
+            listIndex = 0
+            for field in embedDict['fields']:
+                # We are working with the dict because some logs can have `reason` at different indexes and we should not assume index position
+                if (
+                    field['name'] == 'Expires'
+                ):  # This is subject to a breaking change if `name` updated, but I'll take the risk
+                    newEmbedDict['fields'][listIndex]['value'] = expireStr
 
+                    break
+
+                listIndex += 1
+
+            assert (
+                embedDict['fields'] != newEmbedDict['fields']
+            )  # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow
+            newEmbed = discord.Embed.from_dict(newEmbedDict)
+            await pubMessage.edit(embed=newEmbed)
+
+        except Exception as e:
+            logging.error(f'[Moderation] _infraction_duration: {e}')
+
+        db.update_one({'_id': doc['_id']}, {'$set': {'expiry': int(_duration.timestamp())}})
+        error = ''
         try:
             member = await ctx.guild.fetch_member(doc['user'])
+            await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
 
-        except:
-            await ctx.send(
-                f'{config.greenTick} The {doc["type"]} duration has been successfully updated for {doc["user"]} '
-            )  # TODO LANG HERE AND FIGURE OUT MODLOG EDITING
+        except (discord.Forbidden, AttributeError):
+            error = '. I was not able to DM them about this action'
+
+        await ctx.send(
+            f'{config.greenTick} The {doc["type"]} duration has been successfully updated for {user} ({user.id}){error}'
+        )
 
     @commands.is_owner()
     @_infraction.command('remove')
@@ -749,6 +798,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         elif doc['type'] == 'mute' and doc['expiry']:  # A mute that has an expiry
             # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
+            # This could also fail if the expiry time is changed by a mod
             if doc['expiry'] > time.time():
                 retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
                 self.taskHandles.append(
