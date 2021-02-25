@@ -175,7 +175,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
         self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
         self._draw_text(draw, (440, 470), 'Messages sent', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (800, 470), 'Timezone', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (800, 470), 'Local time', (126, 126, 126), fonts['small'])
         self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
         self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
 
@@ -238,8 +238,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self._draw_text(draw, (800, 505), 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
-            tzOffset = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%z')
-            self._draw_text(draw, (800, 505), 'GMT' + tzOffset, (80, 80, 80), fonts['medium'])
+            localtime = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%H:%M')
+            self._draw_text(draw, (800, 505), localtime, (80, 80, 80), fonts['medium'])
 
         # Start trophies
         trophyLocations = {
@@ -543,7 +543,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             backgrounds.remove('default')
 
             if not backgrounds:
-                await message.channel.send('Since you don\'t have any background themes unlocked we\'ll skip this step')
+                await message.channel.send(
+                    'Since you don\'t have any background themes unlocked we\'ll skip this step'
+                )
                 return True
 
             else:
@@ -555,7 +557,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     content = response.content.lower().strip()
                     if response.content.lower().strip() == 'reset':
                         db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default'}})
-                        await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
+                        await message.channel.send(
+                            'I\'ve gone ahead and reset your setting for **profile background**'
+                        )
                         return True
 
                     elif content != 'skip':
