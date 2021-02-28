@@ -16,6 +16,7 @@ import gridfs
 import numpy as np
 import pymongo
 import pytz
+import token_bucket
 import requests
 from discord.ext import commands
 from fuzzywuzzy import process
@@ -31,6 +32,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
+        self.bucket_storage = token_bucket.MemoryStorage()
+        self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
         self.bot_contributors = [
             125233822760566784,  # MattBSG
@@ -49,10 +52,23 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
     @commands.group(name='profile', invoke_without_command=True)
-    # @commands.cooldown(2, 60, commands.BucketType.channel)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member:
             member = ctx.author
+
+        # If channel can be ratelimited
+        if ctx.message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
+            channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
+            if channel_being_rate_limited:
+
+                #  Moderators consume a ratelimit token but are not limited
+                if not ctx.guild.get_role(config.moderator) in ctx.author.roles:
+                    await ctx.send(
+                        f'{config.redTick} That command is being used too often, try again in a few seconds.',
+                        delete_after=15,
+                    )
+                    await ctx.message.delete(delay=15)
+                    return
 
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
