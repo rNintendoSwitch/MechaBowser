@@ -51,13 +51,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @commands.group(name='profile', invoke_without_command=True)
     # @commands.cooldown(2, 60, commands.BucketType.channel)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
-        # We have to call the converter as a function and do extra error checking on it.
-        # The main issue we have with just using the regular member converter, is it returns a None instead of a
-        # MemberNotFound, this poses an issue when using the MemberConverter with typing.Optional as there is no way to
-        # know if it was no arugment or a failure. Furthermore, typing.Optional eats all expections, so this has to be
-        # called as a function.
-
-        logging.warn(f'{repr(member)}')
         if not member:
             member = ctx.author
 
@@ -677,7 +670,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if not contains_code:
             return
-        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
+        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
             await message.channel.send(
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
