@@ -49,11 +49,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
     @commands.group(name='profile', invoke_without_command=True)
-    @commands.cooldown(2, 60, commands.BucketType.channel)
-    async def _profile(self, ctx, user: typing.Optional[discord.User]):
-        if user:
-            member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
-        else:
+    # @commands.cooldown(2, 60, commands.BucketType.channel)
+    async def _profile(self, ctx, member: typing.Optional[discord.Member]):
+        # We have to call the converter as a function and do extra error checking on it.
+        # The main issue we have with just using the regular member converter, is it returns a None instead of a
+        # MemberNotFound, this poses an issue when using the MemberConverter with typing.Optional as there is no way to
+        # know if it was no arugment or a failure. Furthermore, typing.Optional eats all expections, so this has to be
+        # called as a function.
+
+        logging.warn(f'{repr(member)}')
+        if not member:
             member = ctx.author
 
         db = mclient.bowser.users
@@ -672,7 +677,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if not contains_code:
             return
-        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
+        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
             await message.channel.send(
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
@@ -681,24 +686,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def social_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
 
-        if isinstance(error, commands.CommandOnCooldown):
-            if cmd_str == 'profile' and (
-                ctx.message.channel.id in [config.commandsChannel, config.voiceTextChannel]
-                or ctx.guild.get_role(config.moderator) in ctx.author.roles
-            ):
-                await self._profile.__call__(ctx, None if not ctx.args else ctx.args[0])
-            else:
-                return await ctx.send(
-                    f'{config.redTick} That command is being used too often, try again in a few seconds.',
-                    delete_after=15,
-                )
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+        await ctx.send(
+            f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+            delete_after=15,
+        )
+        raise error
 
 
 def setup(bot):
