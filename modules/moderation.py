@@ -194,53 +194,74 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters'
             )
 
+        await self._infraction_editing(ctx, infraction, reason)
+
     @_infraction.command(name='duration', aliases=['dur', 'time'])
     @commands.has_any_role(config.moderator, config.eh)
     async def _infraction_duration(self, ctx, infraction, duration, *, reason):
+        await self._infraction_editing(ctx, infraction, reason, duration)
+
+    async def _infraction_editing(self, ctx, infraction, reason, duration=None):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': infraction})
         if not doc:
             return await ctx.send(f'{config.redTick} An invalid infraction id was provided')
 
-        if not doc['active']:
+        if not doc['active'] and duration:
             return await ctx.send(
                 f'{config.redTick} That infraction has already expired and the duration cannot be edited'
             )
 
-        if doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
+        if duration and doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
             return ctx.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}')
 
-        try:
-            _duration = tools.resolve_duration(duration)
-            humanized = tools.humanize_duration(_duration)
-            expireStr = f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanized})'
-            stamp = _duration.timestamp()
-            try:
-                if int(duration):
-                    raise TypeError
-
-            except ValueError:
-                pass
-
-        except (KeyError, TypeError):
-            return await ctx.send(f'{config.redTick} Invalid duration passed')
-
-        if stamp - time.time() < 60:  # Less than a minute
-            return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
-
-        db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
         user = await self.bot.fetch_user(doc['user'])
-        await tools.send_modlog(
-            self.bot,
-            self.modLogs,
-            'duration-update',
-            doc['_id'],
-            reason,
-            user=user,
-            moderator=ctx.author,
-            expires=expireStr,
-            extra_author=doc['type'].capitalize(),
-        )
+        if duration:
+            try:
+                _duration = tools.resolve_duration(duration)
+                humanized = tools.humanize_duration(_duration)
+                expireStr = f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanized})'
+                stamp = _duration.timestamp()
+                try:
+                    if int(duration):
+                        raise TypeError
+
+                except ValueError:
+                    pass
+
+            except (KeyError, TypeError):
+                return await ctx.send(f'{config.redTick} Invalid duration passed')
+
+            if stamp - time.time() < 60:  # Less than a minute
+                return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
+
+            db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
+            await tools.send_modlog(
+                self.bot,
+                self.modLogs,
+                'duration-update',
+                doc['_id'],
+                reason,
+                user=user,
+                moderator=ctx.author,
+                expires=expireStr,
+                extra_author=doc['type'].capitalize(),
+            )
+
+        else:
+            db.update_one({'_id': infraction}, {'$set': {'reason': reason}})
+            await tools.send_modlog(
+                self.bot,
+                self.modLogs,
+                'reason-update',
+                doc['_id'],
+                reason,
+                user=user,
+                moderator=ctx.author,
+                extra_author=doc['type'].capitalize(),
+                updated=doc['reason'],
+            )
+
         try:
             pubChannel = self.bot.get_channel(doc['public_log_channel'])
             pubMessage = await pubChannel.fetch_message(doc['public_log_message'])
@@ -250,11 +271,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             listIndex = 0
             for field in embedDict['fields']:
                 # We are working with the dict because some logs can have `reason` at different indexes and we should not assume index position
-                if (
-                    field['name'] == 'Expires'
-                ):  # This is subject to a breaking change if `name` updated, but I'll take the risk
+                if duration and field['name'] == 'Expires':
+                    # This is subject to a breaking change if `name` updated, but I'll take the risk
                     newEmbedDict['fields'][listIndex]['value'] = expireStr
+                    break
 
+                elif not duration and field['name'] == 'Reason':
+                    newEmbedDict['fields'][listIndex]['value'] = reason
                     break
 
                 listIndex += 1
@@ -268,17 +291,29 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except Exception as e:
             logging.error(f'[Moderation] _infraction_duration: {e}')
 
-        db.update_one({'_id': doc['_id']}, {'$set': {'expiry': int(_duration.timestamp())}})
         error = ''
         try:
             member = await ctx.guild.fetch_member(doc['user'])
-            await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
+            if duration:
+                await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
+
+            else:
+                await member.send(
+                    tools.format_pundm(
+                        'reason-update',
+                        reason,
+                        details=(
+                            doc['type'],
+                            datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime("%B %d, %Y %H:%M:%S UTC"),
+                        ),
+                    )
+                )
 
         except (discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'
 
         await ctx.send(
-            f'{config.greenTick} The {doc["type"]} duration has been successfully updated for {user} ({user.id}){error}'
+            f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}'
         )
 
     @commands.is_owner()
