@@ -259,9 +259,7 @@ class MainEvents(commands.Cog):
     async def on_member_remove(self, member):
         # log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
         db = mclient.bowser.puns
-        puns = db.find(
-            {'user': member.id, 'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3', 'mute', 'blacklist']}}
-        )
+        puns = db.find({'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}})
 
         mclient.bowser.users.update_one(
             {'_id': member.id},

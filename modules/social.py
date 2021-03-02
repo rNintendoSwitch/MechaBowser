@@ -11,13 +11,14 @@ from pathlib import Path
 import codepoints
 import config
 import discord
+import emoji_data
 import gridfs
 import numpy as np
 import pymongo
 import pytz
+import token_bucket
 import requests
 from discord.ext import commands
-from emoji import UNICODE_EMOJI
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
 
@@ -31,34 +32,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
-        self.letterCodepoints = [
-            '1f1e6',
-            '1f1e7',
-            '1f1e8',
-            '1f1e9',
-            '1f1ea',
-            '1f1eb',
-            '1f1ec',
-            '1f1ed',
-            '1f1ee',
-            '1f1ef',
-            '1f1f0',
-            '1f1f1',
-            '1f1f2',
-            '1f1f3',
-            '1f1f4',
-            '1f1f5',
-            '1f1f6',
-            '1f1f7',
-            '1f1f8',
-            '1f1f9',
-            '1f1fa',
-            '1f1fb',
-            '1f1fc',
-            '1f1fd',
-            '1f1fe',
-            '1f1ff',
-        ]
+        self.bucket_storage = token_bucket.MemoryStorage()
+        self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
         self.bot_contributors = [
             125233822760566784,  # MattBSG
@@ -77,12 +52,23 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
     @commands.group(name='profile', invoke_without_command=True)
-    @commands.cooldown(2, 60, commands.BucketType.channel)
-    async def _profile(self, ctx, user: typing.Optional[discord.User]):
-        if user:
-            member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
-        else:
+    async def _profile(self, ctx, member: typing.Optional[discord.Member]):
+        if not member:
             member = ctx.author
+
+        # If channel can be ratelimited
+        if ctx.message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
+            channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
+            if channel_being_rate_limited:
+
+                #  Moderators consume a ratelimit token but are not limited
+                if not ctx.guild.get_role(config.moderator) in ctx.author.roles:
+                    await ctx.send(
+                        f'{config.redTick} That command is being used too often, try again in a few seconds.',
+                        delete_after=15,
+                    )
+                    await ctx.message.delete(delay=15)
+                    return
 
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
@@ -188,7 +174,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         member_name_font = fonts['user'][self._determine_cjk_font(memberName)]
 
         for char in member.name:
-            if char not in UNICODE_EMOJI:
+            if char not in emoji_data.EmojiSequence:
                 memberName += char
 
             else:
@@ -350,6 +336,38 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
+    def check_flag(self, emoji: str) -> typing.Optional[typing.Iterable[int]]:
+        # For some reason emoji emoji_data.is_emoji_tag_sequence() does not return correctly, so we have to write our own function
+        def is_valid_tag_flag(sequence: emoji_data.EmojiSequence) -> bool:
+            BLACK_FLAG_EMOJI = u'\U0001F3F4'
+            TAG_CHARACTERS = [chr(c) for c in range(ord('\U000E0020'), ord('\U000E007E') + 1)]
+            TAG_TERMINATOR = u'\U000E007F'
+
+            if seq.string[0] != BLACK_FLAG_EMOJI:  # First character
+                return False
+            if seq.string[-1] != TAG_TERMINATOR:  # Middle character
+                return False
+            for character in seq.string[1:-1]:  # Middle characters
+                if character not in TAG_CHARACTERS:
+                    return False
+
+            return emoji_data.QualifiedType.FULLY_QUALIFIED
+
+        # Locate EmojiSequence for given emoji
+        for uni, seq in emoji_data.EmojiSequence:
+            if uni == emoji:
+                # Normal unicode flags
+                is_emoji_flag = emoji_data.is_emoji_flag_sequence(emoji)
+                # Flags such as england, scotland, and wales
+                is_tag_flag = is_valid_tag_flag(seq)
+                # Flags such as pirate, lgbt, and trans flag
+                is_zwj_flag = emoji_data.is_emoji_zwj_sequence(emoji) and 'flag' in seq.description
+
+                return seq.code_points if (is_emoji_flag or is_tag_flag or is_zwj_flag) else None
+
+        # Emoji not found
+        return None
+
     @_profile.command(name='edit')
     async def _profile_edit(self, ctx):
         db = mclient.bowser.users
@@ -427,22 +445,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 await message.channel.send('I\'ve gone ahead and reset your setting for **regional flag**')
                 return True
 
-            for x in content:
-                if x not in UNICODE_EMOJI:
-                    return False
+            code_points = self.check_flag(content)
+            if code_points is None:
+                return False
 
-            rawPoints = tuple(codepoints.from_unicode(content))
-            points = []
+            # Convert list of ints to lowercase hex code points, seperated by dashes
+            pointStr = '-'.join('{:04x}'.format(n) for n in code_points)
 
-            for x in rawPoints:
-                if (
-                    str(hex(x)[2:]) not in self.letterCodepoints
-                ):  # Flags are the 2 letter abbrev. in regional letter emoji
-                    return False
-
-                points.append(str(hex(x)[2:]))
-
-            pointStr = '-'.join(points)
             if not Path(f'{self.twemojiPath}{pointStr}.png').is_file():
                 return False
 
@@ -686,24 +695,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def social_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
 
-        if isinstance(error, commands.CommandOnCooldown):
-            if cmd_str == 'profile' and (
-                ctx.message.channel.id in [config.commandsChannel, config.voiceTextChannel]
-                or ctx.guild.get_role(config.moderator) in ctx.author.roles
-            ):
-                await self._profile.__call__(ctx, None if not ctx.args else ctx.args[0])
-            else:
-                return await ctx.send(
-                    f'{config.redTick} That command is being used too often, try again in a few seconds.',
-                    delete_after=15,
-                )
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+        await ctx.send(
+            f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+            delete_after=15,
+        )
+        raise error
 
 
 def setup(bot):

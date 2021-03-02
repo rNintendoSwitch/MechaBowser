@@ -103,6 +103,8 @@ punStrs = {
     'unblacklist': 'Unblacklist',
     'note': 'Note',
     'appealdeny': 'Denied ban appeal',
+    'duration-update': 'Duration updated',
+    'reason-update': 'Reason updated',
 }
 
 punColors = {
@@ -116,4 +118,6 @@ punColors = {
     'mute': 0x3680A4,
     'unblacklist': 0x80E59A,
     'unmute': 0x39C05D,
+    'duration-update': 0x58B9FF,
+    'reason-update': 0x58B9FF,
 }
