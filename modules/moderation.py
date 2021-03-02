@@ -309,7 +309,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     )
                 )
 
-        except (discord.Forbidden, AttributeError):
+        except (discord.NotFound, discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'
 
         await ctx.send(
