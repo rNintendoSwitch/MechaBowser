@@ -224,8 +224,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self._draw_text(draw, (800, 505), 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
-            localtime = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%H:%M')
-            self._draw_text(draw, (800, 505), localtime, (80, 80, 80), fonts['medium'])
+            tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
+            localtime = tznow.strftime('%H:%M')
+            tzOffset = tznow.strftime('%z')
+
+            if tzOffset[-2:] == '00':  # Remove 00 at end, if present
+                tzOffset = tzOffset[:-2]
+            if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
+                tzOffset = tzOffset[0] + tzOffset[2:]
+
+            self._draw_text(draw, (800, 505), f'{localtime} (UTC{tzOffset})', (80, 80, 80), fonts['medium'])
 
         # Start trophies
         trophyLocations = {
