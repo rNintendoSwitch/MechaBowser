@@ -204,7 +204,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             # Drop Shadow
             shadowData = np.array(regionImg)
-            shadowData[..., :-1] = (128, 128, 128)
+            shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
             shadowImg = Image.fromarray(shadowData)
 
             card.paste(shadowImg, (978, 52), shadowImg)
