@@ -160,8 +160,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), fonts['meta'])
         self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
         self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (440, 470), 'Messages sent', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (800, 470), 'Local time', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (435, 470), 'Messages sent', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (790, 470), 'Local time', (126, 126, 126), fonts['small'])
         self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
         self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
 
@@ -209,7 +209,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Start customized content -- stats
         message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
-        self._draw_text(draw, (440, 505), message_count, (80, 80, 80), fonts['medium'])
+        self._draw_text(draw, (435, 505), message_count, (80, 80, 80), fonts['medium'])
 
         joins = dbUser['joins']
         joins.sort()
@@ -221,7 +221,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 505), joinDateF, (80, 80, 80), fonts['medium'])
 
         if not dbUser['timezone']:
-            self._draw_text(draw, (800, 505), 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (790, 505), 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
             tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
@@ -233,7 +233,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
                 tzOffset = tzOffset[0] + tzOffset[2:]
 
-            self._draw_text(draw, (800, 505), f'{localtime} (UTC{tzOffset})', (80, 80, 80), fonts['medium'])
+            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', (80, 80, 80), fonts['medium'])
 
         # Start trophies
         trophyLocations = {
