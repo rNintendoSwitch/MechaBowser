@@ -16,8 +16,8 @@ import gridfs
 import numpy as np
 import pymongo
 import pytz
-import token_bucket
 import requests
+import token_bucket
 from discord.ext import commands
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
