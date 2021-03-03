@@ -179,10 +179,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return self.fsImgCache[filename]
 
     def _cache_game_img(self, fs: gridfs.GridFS, id: str) -> Image:
+        EXPIRY, IMAGE = 0, 1
         do_recache = False
 
         if id in self.gameImgCache:
-            if time.time() > self.gameImgCache[id][0]:  # Expired in cache
+            if time.time() > self.gameImgCache[id][EXPIRY]:  # Expired in cache
                 do_recache = True
         else:  # Not in cache
             do_recache = True
@@ -196,10 +197,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             self.gameImgCache[id] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
 
-        if self.gameImgCache[id] is None:
+        if self.gameImgCache[id][IMAGE] is None:
             return self.missingImage
 
-        return self.gameImgCache[id]
+        return self.gameImgCache[id][IMAGE]
 
     async def _generate_profile_card(self, member: discord.Member) -> discord.File:
         START_TIME = time.time()
@@ -362,7 +363,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for game in setGames:
                 gameDoc = gamesDb.find_one({'_id': game})
                 gameIcon = self._cache_game_img(fs, game)
-                logging.warn(type(gameIcon))
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 if gameDoc['titles']['NA']:
