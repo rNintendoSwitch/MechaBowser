@@ -203,7 +203,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return self.gameImgCache[id][IMAGE]
 
     async def _generate_profile_card(self, member: discord.Member) -> discord.File:
-        START_TIME = time.time()
         db = mclient.bowser.users
         fs = gridfs.GridFS(mclient.bowser)
         dbUser = db.find_one({'_id': member.id})
@@ -390,7 +389,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
-        logging.warn(time.time() - START_TIME)
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
     def check_flag(self, emoji: str) -> typing.Optional[typing.Iterable[int]]:
