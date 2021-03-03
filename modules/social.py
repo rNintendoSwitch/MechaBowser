@@ -255,6 +255,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if dbUser['regionFlag']:
             regionImg = Image.open(self.twemojiPath + dbUser['regionFlag'] + '.png').convert('RGBA')
+
+            # Drop Shadow
+            shadowData = np.array(regionImg)
+            shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
+            shadowImg = Image.fromarray(shadowData)
+
+            card.paste(shadowImg, (978, 52), shadowImg)
             card.paste(regionImg, (976, 50), regionImg)
 
         # Friend code
