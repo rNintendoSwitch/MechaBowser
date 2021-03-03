@@ -165,7 +165,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return img
 
-    def _cache_fs_image(self, type: typing.Literal['backgroundn', 'trophy'], name: str) -> Image:
+    def _cache_fs_image(self, type: str, name: str) -> Image:
         if type == 'background':
             filename = 'resources/profile-{}.png'.format(name)
         elif type == 'trophy':
