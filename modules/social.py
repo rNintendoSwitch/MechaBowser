@@ -57,6 +57,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
         self.pfpBackground = Image.open('resources/pfp-background.png').convert('RGBA')
         self.profileStatic = self._init_profile_static()
+        self.missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
+        self.fsImgCache = {}
+        self.gameImgCache = {}
 
         # Friend Code Regexs (\u2014 = em-dash)
         self.friendCodeRegex = {
@@ -162,14 +165,51 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return img
 
+    def _cache_fs_image(self, type: typing.Literal['backgroundn', 'trophy'], name: str) -> Image:
+        if type == 'background':
+            filename = 'resources/profile-{}.png'.format(name)
+        elif type == 'trophy':
+            filename = 'resources/trophies/{}.png'.format(name)
+        else:
+            raise ValueError('Unupported type: ' + type)
+
+        if not filename in self.fsImgCache:
+            self.fsImgCache[filename] = Image.open(filename).convert("RGBA")
+
+        return self.fsImgCache[filename]
+
+    def _cache_game_img(self, fs: gridfs.GridFS, id: str) -> Image:
+        do_recache = False
+
+        if id in self.gameImgCache:
+            if time.time() > self.gameImgCache[id][0]:  # Expired in cache
+                do_recache = True
+        else:  # Not in cache
+            do_recache = True
+
+        if do_recache:
+            if fs.exists(id):
+                gameImg = fs.get(id)
+                gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+            else:
+                gameIcon = None
+
+            self.gameImgCache[id] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
+
+        if self.gameImgCache[id] is None:
+            return self.missingImage
+
+        return self.gameImgCache[id]
+
     async def _generate_profile_card(self, member: discord.Member) -> discord.File:
+        START_TIME = time.time()
         db = mclient.bowser.users
         fs = gridfs.GridFS(mclient.bowser)
         dbUser = db.find_one({'_id': member.id})
 
         pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
-        background = Image.open('resources/profile-{}.png'.format(dbUser['background'])).convert("RGBA")
+        background = self._cache_fs_image('background', dbUser['background'])
 
         card = self.pfpBackground.copy()
         card.paste(pfp, (50, 170), pfp)
@@ -215,13 +255,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if dbUser['regionFlag']:
             regionImg = Image.open(self.twemojiPath + dbUser['regionFlag'] + '.png').convert('RGBA')
-
-            # Drop Shadow
-            shadowData = np.array(regionImg)
-            shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
-            shadowImg = Image.fromarray(shadowData)
-
-            card.paste(shadowImg, (978, 52), shadowImg)
             card.paste(regionImg, (976, 50), regionImg)
 
         # Friend code
@@ -312,7 +345,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         trophyNum = 0
         for x in trophies:
-            trophyBadge = Image.open('resources/trophies/' + x + '.png').convert('RGBA')
+            trophyBadge = self._cache_fs_image('trophy', x)
             card.paste(trophyBadge, trophyLocations[trophyNum], trophyBadge)
             trophyNum += 1
 
@@ -328,14 +361,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             gamesDb = mclient.bowser.games
             for game in setGames:
                 gameDoc = gamesDb.find_one({'_id': game})
-                if fs.exists(game):
-                    gameImg = fs.get(game)
-                    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-                    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
-
-                else:
-                    missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-                    card.paste(missingImage, gameIconLocations[gameCount], missingImage)
+                gameIcon = self._cache_game_img(fs, game)
+                card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
@@ -362,6 +389,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
+        logging.warn(time.time() - START_TIME)
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
     def check_flag(self, emoji: str) -> typing.Optional[typing.Iterable[int]]:
