@@ -59,6 +59,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.profileStatic = self._init_profile_static()
         self.missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
         self.fsImgCache = {}
+        self.flagImgCache = {}
         self.gameImgCache = {}
 
         # Friend Code Regexs (\u2014 = em-dash)
@@ -178,6 +179,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.fsImgCache[filename]
 
+    def _cache_flag_image(self, name) -> typing.Tuple:
+        if not name in self.flagImgCache:
+            regionImg = Image.open(self.twemojiPath + name + '.png').convert('RGBA')
+
+            # Drop Shadow
+            shadowData = np.array(regionImg)
+            shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
+            shadowImg = Image.fromarray(shadowData)
+
+            self.flagImgCache[name] = (regionImg, shadowImg)
+
+        return self.flagImgCache[name]
+
     def _cache_game_img(self, fs: gridfs.GridFS, id: str) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
@@ -254,13 +268,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
 
         if dbUser['regionFlag']:
-            regionImg = Image.open(self.twemojiPath + dbUser['regionFlag'] + '.png').convert('RGBA')
-
-            # Drop Shadow
-            shadowData = np.array(regionImg)
-            shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
-            shadowImg = Image.fromarray(shadowData)
-
+            regionImg, shadowImg = self._cache_flag_image(dbUser['regionFlag'])
             card.paste(shadowImg, (978, 52), shadowImg)
             card.paste(regionImg, (976, 50), regionImg)
 
