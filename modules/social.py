@@ -179,8 +179,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.fsImgCache[filename]
 
-    def _cache_flag_image(self, name) -> typing.Tuple:
+    def _cache_flag_image(self, name) -> Image:
+        SHADOW_OFFSET = 2
+
         if not name in self.flagImgCache:
+
             regionImg = Image.open(self.twemojiPath + name + '.png').convert('RGBA')
 
             # Drop Shadow
@@ -188,7 +191,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
             shadowImg = Image.fromarray(shadowData)
 
-            self.flagImgCache[name] = (regionImg, shadowImg)
+            # Combine shadow
+            w, h = regionImg.size
+            img = Image.new('RGBA', (w + SHADOW_OFFSET, h + SHADOW_OFFSET), (0, 0, 0, 0))
+            img.paste(shadowImg, (SHADOW_OFFSET, SHADOW_OFFSET), shadowImg)
+            img.paste(regionImg, (0, 0), regionImg)
+
+            self.flagImgCache[name] = img
 
         return self.flagImgCache[name]
 
@@ -268,8 +277,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
 
         if dbUser['regionFlag']:
-            regionImg, shadowImg = self._cache_flag_image(dbUser['regionFlag'])
-            card.paste(shadowImg, (978, 52), shadowImg)
+            regionImg = self._cache_flag_image(dbUser['regionFlag'])
             card.paste(regionImg, (976, 50), regionImg)
 
         # Friend code
