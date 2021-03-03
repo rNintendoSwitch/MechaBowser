@@ -32,14 +32,32 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
+
+        # !profile ratelimits
         self.bucket_storage = token_bucket.MemoryStorage()
         self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
+
+        # Profile generation
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
         self.bot_contributors = [
             125233822760566784,  # MattBSG
             123879073972748290,  # Lyrus
             108429628560924672,  # Alex from Alaska
         ]
+
+        # Profile generation - precaching
+        self.profileFonts = self._load_fonts(
+            {
+                'meta': ('Regular', 36),
+                'user': ('Regular', 48),
+                'subtext': ('Light', 48),
+                'medium': ('Light', 36),
+                'small': ('Light', 30),
+            }
+        )
+        self.pfpBackground = Image.open('resources/pfp-background.png').convert('RGBA')
+        self.profileStatic = self._init_profile_static()
+
         # Friend Code Regexs (\u2014 = em-dash)
         self.friendCodeRegex = {
             # Profile setup/editor (lenient)
@@ -120,43 +138,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         font = fonts[self._determine_cjk_font(text)]
         return draw.text(xy, text, fill, font)
 
-    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
-        db = mclient.bowser.users
-        fs = gridfs.GridFS(mclient.bowser)
-        dbUser = db.find_one({'_id': member.id})
-        guild = member.guild
+    def _init_profile_static(self) -> Image:
+        '''Inits static elements above background for profile card precache'''
+        fonts = self.profileFonts
+        img = Image.new('RGBA', self.pfpBackground.size, (0, 0, 0, 0))
 
-        fonts = self._load_fonts(
-            {
-                'meta': ('Regular', 36),
-                'user': ('Regular', 48),
-                'subtext': ('Light', 48),
-                'medium': ('Light', 36),
-                'small': ('Light', 30),
-            }
-        )
-
-        # Start construction of key features
-        pfp = (
-            Image.open(io.BytesIO(await member.avatar_url_as(format='png', size=256).read()))
-            .convert("RGBA")
-            .resize((250, 250))
-        )
-        pfpBack = Image.open('resources/pfp-background.png').convert('RGBA')
-        pfpBack.paste(pfp, (50, 170), pfp)
-        card = Image.open('resources/profile-{}.png'.format(dbUser['background'])).convert("RGBA")
-        pfpBack.paste(card, mask=card)
-        card = pfpBack
         snoo = Image.open('resources/snoo.png').convert("RGBA")
         trophyUnderline = Image.open('resources/trophy-case-underline.png').convert("RGBA")
         gameUnderline = Image.open('resources/favorite-games-underline.png').convert("RGBA")
 
-        card.paste(snoo, (50, 50), snoo)
-        card.paste(trophyUnderline, (1150, 100), trophyUnderline)
-        card.paste(gameUnderline, (60, 645), gameUnderline)
+        img.paste(snoo, (50, 50), snoo)
+        img.paste(trophyUnderline, (1150, 100), trophyUnderline)
+        img.paste(gameUnderline, (60, 645), gameUnderline)
 
-        # Start header/static text
-        draw = ImageDraw.Draw(card)
+        draw = ImageDraw.Draw(img)
         self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), fonts['meta'])
         self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
         self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
@@ -165,10 +160,29 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
         self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
 
-        # Start customized content -- userinfo
+        return img
+
+    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
+        db = mclient.bowser.users
+        fs = gridfs.GridFS(mclient.bowser)
+        dbUser = db.find_one({'_id': member.id})
+
+        pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
+        pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
+        background = Image.open('resources/profile-{}.png'.format(dbUser['background'])).convert("RGBA")
+
+        card = self.pfpBackground.copy()
+        card.paste(pfp, (50, 170), pfp)
+        card.paste(background, mask=background)
+        card.paste(self.profileStatic, mask=self.profileStatic)
+
+        guild = member.guild
+        draw = ImageDraw.Draw(card)
+        fonts = self.profileFonts
+
+        # userinfo
         memberName = ''
         nameW = 350
-        nameH = 0
 
         # Member name may be rendered in parts, so we want to ensure the font stays the same for the entire thing
         member_name_font = fonts['user'][self._determine_cjk_font(memberName)]
@@ -179,7 +193,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             else:
                 if memberName:
-                    W, nameH = draw.textsize(memberName, font=member_name_font)
+                    W, _ = draw.textsize(memberName, font=member_name_font)
                     draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
                     nameW += W
                     memberName = ''
@@ -265,7 +279,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for x in dbUser:
                 trophies.append(x)
 
-        # Hardcoding IDs like a genius
         if member.id == guild.owner.id:  # Server owner
             trophies.append('owner')
 
