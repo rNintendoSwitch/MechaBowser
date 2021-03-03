@@ -362,6 +362,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for game in setGames:
                 gameDoc = gamesDb.find_one({'_id': game})
                 gameIcon = self._cache_game_img(fs, game)
+                logging.warn(type(gameIcon))
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 if gameDoc['titles']['NA']:
