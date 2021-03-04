@@ -91,7 +91,21 @@ class MainEvents(commands.Cog):
     async def _ping(self, ctx):
         initiated = ctx.message.created_at
         msg = await ctx.send('Evaluating...')
-        return await msg.edit(content=f'Pong! Roundtrip latency {(msg.created_at - initiated).total_seconds()} seconds')
+        roundtrip = (msg.created_at - initiated).total_seconds() * 1000
+
+        database_start = time.time()
+        mclient.bowser.command('ping')
+        database = (time.time() - database_start) * 1000
+
+        websocket = self.bot.latency * 1000
+
+        return await msg.edit(
+            content=(
+                'Pong! Latency: **Roundtrip** `{:1.0f}ms`, **Websocket** `{:1.0f}ms`, **Database** `{:1.0f}ms`'.format(
+                    roundtrip, websocket, database
+                )
+            )
+        )
 
     @commands.Cog.listener()
     async def on_resume(self):
