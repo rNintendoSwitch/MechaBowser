@@ -298,7 +298,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         wait=True,
                     )
 
-                    await message.delete()
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
 
                     embed = discord.Embed(
                         description='The above message was automatically reposted by Mecha Bowser to remove an affiliate marketing link. The author may react with 🗑️ to delete these messages.'
