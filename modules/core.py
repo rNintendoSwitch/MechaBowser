@@ -21,7 +21,7 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.private_modules_loaded = False
+        self.antispam_loaded = False
 
         try:
             self.bot.load_extension('tools')
@@ -31,7 +31,6 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('modules.social')
             try:  # Private submodule extensions
                 self.bot.load_extension('private.automod')
-                self.private_modules_loaded = True
 
             except commands.errors.ExtensionNotFound:
                 logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
@@ -46,6 +45,9 @@ class MainEvents(commands.Cog):
         self.debugChannel = self.bot.get_channel(config.debugChannel)
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.invites = {}
+
+    def set_antispam_loaded(self):
+        self.antispam_loaded = True
 
     def cog_unload(self):
         self.sanitize_eud.cancel()  # pylint: disable=no-member
@@ -373,7 +375,7 @@ class MainEvents(commands.Cog):
 
         await self.bot.process_commands(message)  # Allow commands to fire
 
-        if not self.private_modules_loaded:
+        if not self.antispam_loaded:
             await self.bot.get_cog('Utility Commands').on_automod_finished(message)
 
         return
