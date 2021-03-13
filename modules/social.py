@@ -248,7 +248,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         nameW = 350
 
         # Member name may be rendered in parts, so we want to ensure the font stays the same for the entire thing
-        member_name_font = fonts['user'][self._determine_cjk_font(memberName)]
+        member_name_font = fonts['user'][self._determine_cjk_font(member.name)]
 
         for char in member.name:
             if char not in emoji_data.EmojiSequence:
