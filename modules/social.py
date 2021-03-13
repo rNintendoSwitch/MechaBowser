@@ -447,7 +447,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return None
 
     @_profile.command(name='edit')
-    async def _profile_edit(self, ctx):
+    async def _profile_edit(self, ctx: commands.Context):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': ctx.author.id})
         mainMsg = None
@@ -603,10 +603,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if results and results[0][1] >= 86:
                     if gameCnt == 0 and dbUser['favgames']:
                         db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+                    msg = f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__'
                     while True:
-                        await message.channel.send(
-                            f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__'
-                        )
+                        await message.channel.send(msg)
                         checkResp = await self.bot.wait_for('message', timeout=120, check=check)
                         if checkResp.content.lower().strip() in ['yes', 'y']:
                             gameObj = games[titleList[results[0][0]]]
@@ -621,6 +620,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                         elif checkResp.content.lower().strip() in ['no', 'n']:
                             break
+                        msg = "Your input was not __yes__ or __no__. Please say exactly __yes__ or __no__."
 
                 else:
                     failedFetch = True

@@ -107,7 +107,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             elif pun['type'] == 'mute':
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
-                logging.info(f'using {tryTime} for mute')
                 self.taskHandles.append(
                     self.bot.loop.call_later(
                         tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)
@@ -521,7 +520,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())
-        logging.info(f'using {expireTime}')
         tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
         self.taskHandles.append(
             self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
