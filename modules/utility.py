@@ -145,6 +145,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     if x not in fetchedInvites:
                         fetchedInvites.append(x)
                         invite = await self.bot.fetch_invite(x)
+                        if not invite.guild:
+                            pass
                         if invite.guild.id in guildWhitelist:
                             continue
                         if 'VERIFIED' in invite.guild.features:
@@ -160,7 +162,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if inviteInfos:
                 await message.delete()
                 await message.channel.send(
-                    f':bangbang: {message.author.mention} please do not post invite links to other Discord servers. If you believe the linked server(s) should be whitelisted, contact a moderator',
+                    f':bangbang: {message.author.mention} please do not post invite links to other Discord servers or groups. If you believe the linked server(s) should be whitelisted, contact a moderator',
                     delete_after=10,
                 )
                 await self.adminChannel.send(
