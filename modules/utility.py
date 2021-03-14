@@ -147,12 +147,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         invite = await self.bot.fetch_invite(x)
                         if not invite.guild:
                             pass
-                        if invite.guild.id in guildWhitelist:
-                            continue
-                        if 'VERIFIED' in invite.guild.features:
-                            continue
-                        if 'PARTNERED' in invite.guild.features:
-                            continue
+
+                        else:
+                            if invite.guild.id in guildWhitelist:
+                                continue
+                            if 'VERIFIED' in invite.guild.features:
+                                continue
+                            if 'PARTNERED' in invite.guild.features:
+                                continue
 
                         inviteInfos.append(invite)
 
