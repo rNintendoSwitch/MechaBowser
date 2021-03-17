@@ -302,7 +302,7 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':outbox_tray: User left', embed=embed)
 
     @commands.Cog.listener()
-    async def on_member_ban(self, guild, user):
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User):
         if guild.id != config.nintendoswitch:
             return
 
@@ -310,14 +310,14 @@ class MainEvents(commands.Cog):
         await asyncio.sleep(10)  # Wait 10 seconds to allow audit log to update
         if not db.find_one({'user': user.id, 'type': 'ban', 'active': True, 'timestamp': {'$gt': time.time() - 60}}):
             # Manual ban
-            audited = False
+            audited = None
             async for entry in guild.audit_logs(action=discord.AuditLogAction.ban):
                 if entry.target == user:
                     audited = entry
                     break
 
             if audited:
-                reason = '-No reason specified-' if not audited.reason else audited.reason
+                reason = audited.reason or '-No reason specified-'
                 docID = await tools.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 
                 await tools.send_modlog(
@@ -331,21 +331,26 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':rotating_light: User banned', embed=embed)
 
     @commands.Cog.listener()
-    async def on_member_unban(self, guild, user):
+    async def on_member_unban(self, guild: discord.Guild, user: discord.User):
         if guild.id != config.nintendoswitch:
             return
 
         db = mclient.bowser.puns
         if not db.find_one({'user': user.id, 'type': 'unban', 'timestamp': {'$gt': time.time() - 60}}):
             # Manual unban
-            audited = False
+
+            audited = None
             async for entry in guild.audit_logs(action=discord.AuditLogAction.unban):
                 if entry.target == user:
                     audited = entry
                     break
 
             if audited:
-                reason = '-No reason specified-' if not audited.reason else audited.reason
+                reason = (
+                    "Ban appeal accepted"
+                    if audited.user.id == config.parakarry
+                    else audited.reason or '-No reason specified-'
+                )
                 docID = await tools.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
                 db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
 
