@@ -8,13 +8,13 @@ import typing
 import urllib
 
 import aiohttp
-from nsecpy.status import EventStatus
 import config
 import discord
 import nsecpy
 import pymongo
 from discord import AsyncWebhookAdapter, Webhook
 from discord.ext import commands, tasks
+from nsecpy.status import EventStatus
 
 import tools
 
