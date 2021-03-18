@@ -8,8 +8,10 @@ import typing
 import urllib
 
 import aiohttp
+from nsecpy.status import EventStatus
 import config
 import discord
+import nsecpy
 import pymongo
 from discord import AsyncWebhookAdapter, Webhook
 from discord.ext import commands, tasks
@@ -1038,6 +1040,35 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         else:
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+
+    @commands.command(name='ninstatus')
+    async def _ninstatus(self, ctx: commands.Context, region: str):
+        if region not in nsecpy.regions:
+            await ctx.send(
+                f"that region does not exist. regions that do exist are `{'`, `'.join([region for region in nsecpy.regions])}`"
+            )
+            return
+        status = await nsecpy.regions[region].getStatus()
+        embed = discord.Embed()
+
+        for platform in status.categories:
+            embed.add_field(name=platform.name, value=f"Currently {platform.type.name.capitalize()}")
+
+        for outage in status.operational_statuses:
+            embed.add_field(
+                name=outage.software_title,
+                value=f"This outage began at {outage.begin.isoformat()}. {outage.message}",
+                inline=True,
+            )
+        for planned in status.temporary_maintenances:
+            if planned.event_status == EventStatus.PLANNED:
+                embed.add_field(
+                    name=planned.software_title,
+                    value=f"{planned.message}\nthis event is scheduled to begin at {planned.begin}, and end at {planned.end}",
+                    inline=True,
+                )
+
+        await ctx.message.reply(embed=embed, mention_author=False)
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
