@@ -767,6 +767,16 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             else:
                 raise
 
+    @commands.command(name='reply')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _reply(self, ctx: commands.Context, message: discord.Message, *, text: str):
+        await message.reply(text)
+
+    @commands.command(name='echo')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _echo(self, ctx: commands.Context, channel: discord.TextChannel, *, text: str):
+        await channel.send(text)
+
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
     async def _roles(self, ctx):
