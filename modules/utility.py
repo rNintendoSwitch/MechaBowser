@@ -767,7 +767,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             else:
                 raise
 
-    @commands.command(name='reply')
+    @commands.command(name='echoreply')
     @commands.has_any_role(config.moderator, config.eh)
     async def _reply(self, ctx: commands.Context, message: discord.Message, *, text: str):
         await message.reply(text)
