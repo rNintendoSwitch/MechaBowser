@@ -1183,6 +1183,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
 
+    @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
