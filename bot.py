@@ -4,7 +4,6 @@ from sys import exit
 import discord
 import pymongo
 from discord.ext import commands
-from discord_sentry_reporting import use_sentry
 
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
@@ -34,6 +33,8 @@ bot = commands.Bot(
     case_insensitive=True,
 )
 if config.DSN:
+    from discord_sentry_reporting import use_sentry
+
     use_sentry(bot, dsn=config.DSN, traces_sample_rate=1.0, environment='production')
 
 
