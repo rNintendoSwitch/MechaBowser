@@ -417,41 +417,52 @@ class MainEvents(commands.Cog):
         return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
 
     @commands.Cog.listener()
-    async def on_message_delete(self, message):
-        if message.type != discord.MessageType.default or message.author.bot:
-            return  # No system messages
+    async def on_raw_message_delete(self, payload):
+        if payload.cached_message:
+            if payload.cached_message.type != discord.MessageType.default or payload.cached_message.author.bot:
+                return  # No system messages
 
-        if not message.content and not message.attachments:
-            return  # Blank or null content (could be embed)
+            if not payload.cached_message.content and not payload.cached_message.attachments:
+                return  # Blank or null content (could be embed)
 
-        content = message.content if message.content else '-No message content-'
+            user = payload.cached_message.author
+            jump_url = payload.cached_message.jump_url
+            content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
 
-        # log = f':wastebasket: Message by **{str(message.author)}** ({message.author.id}) in <#{message.channel.id}> deleted:\n'
-        # content = message.content if (len(log) + len(message.clean_content)) < 2000 else 'Message exceeds character limit, ' \
-        #    f'view at {config.baseUrl}/archive/{await utils.message_archive(message)}'
-        # log += content
+        else:
+            db = mclient.bowser.messages
+            dbMessage = db.find_one({'_id': payload.message_id, 'channel': payload.channel_id})
+            if not dbMessage:
+                logging.warning(
+                    f'[Core] Missing message metadata for deletion of {payload.channel_id}-{payload.message_id}'
+                )
+                return
+
+            user = await self.bot.fetch_user(dbMessage['author'])
+            jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
+            content = dbMessage['content'] or '-No saved copy of message content available-'
 
         embed = discord.Embed(
-            description=f'[Jump to message]({message.jump_url})\n{content}',
+            description=f'[Jump to message]({jump_url})\n{content}',
             color=0xF8E71C,
             timestamp=datetime.datetime.utcnow(),
         )
-        embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
-        embed.add_field(name='Mention', value=f'<@{message.author.id}>')
-        if len(message.attachments) == 1:
-            embed.set_image(url=message.attachments[0].proxy_url)
+        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar_url)
+        embed.add_field(name='Mention', value=f'<@{user.id}>')
+        if payload.cached_message and len(payload.cached_message.attachments) == 1:
+            embed.set_image(url=payload.cached_message.attachments[0].proxy_url)
 
-        elif len(message.attachments) > 1:
+        elif payload.cached_message and len(payload.cached_message.attachments) > 1:
             # More than one attachment, use fields
-            attachments = [x.proxy_url for x in message.attachments]
+            attachments = [x.proxy_url for x in payload.cached_message.attachments]
             for a in range(len(attachments)):
                 embed.add_field(name=f'Attachment {a + 1}', value=attachments[a])
 
         if len(content) > 1950:  # Too long to safely add jump to message in desc, use field
             embed.description = content
-            embed.add_field(name='Jump', value=f'[Jump to message]({message.jump_url})')
+            embed.add_field(name='Jump', value=f'[Jump to message]({jump_url})')
 
-        await self.serverLogs.send(f':wastebasket: Message deleted in <#{message.channel.id}>', embed=embed)
+        await self.serverLogs.send(f':wastebasket: Message deleted in <#{payload.channel_id}>', embed=embed)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
