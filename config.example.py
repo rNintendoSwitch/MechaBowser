@@ -3,6 +3,9 @@
 token = 'token'
 command_prefixes = ['!', ',', '.']
 
+# Sentry DSN
+DSN = ''
+
 # Mongo Credentials
 mongoUser = 'user'
 mongoPass = 'password'
