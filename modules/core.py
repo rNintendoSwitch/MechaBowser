@@ -52,7 +52,10 @@ class MainEvents(commands.Cog):
         logging.info('[Core] Starting sanitzation of old EUD')
         msgDB = mclient.bowser.messages
         msgDB.update_many(
-            {'timestamp': {"$lte": time.time() - (86400 * 30)}, 'sanitized': False},
+            {
+                'timestamp': {"$lte": time.time() - (86400 * 365)},
+                'sanitized': False,
+            },  # Store message data upto 1 year old
             {"$set": {'content': None, 'sanitized': True}},
         )
 
