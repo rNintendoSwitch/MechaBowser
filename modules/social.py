@@ -771,10 +771,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @_profile.error
     async def social_error(self, ctx, error):
-        if ctx.command:
-            cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        else:
-            cmd_str = '<command>'
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
 
         await ctx.send(
             f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
