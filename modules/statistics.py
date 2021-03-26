@@ -248,6 +248,9 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         return await ctx.send(f'{config.redTick} Channel statistics are not ready for use')
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        if not ctx.command:
+            return
+
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(
