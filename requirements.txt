@@ -16,4 +16,4 @@ discord-sentry-reporting
 
 # Workaround for numpy issue on windows. https://stackoverflow.com/a/64661876
 numpy==1.19.3; platform_system == "Windows"
-numpy>=1.19.4; platform_system == "linux"
+numpy>=1.19.4; platform_system == "Linux"
