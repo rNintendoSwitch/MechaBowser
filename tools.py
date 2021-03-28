@@ -555,6 +555,7 @@ async def send_paginated_embed(
         remaining_chars = page_char_cap
         page = []
 
+        # Make sure a field won't max out this page
         for field in fields.copy():
             field_length = len(field['name']) + len(field['value'])
 

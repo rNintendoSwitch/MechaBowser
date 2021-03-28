@@ -736,9 +736,30 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 else:
                     inf = punNames[pun['type']]
 
-                fields.append(
-                    {'name': datestamp, 'value': f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'}
-                )
+                value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
+
+                if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
+
+                    strings = []
+                    offsets = [range(0, len(value), 1018)]  # 1024 - 6 = 1018
+
+                    for i, o in enumerate(offsets):
+                        segment = value[o:1018]
+
+                        if i == 0:  # First segment
+                            segment = f'{segment}...'
+                        elif i == len(offsets) - 1:  # Last segment
+                            segment = f'...{segment}'
+                        else:
+                            segment = f'...{segment}...'
+
+                        strings.append(segment)
+
+                    for i, string in enumerate(strings):
+                        fields.append({'name': f'{datestamp} ({i+1}/{len(strings)})', 'value': string})
+
+                else:
+                    fields.append({'name': datestamp, 'value': value})
 
             if totalStrikes:
                 desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
