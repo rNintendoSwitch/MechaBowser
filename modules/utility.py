@@ -741,10 +741,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
 
                     strings = []
-                    offsets = [range(0, len(value), 1018)]  # 1024 - 6 = 1018
+                    offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
 
                     for i, o in enumerate(offsets):
-                        segment = value[o:1018]
+                        segment = value[o : (o + 1018)]
 
                         if i == 0:  # First segment
                             segment = f'{segment}...'
