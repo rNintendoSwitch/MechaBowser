@@ -1206,11 +1206,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if ctx.command:
-            cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        else:
-            cmd_str = '<command>'
+        if not ctx.command:
+            return
 
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(
                 f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
