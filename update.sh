@@ -1,5 +1,5 @@
 #!/bin/bash
-# Updates submodules, but allow for env vars for private to use tokens for pull
+# Script that updates all submodules, using a GitHub PAT to update private modules if defined
 
 echo 'Updating root...'
 git pull
