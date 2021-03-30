@@ -8,7 +8,6 @@ import time
 import typing
 import urllib
 
-
 import aiohttp
 import config
 import discord
