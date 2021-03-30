@@ -1,11 +1,13 @@
 import asyncio
 import datetime
+import io
 import logging
 import pathlib
 import re
 import time
 import typing
 import urllib
+
 
 import aiohttp
 import config
@@ -790,13 +792,23 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @commands.command(name='echoreply')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _reply(self, ctx: commands.Context, message: discord.Message, *, text: str):
-        await message.reply(text)
+    async def _reply(self, ctx: commands.Context, message: discord.Message, *, text: str = ""):
+        files = []
+        for file in ctx.message.attachments:
+            data = io.BytesIO()
+            await file.save(data)
+            files.append(discord.File(data, file.filename))
+        await message.reply(text, files=files)
 
     @commands.command(name='echo')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _echo(self, ctx: commands.Context, channel: discord.TextChannel, *, text: str):
-        await channel.send(text)
+    async def _echo(self, ctx: commands.Context, channel: discord.TextChannel, *, text: str = ""):
+        files = []
+        for file in ctx.message.attachments:
+            data = io.BytesIO()
+            await file.save(data)
+            files.append(discord.File(data, file.filename))
+        await channel.send(text, files=files)
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
