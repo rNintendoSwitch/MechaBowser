@@ -100,7 +100,7 @@ class Splatfest(commands.Cog):
                     await ctx.send(f'{config.redTick} That is not a valid role, please send a valid role ID')
 
             # Channel logic
-            await ctx.send(f'What channel should team be in? (Please send the ID)')
+            await ctx.send(f'What channel should team choosing be in? (Please send the ID)')
             while True:
                 try:
                     _channel = await self.bot.wait_for('message', check=check, timeout=60.0)
@@ -135,6 +135,7 @@ class Splatfest(commands.Cog):
     @_splatfest.command(name='end')
     async def _splatfest_end(self, ctx):
         self.ACTIVE = False
+        self.channel = None
         self.team1 = None
         self.team2 = None
         await ctx.send(f'{config.greenTick} Splatfest ended!')
