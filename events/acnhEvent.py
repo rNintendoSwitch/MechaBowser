@@ -1285,6 +1285,12 @@ class AnimalGame(commands.Cog):
             )
             return await ctx.message.delete()
 
+        await ctx.send(
+            f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
+            delete_after=15,
+        )
+        raise error
+
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="dig")
     async def _dig(self, ctx):
@@ -1315,7 +1321,7 @@ class AnimalGame(commands.Cog):
 
         self.durabilities[ctx.author.id]["shovel"]["value"] -= 1
 
-        catch = random.choice(
+        catch = random.choices(
             [
                 "bait",
                 "stick",
@@ -1327,7 +1333,9 @@ class AnimalGame(commands.Cog):
                 "cowrie",
                 "coral",
                 "sand-dollar",
-            ]
+                "turnip",
+            ],
+            weights=[3, 8, 4, 6, 5, 7, 7, 7, 5, 8, 0.2],
         )
         embed = discord.Embed(
             title="You used your shovel to dig up some sand...",
@@ -1338,19 +1346,27 @@ class AnimalGame(commands.Cog):
 
         await asyncio.sleep(11)
         if random.choices([True, False], weights=[65, 35])[0]:
-            embed.set_thumbnail(url=self.items[catch]["image"])
             description = f'And you found 1x {self.items[catch]["name"]}'
+
+            if catch == "turnip":
+                description += ". Huh, this looks valuable. Maybe you can plant it in the ground?"
+                embed.set_thumbnail(url=self.fruit[catch])
+                db.update_one({"_id": ctx.author.id}, {"$inc": {"fruit." + catch: 1}})
+
+            else:
+                embed.set_thumbnail(url=self.items[catch]["image"])
+                db.update_one({"_id": ctx.author.id}, {"$inc": {"items." + catch: 1}})
+
             if willBreak:
                 description += (
                     "\n\nWhat's this? Oh darn, __your shovel broke__! It will take about 1 hour to craft a new one"
                 )
-            embed.description = description
-            db.update_one({"_id": ctx.author.id}, {"$inc": {"items." + catch: 1}})
 
+            embed.description = description
             await message.edit(embed=embed)
 
         else:
-            description = "And you found nothing. Well that sucks"
+            description = "And you found nothing. Welp, that sucks"
             if willBreak:
                 description += (
                     "\n\nWhat's this? Oh darn, __your shovel broke__! It will take about 1 hour to craft a new one"
@@ -1360,12 +1376,19 @@ class AnimalGame(commands.Cog):
 
     @_dig.error
     async def _dig_error(self, ctx, error):
+        # await ctx.send(type(error))
         if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
             await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You need two hands on a shovel, how can you use two at once? (wait until your digging is over before trying again)",
                 delete_after=10,
             )
             return await ctx.message.delete()
+
+        await ctx.send(
+            f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
+            delete_after=15,
+        )
+        raise error
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.group(name="use", invoke_without_command=True)
@@ -1419,7 +1442,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=15,
             )
 
         db = mclient.bowser.animalEvent
@@ -1439,8 +1463,8 @@ class AnimalGame(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="You harvest one of your trees...",
-            description=f"You reach up to the **{fruit}** tree...",
+            title=f"You harvest one of your {'plants' if fruit == 'turnip' else 'trees'}...",
+            description=f"You reach towards to the **{fruit}** {'plant' if fruit == 'turnip' else 'tree'}...",
         )
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         message = await ctx.send(ctx.author.mention, embed=embed)
@@ -1459,7 +1483,7 @@ class AnimalGame(commands.Cog):
         )
         await asyncio.sleep(4)
 
-        embed.description = f'You reach up to the **{fruit}** tree and pull down **{abs(quantity)}x {fruit}**! There are __{user["unpickedFruit"][fruit] - abs(quantity)}__ fruit of this type still ready to be harvested'
+        embed.description = f'You reach towards the **{fruit}** {"plants" if fruit == "turnip" else "trees"} and grab **{abs(quantity)}x {fruit}**! There are __{user["unpickedFruit"][fruit] - abs(quantity)}__ fruit of this type still ready to be harvested'
         await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
@@ -1491,7 +1515,7 @@ class AnimalGame(commands.Cog):
         likeSaplings = 0 if not fruit in user["saplings"].keys() else user["saplings"][fruit]
         if (likeTrees + likeSaplings) >= 50:  # Max trees
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You have the maximum amount of {fruit} trees already. Try planting another type of fruit?",
+                f"{config.redTick} {ctx.author.mention} You have the maximum amount of {fruit} {'plants' if fruit == 'turnip' else 'trees'} already. Try planting another type of fruit?",
                 delete_after=10,
             )
 
@@ -1774,18 +1798,7 @@ class AnimalGame(commands.Cog):
 
         await gameMessage.edit(embed=embed)
 
-    @_donate.error
-    @_pay.error
-    @_sell.error
-    @_quests.error
-    @_use_bait.error
-    @_harvest.error
-    @_plant.error
-    @_fish.error
-    @_dig.error
-    @_gift.error
-    @_signup.error
-    async def _generic_errors(self, ctx, error):
+    async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
             await ctx.send(
                 f"{config.redTick} {ctx.author.mention} Please wait before using that command again",
@@ -1813,6 +1826,10 @@ class AnimalGame(commands.Cog):
             )
 
         else:
+            await ctx.send(
+                f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
+                delete_after=15,
+            )
             raise error
 
     @commands.Cog.listener()
