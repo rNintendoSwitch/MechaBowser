@@ -114,6 +114,7 @@ class AnimalGame(commands.Cog):
             'peach': 'https://cdn.mattbsg.xyz/rns/peach.png',
             'pear': 'https://cdn.mattbsg.xyz/rns/pear.png',
             'cherry': 'https://cdn.mattbsg.xyz/rns/cherries.png',
+            'turnip': 'https://cdn.mattbsg.xyz/rns/turnip.png',
         }
         self.fish = {
             'black-bass': {
@@ -361,7 +362,7 @@ class AnimalGame(commands.Cog):
             elif requestedItem in self.fruits.keys():
                 itemName = requestedItem
                 itemImage = self.fruits[requestedItem]
-                itemCost = 600
+                itemCost = 1400 if itemName == 'turnip' else 800
                 catID = 'fruit'
 
             else:
@@ -493,7 +494,7 @@ class AnimalGame(commands.Cog):
     @commands.command(name='pricepost')
     async def _pricepost(self, ctx):
         await ctx.message.delete()
-        textPost = f"Hello!\nAre you looking to sell something? You\'ve came to the right place! Use the `!sell amt item` command, replacing \"amt\" with the number of items to sell and \"item\" with the item you want to sell. If you just want to sell 1 item, you can just use the `!sell item` command. To sell all items of a specific category, use `!sell category` replacing \"category\" with the category you want to sell.\nOur prices may change, so please be sure to check back every day!\n\n__Fruit:__\nNative fruit is fruit from your island, while foreign fruit is from other people\'s islands\n\n**Native Fruit** - 400 Bells\n**Foreign Fruit** - 600 Bells\n\n__Fish:__\n\n**Black Bass** - {self.fish['black-bass']['value']} Bells\n**Carp** - {self.fish['carp']['value']} Bells\n**Crucian Carp** - {self.fish['crucian-carp']['value']} Bells\n**Dab** - {self.fish['dab']['value']} Bells\n**Freshwater Goby** - {self.fish['freshwater-goby']['value']} Bells\n**Loach** - {self.fish['loach']['value']} Bells\n**Ocean Sunfish** - {self.fish['ocean-sunfish']['value']} Bells\n**Olive Flounder** - {self.fish['olive-flounder']['value']} Bells\n**Red Snapper** - {self.fish['red-snapper']['value']} Bells\n**Sea Bass** - {self.fish['sea-bass']['value']} Bells\n**Sea Butterfly** - {self.fish['sea-butterfly']['value']} Bells\n**Shark** - {self.fish['shark']['value']} Bells\n**Squid** - {self.fish['squid']['value']} Bells\n**Tadpole** - {self.fish['tadpole']['value']} Bells\n**Yellow Perch** - {self.fish['yellow-perch']['value']} Bells\n\n__Bugs:__\n\n**Butterfly** - {self.bugs['butterfly']['value']} Bells\n**Hermit Crab** - {self.bugs['hermit-crab']['value']} Bells\n**Moth** - {self.bugs['moth']['value']} Bells\n**Pill Bug** - {self.bugs['pill-bug']['value']} Bells\n**Spider** - {self.bugs['spider']['value']} Bells\n**Tarantula** - {self.bugs['tarantula']['value']} Bells\n**Wharf Roach** - {self.bugs['wharf-roach']['value']} Bells\n\n__Misc:__\n\n**Bait** - {self.items['bait']['value']} Bells\n**Clay** - {self.items['clay']['value']} Bells\n**Conch** - {self.items['conch']['value']} Bells\n**Coral** - {self.items['coral']['value']} Bells\n**Cowrie** - {self.items['cowrie']['value']} Bells\n**Iron Nugget** - {self.items['iron-nugget']['value']} Bells\n**Sand Dollar** - {self.items['sand-dollar']['value']} Bells\n**Shell** - {self.items['shell']['value']} Bells\n**Stick** - {self.items['stick']['value']} Bells\n**Stone** - {self.items['stone']['value']} Bells"
+        textPost = f"Hello!\nAre you looking to sell something? You\'ve came to the right place! Use the `!sell amt item` command, replacing \"amt\" with the number of items to sell and \"item\" with the item you want to sell. If you just want to sell 1 item, you can just use the `!sell item` command. To sell all items of a specific category, use `!sell category` replacing \"category\" with the category you want to sell.\nOur prices may change, so please be sure to check back every day!\n\n__Fruit:__\nNative fruit is fruit from your island, while foreign fruit is from other people\'s islands\n\n**Native Fruit** - 400 Bells\n**Foreign Fruit** - 600 Bells\n**Turnip** - 1000 Bells\n\n__Fish:__\n\n**Black Bass** - {self.fish['black-bass']['value']} Bells\n**Carp** - {self.fish['carp']['value']} Bells\n**Crucian Carp** - {self.fish['crucian-carp']['value']} Bells\n**Dab** - {self.fish['dab']['value']} Bells\n**Freshwater Goby** - {self.fish['freshwater-goby']['value']} Bells\n**Loach** - {self.fish['loach']['value']} Bells\n**Ocean Sunfish** - {self.fish['ocean-sunfish']['value']} Bells\n**Olive Flounder** - {self.fish['olive-flounder']['value']} Bells\n**Red Snapper** - {self.fish['red-snapper']['value']} Bells\n**Sea Bass** - {self.fish['sea-bass']['value']} Bells\n**Sea Butterfly** - {self.fish['sea-butterfly']['value']} Bells\n**Shark** - {self.fish['shark']['value']} Bells\n**Squid** - {self.fish['squid']['value']} Bells\n**Tadpole** - {self.fish['tadpole']['value']} Bells\n**Yellow Perch** - {self.fish['yellow-perch']['value']} Bells\n\n__Bugs:__\n\n**Butterfly** - {self.bugs['butterfly']['value']} Bells\n**Hermit Crab** - {self.bugs['hermit-crab']['value']} Bells\n**Moth** - {self.bugs['moth']['value']} Bells\n**Pill Bug** - {self.bugs['pill-bug']['value']} Bells\n**Spider** - {self.bugs['spider']['value']} Bells\n**Tarantula** - {self.bugs['tarantula']['value']} Bells\n**Wharf Roach** - {self.bugs['wharf-roach']['value']} Bells\n\n__Misc:__\n\n**Bait** - {self.items['bait']['value']} Bells\n**Clay** - {self.items['clay']['value']} Bells\n**Conch** - {self.items['conch']['value']} Bells\n**Coral** - {self.items['coral']['value']} Bells\n**Cowrie** - {self.items['cowrie']['value']} Bells\n**Iron Nugget** - {self.items['iron-nugget']['value']} Bells\n**Sand Dollar** - {self.items['sand-dollar']['value']} Bells\n**Shell** - {self.items['shell']['value']} Bells\n**Stick** - {self.items['stick']['value']} Bells\n**Stone** - {self.items['stone']['value']} Bells"
         embed = discord.Embed(title='Nooks Cranny', color=0xFFF62D, description=textPost)
         await self.shopChannel.send(embed=embed)
 
@@ -767,6 +768,9 @@ class AnimalGame(commands.Cog):
                 if fruit == user['homeFruit']:
                     bellsOwed += 400 * value
 
+                elif fruit == 'turnip':
+                    bellsOwed += 1000 * value
+
                 else:
                     bellsOwed += 600 * value
 
@@ -861,6 +865,9 @@ class AnimalGame(commands.Cog):
                 if name == saniItem:
                     if saniItem == user['homeFruit']:
                         bellsOwed += 400 * sellAmt
+
+                    elif saniItem == 'turnip':
+                        bellsOwed += 1000 * sellAmt
 
                     else:
                         bellsOwed += 600 * sellAmt
@@ -1475,15 +1482,16 @@ class AnimalGame(commands.Cog):
                 f'{config.redTick} {ctx.author.mention} You\'ve already signed up for this island adventure, why not try playing around the island? For help, see <#674357224176615455>',
                 delete_after=10,
             )
-
-        homeFruit = random.choice(list(self.fruits.keys()))
+        fruitList = list(self.fruits.keys())
+        fruitList.remove('turnip')  # While we want to keep it for tracking, this can't be a home fruit
+        homeFruit = random.choice(fruitList)
         db.insert_one(
             {
                 '_id': invoked if invoked else ctx.author.id,
                 'animals': random.sample(list(self.animals.keys()), k=5),
                 'quests': [],
                 'bells': 0,
-                'debt': 75000,
+                'debt': 50000,
                 'museum': [],  # Bugs/fish donated
                 'townhall': 0,  # Number status of which job currently on. 0=nothing
                 'fish': {},
@@ -1524,7 +1532,7 @@ class AnimalGame(commands.Cog):
             'gift': {'value': 3, 'regenAt': None},
         }
         return await ctx.send(
-            f'{mention} Thanks for signing up for your Nook Inc. Island Getaway Package, to get you started you\'ve been given some **{homeFruit}** trees! We recommend that you check <#674357224176615455> for more information on how best to enjoy your time',
+            f'{mention} Thanks for signing up for your Nook Inc. Island Getaway Package, to get you started we\'ve planted some **{homeFruit}** trees for you on your island! We recommend that you check <#674357224176615455> for more information on how best to enjoy your time',
             delete_after=15,
         )
 
