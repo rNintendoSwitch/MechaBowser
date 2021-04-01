@@ -1795,17 +1795,22 @@ class AnimalGame(commands.Cog):
 
         elif isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You are missing a part of the command. Check <#826914316846366721> command usage",
+                f"{config.redTick} {ctx.author.mention} You are missing a part of the command. Check <#826914316846366721> for command usage",
                 delete_after=10,
             )
             return await ctx.message.delete()
 
         elif isinstance(error, commands.UserInputError):
             await ctx.send(
-                f"{config.redTick} {ctx.author.mention} That is the incorrect usage of the command. Check <#826914316846366721> command usage",
+                f"{config.redTick} {ctx.author.mention} That is the incorrect usage of the command. Check <#826914316846366721> for command usage",
                 delete_after=10,
             )
             return await ctx.message.delete()
+
+        elif isinstance(error, commands.BadUnionArgument):
+            await ctx.send(
+                f"{config.redTick} A part of that command is not correct. Check <#826914316846366721> for command usage"
+            )
 
         else:
             raise error
