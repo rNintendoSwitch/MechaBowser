@@ -11,17 +11,13 @@ import pymongo
 from discord.ext import commands, tasks
 
 
-mclient = pymongo.MongoClient(
-    config.mongoHost, username=config.mongoUser, password=config.mongoPass
-)
+mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 
 class AnimalGame(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.eventRole = self.bot.get_guild(238080556708003851).get_role(
-            761047949328646144
-        )
+        self.eventRole = self.bot.get_guild(238080556708003851).get_role(761047949328646144)
         self.shopChannel = self.bot.get_channel(757411216774791189)
         self.leaderboard = self.bot.get_channel(769663694778400808)
         self.commandChannels = [
@@ -442,19 +438,13 @@ class AnimalGame(commands.Cog):
             if requestedItem in self.fish.keys():
                 itemName = self.fish[requestedItem]["name"].lower()
                 itemImage = self.fish[requestedItem]["image"]
-                itemCost = (
-                    self.fish[requestedItem]["value"] * 0.2
-                    + self.fish[requestedItem]["value"]
-                )
+                itemCost = self.fish[requestedItem]["value"] * 0.2 + self.fish[requestedItem]["value"]
                 catID = "fish"
 
             elif requestedItem in self.bugs.keys():
                 itemName = self.bugs[requestedItem]["name"].lower()
                 itemImage = self.bugs[requestedItem]["image"]
-                itemCost = (
-                    self.bugs[requestedItem]["value"] * 0.2
-                    + self.bugs[requestedItem]["value"]
-                )
+                itemCost = self.bugs[requestedItem]["value"] * 0.2 + self.bugs[requestedItem]["value"]
                 catID = "bugs"
 
             elif requestedItem in self.fruits.keys():
@@ -466,10 +456,7 @@ class AnimalGame(commands.Cog):
             else:
                 itemName = self.items[requestedItem]["name"].lower()
                 itemImage = self.items[requestedItem]["image"]
-                itemCost = (
-                    self.items[requestedItem]["value"] * 0.2
-                    + self.items[requestedItem]["value"]
-                )
+                itemCost = self.items[requestedItem]["value"] * 0.2 + self.items[requestedItem]["value"]
                 catID = "items"
 
             self.todaysQuests[animal] = {
@@ -490,24 +477,18 @@ class AnimalGame(commands.Cog):
         for x in range(1, 26):
             try:
                 user = users[x - 1]
-                desc += "**#{}** - {:,} bells <@{}>\n".format(
-                    x, user["bells"], user["_id"]
-                )
+                desc += "**#{}** - {:,} bells <@{}>\n".format(x, user["bells"], user["_id"])
 
             except IndexError:
                 break
 
         if desc:
-            desc = (
-                "The current event standings for players with the most amount of bells are:\n\n"
-                + desc
-            )
+            desc = "The current event standings for players with the most amount of bells are:\n\n" + desc
 
         embed = discord.Embed(
             title="Event Leaderboard",
             color=0x83D632,
-            description=desc
-            or "There are not enough players yet to display rankings, go play and have fun!",
+            description=desc or "There are not enough players yet to display rankings, go play and have fun!",
         )
 
         embed.set_thumbnail(
@@ -528,10 +509,7 @@ class AnimalGame(commands.Cog):
         logging.debug("[ACEvent] Running regen tools")
         localDurabilities = self.durabilities.copy()
         for user, tools in localDurabilities.items():
-            if (
-                tools["fishrod"]["regenAt"]
-                and tools["fishrod"]["regenAt"] < time.time()
-            ):
+            if tools["fishrod"]["regenAt"] and tools["fishrod"]["regenAt"] < time.time():
                 localDurabilities[user]["fishrod"]["regenAt"] = None
                 localDurabilities[user]["fishrod"]["value"] = 25
 
@@ -582,9 +560,7 @@ class AnimalGame(commands.Cog):
             for treeType, trees in user["trees"].items():
                 availableFruit[treeType] = trees * 3
 
-            unpickedFruit = {
-                "unpickedFruit." + x: availableFruit[x] for x in availableFruit.keys()
-            }
+            unpickedFruit = {"unpickedFruit." + x: availableFruit[x] for x in availableFruit.keys()}
             unpickedFruit["saplings"] = {}
             db.update_one({"_id": user["_id"]}, {"$set": unpickedFruit})
             if runTrees:
@@ -616,18 +592,12 @@ class AnimalGame(commands.Cog):
     async def _pricepost(self, ctx):
         await ctx.message.delete()
         textPost = f"Hello!\nAre you looking to sell something? You've came to the right place! Use the `!sell amt item` command, replacing \"amt\" with the number of items to sell and \"item\" with the item you want to sell. If you just want to sell 1 item, you can just use the `!sell item` command. To sell all items of a specific category, use `!sell category` replacing \"category\" with the category you want to sell.\nOur prices may change, so please be sure to check back every day!\n\n__Fruit:__\nNative fruit is fruit from your island, while foreign fruit is from other people's islands\n\n**Native Fruit** - 400 Bells\n**Foreign Fruit** - 600 Bells\n**Turnip** - 1000 Bells\n\n__Fish:__\n\n**Black Bass** - {self.fish['black-bass']['value']} Bells\n**Carp** - {self.fish['carp']['value']} Bells\n**Crucian Carp** - {self.fish['crucian-carp']['value']} Bells\n**Dab** - {self.fish['dab']['value']} Bells\n**Freshwater Goby** - {self.fish['freshwater-goby']['value']} Bells\n**Loach** - {self.fish['loach']['value']} Bells\n**Ocean Sunfish** - {self.fish['ocean-sunfish']['value']} Bells\n**Olive Flounder** - {self.fish['olive-flounder']['value']} Bells\n**Red Snapper** - {self.fish['red-snapper']['value']} Bells\n**Sea Bass** - {self.fish['sea-bass']['value']} Bells\n**Sea Butterfly** - {self.fish['sea-butterfly']['value']} Bells\n**Shark** - {self.fish['shark']['value']} Bells\n**Squid** - {self.fish['squid']['value']} Bells\n**Tadpole** - {self.fish['tadpole']['value']} Bells\n**Yellow Perch** - {self.fish['yellow-perch']['value']} Bells\n\n__Bugs:__\n\n**Butterfly** - {self.bugs['butterfly']['value']} Bells\n**Hermit Crab** - {self.bugs['hermit-crab']['value']} Bells\n**Moth** - {self.bugs['moth']['value']} Bells\n**Pill Bug** - {self.bugs['pill-bug']['value']} Bells\n**Spider** - {self.bugs['spider']['value']} Bells\n**Tarantula** - {self.bugs['tarantula']['value']} Bells\n**Wharf Roach** - {self.bugs['wharf-roach']['value']} Bells\n\n__Misc:__\n\n**Bait** - {self.items['bait']['value']} Bells\n**Clay** - {self.items['clay']['value']} Bells\n**Conch** - {self.items['conch']['value']} Bells\n**Coral** - {self.items['coral']['value']} Bells\n**Cowrie** - {self.items['cowrie']['value']} Bells\n**Iron Nugget** - {self.items['iron-nugget']['value']} Bells\n**Sand Dollar** - {self.items['sand-dollar']['value']} Bells\n**Shell** - {self.items['shell']['value']} Bells\n**Stick** - {self.items['stick']['value']} Bells\n**Stone** - {self.items['stone']['value']} Bells"
-        embed = discord.Embed(
-            title="Nooks Cranny", color=0xFFF62D, description=textPost
-        )
-        embed = discord.Embed(
-            title="Nooks Cranny", color=0xFFF62D, description=textPost
-        )
+        embed = discord.Embed(title="Nooks Cranny", color=0xFFF62D, description=textPost)
+        embed = discord.Embed(title="Nooks Cranny", color=0xFFF62D, description=textPost)
         embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Timmy-Tommy-01.png")
         await self.shopChannel.send(embed=embed)
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="pay")
     async def _pay(self, ctx, amount: int):
         db = mclient.bowser.animalEvent
@@ -663,9 +633,7 @@ class AnimalGame(commands.Cog):
                 {"_id": ctx.author.id},
                 {"$inc": {"bells": -1 * amount}, "$set": {"debt": 0, "finished": True}},
             )
-            mclient.bowser.users.update_one(
-                {"_id": ctx.author.id}, {"$push": {"backgrounds": "animalcrossing"}}
-            )
+            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"backgrounds": "animalcrossing"}})
             return await ctx.send(
                 f"🎉 Success! You made a payment of **{amount}** bells towards your loan and paid it off in full! Woop! You got the **Animal Crossing: New Horizons profile background** -- to equip it use `!profile edit` 🎉\nAdditionally, you now have access to the `!donate` command, why not try it out?"
             )
@@ -674,13 +642,9 @@ class AnimalGame(commands.Cog):
             {"_id": ctx.author.id},
             {"$inc": {"bells": -1 * amount, "debt": -1 * amount}},
         )
-        return await ctx.send(
-            f"Success! You made a payment of **{amount}** bells towards your loan!"
-        )
+        return await ctx.send(f"Success! You made a payment of **{amount}** bells towards your loan!")
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="donate")
     async def _donate(self, ctx, *, item: typing.Optional[str] = ""):
         db = mclient.bowser.animalEvent
@@ -700,9 +664,7 @@ class AnimalGame(commands.Cog):
             )
 
         if user["townhall"] == 0:
-            db.update_one(
-                {"_id": ctx.author.id}, {"$set": {"debt": 200000, "townhall": 1}}
-            )
+            db.update_one({"_id": ctx.author.id}, {"$set": {"debt": 200000, "townhall": 1}})
             return await ctx.send(
                 f"{ctx.author.mention} Thanks for stopping by! So Tom Nook sent you? Great! I could some use some capital to help build the island museum.\nSpecifically, I need **200,000** bells to construct the new building -- come back and see me with `!donate` after you've got it!"
             )
@@ -809,11 +771,7 @@ class AnimalGame(commands.Cog):
 
                 else:
                     missingItem += 1
-                    description += (
-                        "･ "
-                        + self.fish[fish]["name"]
-                        + f' [{user["museum"].count(fish)}/2]\n'
-                    )
+                    description += "･ " + self.fish[fish]["name"] + f' [{user["museum"].count(fish)}/2]\n'
 
             description += "\n\n__Bugs__\n"
 
@@ -828,11 +786,7 @@ class AnimalGame(commands.Cog):
 
                 else:
                     missingItem += 1
-                    description += (
-                        "･ "
-                        + self.bugs[bug]["name"]
-                        + f' [{user["museum"].count(bug)}/2]\n'
-                    )
+                    description += "･ " + self.bugs[bug]["name"] + f' [{user["museum"].count(bug)}/2]\n'
 
             if missingItem == 0:
                 description = "Heyo, hoot hoot! Thanks for swinging by, here is our collection! We are very thankful that **you've donated two of every creature on the island**.\n:tada: I couldn't have done it without your help!\n\n__Fish__\n"
@@ -847,9 +801,7 @@ class AnimalGame(commands.Cog):
             embed.description = description
             await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="sell")
     async def _sell(self, ctx, quantity: typing.Optional[int] = 1, *, item):
         db = mclient.bowser.animalEvent
@@ -1085,9 +1037,7 @@ class AnimalGame(commands.Cog):
                 delete_after=10,
             )
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="quests", aliases=["quest"])
     async def _quests(self, ctx, animal: typing.Optional[str]):
         if ctx.channel.id not in self.commandChannels:
@@ -1114,9 +1064,7 @@ class AnimalGame(commands.Cog):
 
         if trophyProgress == 5 and not user["hasRole"]:
             db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
-            mclient.bowser.users.update_one(
-                {"_id": ctx.author.id}, {"$push": {"trophies": "acevent"}}
-            )
+            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent"}})
             await ctx.send(
                 f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have earned the event trophy on your `!profile`, great job!"
             )
@@ -1128,20 +1076,11 @@ class AnimalGame(commands.Cog):
                 xQuest = self.todaysQuests[x]
                 catVal = xQuest["catID"] + "." + xQuest["item"]
                 cat = xQuest["catID"]
-                if (
-                    ctx.author.id in self.completedQuests
-                    and x in self.completedQuests[ctx.author.id]
-                ):
-                    animalList.append(
-                        f'**{x}**: {xQuest["value"]}x {xQuest["itemName"]} - [COMPLETED]'
-                    )
+                if ctx.author.id in self.completedQuests and x in self.completedQuests[ctx.author.id]:
+                    animalList.append(f'**{x}**: {xQuest["value"]}x {xQuest["itemName"]} - [COMPLETED]')
 
                 else:
-                    itemCnt = (
-                        0
-                        if xQuest["item"] not in user[cat].keys()
-                        else user[cat][xQuest["item"]]
-                    )
+                    itemCnt = 0 if xQuest["item"] not in user[cat].keys() else user[cat][xQuest["item"]]
                     animalStr = f'**{x}**: {xQuest["value"]}x {xQuest["itemName"]} - [{itemCnt}/{xQuest["value"]}]'
                     if x not in user["quests"]:
                         animalStr = "*️⃣ " + animalStr
@@ -1180,14 +1119,9 @@ class AnimalGame(commands.Cog):
 
             itemCost = int(questInfo["itemCost"])
 
-            if (
-                ctx.author.id in self.completedQuests.keys()
-                and realName in self.completedQuests[ctx.author.id]
-            ):
+            if ctx.author.id in self.completedQuests.keys() and realName in self.completedQuests[ctx.author.id]:
                 description = (
-                    "__[COMPLETED]__\n"
-                    + description
-                    + "\n\nSwing by tomorrow! I might have something for you to do"
+                    "__[COMPLETED]__\n" + description + "\n\nSwing by tomorrow! I might have something for you to do"
                 )
                 embed.description = description
                 return await ctx.send(ctx.author.mention, embed=embed)
@@ -1207,19 +1141,12 @@ class AnimalGame(commands.Cog):
             else:
                 actionHint = f"You can find this item with `!dig` over in <#{self.commandChannels[0]}>"
 
-            if (
-                questInfo["item"] not in user[cat].keys()
-                or user[cat][questInfo["item"]] < questInfo["value"]
-            ):
+            if questInfo["item"] not in user[cat].keys() or user[cat][questInfo["item"]] < questInfo["value"]:
                 description += "\n\nCome back and see me when you have it!"
                 if realName not in user["quests"]:
                     description = "*️⃣ " + description
                 embed.description = description
-                itemCnt = (
-                    0
-                    if questInfo["item"] not in user[cat].keys()
-                    else user[cat][questInfo["item"]]
-                )
+                itemCnt = 0 if questInfo["item"] not in user[cat].keys() else user[cat][questInfo["item"]]
                 embed.add_field(
                     name="Item request",
                     value=f'{questInfo["value"]}x {questInfo["itemName"]}\nYou have [{itemCnt}/{questInfo["value"]}] items needed. {actionHint}',
@@ -1280,9 +1207,7 @@ class AnimalGame(commands.Cog):
                     embed.description = description
                     return await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="fish")
     async def _fish(self, ctx):
         if ctx.channel.id not in self.commandChannels:
@@ -1334,7 +1259,9 @@ class AnimalGame(commands.Cog):
             embed.set_thumbnail(url=self.fish[catch]["image"])
             description = f'You caught a **{self.rarity[self.fish[catch]["weight"]]} {self.fish[catch]["name"]}**! {self.fish[catch]["pun"]}'
             if willBreak:
-                description += "\n\nWhat's this? Oh darn, __your fishing rod broke__! It will take about 1 hour to craft a new one"
+                description += (
+                    "\n\nWhat's this? Oh darn, __your fishing rod broke__! It will take about 1 hour to craft a new one"
+                )
             embed.description = description
             db.update_one({"_id": ctx.author.id}, {"$inc": {"fish." + catch: 1}})
 
@@ -1343,15 +1270,15 @@ class AnimalGame(commands.Cog):
         else:
             description = "You got a bite, but whatever it was got off the line before you could reel it in. Better luck next time"
             if willBreak:
-                description += "\n\nWhat's this? Oh darn, __your fishing rod broke__! It will take about 1 hour to craft a new one"
+                description += (
+                    "\n\nWhat's this? Oh darn, __your fishing rod broke__! It will take about 1 hour to craft a new one"
+                )
             embed.description = description
             await message.edit(embed=embed)
 
     @_fish.error
     async def _fish_error(self, ctx, error):
-        if isinstance(
-            error, commands.MaxConcurrencyReached
-        ):  # pylint: disable=no-member
+        if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
             await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You need two hands to fish, how can you use two lines at once? (wait until your fishing is over before trying again)",
                 delete_after=10,
@@ -1364,9 +1291,7 @@ class AnimalGame(commands.Cog):
         )
         raise error
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="dig")
     async def _dig(self, ctx):
         if ctx.channel.id not in self.commandChannels:
@@ -1423,9 +1348,7 @@ class AnimalGame(commands.Cog):
         if random.choices([True, False], weights=[65, 35])[0]:
             if catch == "turnip":
                 description = f"And you found 1x {self.items[catch]}"
-                description += (
-                    ". Huh, this looks valuable. Maybe you can plant it in the ground?"
-                )
+                description += ". Huh, this looks valuable. Maybe you can plant it in the ground?"
                 embed.set_thumbnail(url=self.fruit[catch])
                 db.update_one({"_id": ctx.author.id}, {"$inc": {"fruit." + catch: 1}})
 
@@ -1435,7 +1358,9 @@ class AnimalGame(commands.Cog):
                 db.update_one({"_id": ctx.author.id}, {"$inc": {"items." + catch: 1}})
 
             if willBreak:
-                description += "\n\nWhat's this? Oh darn, __your shovel broke__! It will take about 1 hour to craft a new one"
+                description += (
+                    "\n\nWhat's this? Oh darn, __your shovel broke__! It will take about 1 hour to craft a new one"
+                )
 
             embed.description = description
             await message.edit(embed=embed)
@@ -1443,16 +1368,16 @@ class AnimalGame(commands.Cog):
         else:
             description = "And you found nothing. Welp, that sucks"
             if willBreak:
-                description += "\n\nWhat's this? Oh darn, __your shovel broke__! It will take about 1 hour to craft a new one"
+                description += (
+                    "\n\nWhat's this? Oh darn, __your shovel broke__! It will take about 1 hour to craft a new one"
+                )
             embed.description = description
             await message.edit(embed=embed)
 
     @_dig.error
     async def _dig_error(self, ctx, error):
         # await ctx.send(type(error))
-        if isinstance(
-            error, commands.MaxConcurrencyReached
-        ):  # pylint: disable=no-member
+        if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
             await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You need two hands on a shovel, how can you use two at once? (wait until your digging is over before trying again)",
                 delete_after=10,
@@ -1465,17 +1390,13 @@ class AnimalGame(commands.Cog):
         )
         raise error
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.group(name="use", invoke_without_command=True)
     async def _use(self, ctx):
         await ctx.message.delete()
         return
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @_use.command(name="bait")
     async def _use_bait(self, ctx):
         await ctx.message.delete()
@@ -1515,9 +1436,7 @@ class AnimalGame(commands.Cog):
             f"{ctx.author.mention} You used 1 bait! You have a higher chance to catch fish for 2 hours"
         )
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="harvest")
     async def _harvest(self, ctx, fruit):
         if ctx.channel.id not in self.commandChannels:
@@ -1537,10 +1456,7 @@ class AnimalGame(commands.Cog):
             )
 
         fruit = fruit.lower().strip()
-        if (
-            not fruit in user["unpickedFruit"].keys()
-            or not user["unpickedFruit"][fruit]
-        ):
+        if not fruit in user["unpickedFruit"].keys() or not user["unpickedFruit"][fruit]:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You don't have any **{fruit}** to harvest!",
                 delete_after=10,
@@ -1570,9 +1486,7 @@ class AnimalGame(commands.Cog):
         embed.description = f'You reach towards the **{fruit}** {"plants" if fruit == "turnip" else "trees"} and grab **{abs(quantity)}x {fruit}**! There are __{user["unpickedFruit"][fruit] - abs(quantity)}__ fruit of this type still ready to be harvested'
         await message.edit(embed=embed)
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="plant")
     async def _plant(self, ctx, fruit):
         if ctx.channel.id not in self.commandChannels:
@@ -1598,9 +1512,7 @@ class AnimalGame(commands.Cog):
             )
 
         likeTrees = 0 if not fruit in user["trees"].keys() else user["trees"][fruit]
-        likeSaplings = (
-            0 if not fruit in user["saplings"].keys() else user["saplings"][fruit]
-        )
+        likeSaplings = 0 if not fruit in user["saplings"].keys() else user["saplings"][fruit]
         if (likeTrees + likeSaplings) >= 50:  # Max trees
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You have the maximum amount of {fruit} {'plants' if fruit == 'turnip' else 'trees'} already. Try planting another type of fruit?",
@@ -1622,13 +1534,9 @@ class AnimalGame(commands.Cog):
         embed.description = f'You put a **{fruit}** in the ground and a {fruit} sapling appeared in it\'s place. You have __{user["fruit"][fruit] - 1}__ left in your inventory'
         await message.edit(embed=embed)
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="gift")
-    async def _gift(
-        self, ctx, target: typing.Union[discord.Member, discord.User], *, item
-    ):
+    async def _gift(self, ctx, target: typing.Union[discord.Member, discord.User], *, item):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
@@ -1640,9 +1548,7 @@ class AnimalGame(commands.Cog):
         initUser = db.find_one({"_id": ctx.author.id})
 
         if target.id == ctx.author.id:
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You can not send a gift to yourself!"
-            )
+            return await ctx.send(f"{config.redTick} {ctx.author.mention} You can not send a gift to yourself!")
 
         if self.durabilities[ctx.author.id]["gift"]["value"] <= 0:
             return await ctx.send(
@@ -1692,12 +1598,8 @@ class AnimalGame(commands.Cog):
                 f"{config.redTick} {ctx.author.mention} You don't have any **{item.lower()}** in your inventory that you can gift!"
             )
 
-        db.update_one(
-            {"_id": ctx.author.id}, {"$inc": {items[saniItem] + "." + saniItem: -1}}
-        )
-        db.update_one(
-            {"_id": target.id}, {"$inc": {items[saniItem] + "." + saniItem: 1}}
-        )
+        db.update_one({"_id": ctx.author.id}, {"$inc": {items[saniItem] + "." + saniItem: -1}})
+        db.update_one({"_id": target.id}, {"$inc": {items[saniItem] + "." + saniItem: 1}})
 
         self.durabilities[ctx.author.id]["gift"]["regenAt"] = time.time() + 86400
         self.durabilities[ctx.author.id]["gift"]["value"] -= 1
@@ -1742,9 +1644,7 @@ class AnimalGame(commands.Cog):
             treeDesc += str(value) + " " + tree.capitalize()
             treeDesc += " tree" if value == 1 else " trees"
             if tree in user["saplings"].keys():
-                treeDesc += (
-                    " | " + str(user["saplings"][tree]) + " " + tree.capitalize()
-                )
+                treeDesc += " | " + str(user["saplings"][tree]) + " " + tree.capitalize()
                 treeDesc += " sapling" if user["saplings"][tree] == 1 else " saplings"
             treeDesc += "\n"
 
@@ -1793,9 +1693,7 @@ class AnimalGame(commands.Cog):
         )
         await ctx.send(ctx.author.mention, embed=embed)
 
-    @commands.max_concurrency(
-        1, per=commands.BucketType.user
-    )  # pylint: disable=no-member
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="play")
     async def _signup(self, ctx, invoked=False):
         db = mclient.bowser.animalEvent
@@ -1806,9 +1704,7 @@ class AnimalGame(commands.Cog):
                 delete_after=10,
             )
         fruitList = list(self.fruits.keys())
-        fruitList.remove(
-            "turnip"
-        )  # While we want to keep it for tracking, this can't be a home fruit
+        fruitList.remove("turnip")  # While we want to keep it for tracking, this can't be a home fruit
         homeFruit = random.choice(fruitList)
         db.insert_one(
             {
@@ -1822,9 +1718,7 @@ class AnimalGame(commands.Cog):
                 "fish": {},
                 "bugs": {},
                 "fruit": {},
-                "unpickedFruit": {
-                    homeFruit: 6
-                },  # Two trees start with fruit, 3x fruit per tree
+                "unpickedFruit": {homeFruit: 6},  # Two trees start with fruit, 3x fruit per tree
                 "trees": {homeFruit: 2},
                 "saplings": {homeFruit: 3},
                 "items": {},
@@ -1888,9 +1782,7 @@ class AnimalGame(commands.Cog):
                     if user.bot:
                         continue
                     if not db.find_one({"_id": user.id}):
-                        await self._signup.__call__(
-                            message.channel, user.id
-                        )  # pylint: disable=not-callable
+                        await self._signup.__call__(message.channel, user.id)  # pylint: disable=not-callable
 
                     db.update_one({"_id": user.id}, {"$inc": {"bugs." + catch: 1}})
                     userList.append(user)
@@ -1907,9 +1799,7 @@ class AnimalGame(commands.Cog):
         await gameMessage.edit(embed=embed)
 
     async def cog_command_error(self, ctx, error):
-        if isinstance(
-            error, commands.MaxConcurrencyReached
-        ):  # pylint: disable=no-member
+        if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
             await ctx.send(
                 f"{config.redTick} {ctx.author.mention} Please wait before using that command again",
                 delete_after=10,
@@ -1982,9 +1872,7 @@ class AnimalGame(commands.Cog):
                     if user.bot:
                         continue
                     if not db.find_one({"_id": user.id}):
-                        await self._signup.__call__(
-                            message.channel, user.id
-                        )  # pylint: disable=not-callable
+                        await self._signup.__call__(message.channel, user.id)  # pylint: disable=not-callable
 
                     db.update_one({"_id": user.id}, {"$inc": {"bugs." + catch: 1}})
                     userList.append(user)
