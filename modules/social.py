@@ -769,8 +769,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
 
-    @_profile.error
-    async def social_error(self, ctx, error):
+    async def cog_command_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
 
         await ctx.send(

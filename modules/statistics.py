@@ -247,7 +247,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     async def _stats_channels(self, ctx):
         return await ctx.send(f'{config.redTick} Channel statistics are not ready for use')
 
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
             return
 

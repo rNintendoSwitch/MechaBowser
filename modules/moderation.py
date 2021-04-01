@@ -742,7 +742,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'({activeStrikes+count} - {count}) {error}'
             )
 
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
             return
 
