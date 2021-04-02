@@ -1415,8 +1415,9 @@ class AnimalGame(commands.Cog):
         await asyncio.sleep(11)
         if random.choices([True, False], weights=[65, 35])[0]:
             if catch == "turnip":
-                description = f"And you found 1x Turnip"
-                description += ". Huh, this looks valuable. Maybe you can plant it in the ground?"
+                description = (
+                    f"And you found 1x Turnip. Huh, this looks valuable. Maybe you can plant it in the ground?"
+                )
                 embed.set_thumbnail(url=self.fruits[catch])
                 db.update_one({"_id": ctx.author.id}, {"$inc": {"fruit." + catch: 1}})
 
