@@ -840,7 +840,7 @@ class AnimalGame(commands.Cog):
                     f"{ctx.author.mention} Why thanks for bringing by **{item.lower()}**, but we do not need any more for our collection! If you need to know what we still need checkout `!donate`"
                 )
 
-            if saniItem not in list(self.fish.keys()) + list(self.bugs.keys()):
+            if saniItem not in list(self.fish.keys()) + list(self.bugs.keys()) or saniItem in ["leaf-egg", "water-egg"]:
                 return await ctx.send(
                     f"{ctx.author.mention} Why thanks for bringing by **{item.lower()}**, but we do not need any for our collection! If you need to know what we still need checkout `!donate`"
                 )
@@ -874,42 +874,46 @@ class AnimalGame(commands.Cog):
             embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Blathers-01.png")
             description = 'Heyo, hoot hoot! Thanks for swinging by, here is our collection and a list of creatures we still need! You can donate an item by using `!donate item` replacing "item" with the name of the creature!\n\n__Fish__\n'
             missingItem = 0
-            for fish in self.fish.keys():
+            fishDict = self.fish.copy()
+            del fishDict["water-egg"]
+            for fish in fishDict.keys():
                 if fish not in user["museum"]:
-                    description += "･ " + self.fish[fish]["name"] + " [0/2]\n"
+                    description += "･ " + fishDict[fish]["name"] + " [0/2]\n"
                     missingItem += 1
                     continue
 
                 if user["museum"].count(fish) >= 2:
-                    description += "･ " + self.fish[fish]["name"] + f" **[COMPLETE]**\n"
+                    description += "･ " + fishDict[fish]["name"] + f" **[COMPLETE]**\n"
 
                 else:
                     missingItem += 1
-                    description += "･ " + self.fish[fish]["name"] + f' [{user["museum"].count(fish)}/2]\n'
+                    description += "･ " + fishDict[fish]["name"] + f' [{user["museum"].count(fish)}/2]\n'
 
             description += "\n\n__Bugs__\n"
 
-            for bug in self.bugs.keys():
+            bugDict = self.bugs.copy()
+            del bugDict["leaf-egg"]
+            for bug in bugDict.keys():
                 if bug not in user["museum"]:
-                    description += "･ " + self.bugs[bug]["name"] + " [0/2]\n"
+                    description += "･ " + bugDict[bug]["name"] + " [0/2]\n"
                     missingItem += 1
                     continue
 
                 elif user["museum"].count(bug) >= 2:
-                    description += "･ " + self.bugs[bug]["name"] + f" **[COMPLETE]**\n"
+                    description += "･ " + bugDict[bug]["name"] + f" **[COMPLETE]**\n"
 
                 else:
                     missingItem += 1
-                    description += "･ " + self.bugs[bug]["name"] + f' [{user["museum"].count(bug)}/2]\n'
+                    description += "･ " + bugDict[bug]["name"] + f' [{user["museum"].count(bug)}/2]\n'
 
             if missingItem == 0:
                 description = "Heyo, hoot hoot! Thanks for swinging by, here is our collection! We are very thankful that **you've donated two of every creature on the island**.\n:tada: I couldn't have done it without your help!\n\n__Fish__\n"
-                for data in self.fish.values():
+                for data in fishDict.values():
                     description += "･ " + data["name"] + "\n"
 
                 description += "\n\n__Bugs__\n"
 
-                for data in self.bugs.values():
+                for data in bugDict.values():
                     description += "･ " + data["name"] + "\n"
 
             embed.description = description
