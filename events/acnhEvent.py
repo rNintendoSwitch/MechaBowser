@@ -916,22 +916,17 @@ class AnimalGame(commands.Cog):
                 for data in bugDict.values():
                     description += "･ " + data["name"] + "\n"
 
-                userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
-                if not user["hasRole"]:
-                    db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
+                if not user["finishedQuests"] and not user["finishedMuseum"]:
+                    db.update_one({"_id": ctx.author.id}, {"$set": {"finishedMuseum": True}})
                     mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2"}})
                     await ctx.send(
                         f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have earned the event trophy on your `!profile`, great job!"
                     )
 
-                elif user["hasRole"] and not "acevent2-extra" in userDoc["trophies"]:
-                    mclient.bowser.users.update_one(
-                        {"_id": ctx.author.id},
-                        {
-                            "$push": {"trophies": "acevent2-extra"},
-                            "$pull": {"trophies": "acevent2"},
-                        },
-                    )
+                elif user["finishedQuests"] and not user["finishedMuseum"]:
+                    db.update_one({"_id": ctx.author.id}, {"$set": {"finishedMuseum": True}})
+                    mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$pull": {"trophies": "acevent2"}})
+                    mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2-extra"}})
                     await ctx.send(
                         f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have now earned the advanced event trophy on your `!profile`, great job!"
                     )
@@ -1200,23 +1195,17 @@ class AnimalGame(commands.Cog):
             if _animal in user["quests"]:
                 trophyProgress += 1
 
-        userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
-        if trophyProgress == 5 and not user["hasRole"]:
-            db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
+        if trophyProgress == 5 and not user["finishedQuests"] and not user["finishedMuseum"]:
+            db.update_one({"_id": ctx.author.id}, {"$set": {"finishedQuests": True}})
             mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2"}})
             await ctx.send(
                 f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have earned the event trophy on your `!profile`, great job!"
             )
 
-        elif trophyProgress == 5 and user["hasRole"] and not "acevent2-extra" in userDoc["trophies"]:
-            db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
-            mclient.bowser.users.update_one(
-                {"_id": ctx.author.id},
-                {
-                    "$push": {"trophies": "acevent2-extra"},
-                    "$pull": {"trophies": "acevent2"},
-                },
-            )
+        elif trophyProgress == 5 and user["finishedMuseum"] and not user["finishedQuests"]:
+            db.update_one({"_id": ctx.author.id}, {"$set": {"finishedQuests": True}})
+            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$pull": {"trophies": "acevent2"}})
+            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2-extra"}})
             await ctx.send(
                 f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have now earned the advanced event trophy on your `!profile`, great job!"
             )
@@ -1955,6 +1944,8 @@ class AnimalGame(commands.Cog):
                 "items": {},
                 "homeFruit": homeFruit,
                 "hasRole": False,
+                "finishedQuests": False,
+                "finishedMuseum": False,
                 "hasBackground": False,
                 "_type": "user",
                 "finished": False,
