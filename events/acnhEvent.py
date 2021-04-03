@@ -678,7 +678,7 @@ class AnimalGame(commands.Cog):
                 {"_id": ctx.author.id},
                 {"$inc": {"bells": -1 * amount}, "$set": {"debt": 0, "finished": True}},
             )
-            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"backgrounds": "animalcrossing"}})
+            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"backgrounds": "blossoms"}})
             return await ctx.send(
                 f"🎉 Success! You made a payment of **{amount}** bells towards your loan and paid it off in full! Woop! You got the **Animal Crossing: New Horizons profile background** -- to equip it use `!profile edit` 🎉\nAdditionally, you now have access to the `!donate` command, why not try it out?"
             )
@@ -917,17 +917,17 @@ class AnimalGame(commands.Cog):
             userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
             if not user["hasRole"]:
                 db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
-                mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent"}})
+                mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2"}})
                 await ctx.send(
                     f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have earned the event trophy on your `!profile`, great job!"
                 )
 
-            elif user["hasRole"] and not "acevent-extra" in userDoc["trophies"]:
+            elif user["hasRole"] and not "acevent2-extra" in userDoc["trophies"]:
                 mclient.bowser.users.update_one(
                     {"_id": ctx.author.id},
                     {
-                        "$push": {"trophies": "acevent-extra"},
-                        "$pull": {"trophies": "acevent"},
+                        "$push": {"trophies": "acevent2-extra"},
+                        "$pull": {"trophies": "acevent2"},
                     },
                 )
                 await ctx.send(
@@ -1198,18 +1198,18 @@ class AnimalGame(commands.Cog):
         userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
         if trophyProgress == 5 and not user["hasRole"]:
             db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
-            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent"}})
+            mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2"}})
             await ctx.send(
                 f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have earned the event trophy on your `!profile`, great job!"
             )
 
-        elif trophyProgress == 5 and user["hasRole"] and not "acevent-extra" in userDoc["trophies"]:
+        elif trophyProgress == 5 and user["hasRole"] and not "acevent2-extra" in userDoc["trophies"]:
             db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
             mclient.bowser.users.update_one(
                 {"_id": ctx.author.id},
                 {
-                    "$push": {"trophies": "acevent-extra"},
-                    "$pull": {"trophies": "acevent"},
+                    "$push": {"trophies": "acevent2-extra"},
+                    "$pull": {"trophies": "acevent2"},
                 },
             )
             await ctx.send(
@@ -1979,7 +1979,7 @@ class AnimalGame(commands.Cog):
             "gift": {"value": 3, "regenAt": None},
         }
         return await ctx.send(
-            f"{mention} Thanks for signing up for your Nook Inc. Island Getaway Package, to get you started we've planted some **{homeFruit}** trees for you on your island! We recommend that you check <#674357224176615455> for more information on how best to enjoy your time",
+            f"{mention} Thanks for signing up for your Nook Inc. Island Getaway Package, to get you started we've planted some **{homeFruit}** trees for you on your island! We recommend that you check <#826914316846366721> for more information on how best to enjoy your time",
             delete_after=15,
         )
 
