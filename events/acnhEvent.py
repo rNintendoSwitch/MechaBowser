@@ -916,27 +916,28 @@ class AnimalGame(commands.Cog):
                 for data in bugDict.values():
                     description += "･ " + data["name"] + "\n"
 
+                userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
+                if not user["hasRole"]:
+                    db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
+                    mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2"}})
+                    await ctx.send(
+                        f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have earned the event trophy on your `!profile`, great job!"
+                    )
+
+                elif user["hasRole"] and not "acevent2-extra" in userDoc["trophies"]:
+                    mclient.bowser.users.update_one(
+                        {"_id": ctx.author.id},
+                        {
+                            "$push": {"trophies": "acevent2-extra"},
+                            "$pull": {"trophies": "acevent2"},
+                        },
+                    )
+                    await ctx.send(
+                        f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have now earned the advanced event trophy on your `!profile`, great job!"
+                    )
+
             embed.description = description
             await ctx.send(ctx.author.mention, embed=embed)
-            userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
-            if not user["hasRole"]:
-                db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
-                mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2"}})
-                await ctx.send(
-                    f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have earned the event trophy on your `!profile`, great job!"
-                )
-
-            elif user["hasRole"] and not "acevent2-extra" in userDoc["trophies"]:
-                mclient.bowser.users.update_one(
-                    {"_id": ctx.author.id},
-                    {
-                        "$push": {"trophies": "acevent2-extra"},
-                        "$pull": {"trophies": "acevent2"},
-                    },
-                )
-                await ctx.send(
-                    f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have now earned the advanced event trophy on your `!profile`, great job!"
-                )
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="sell")
