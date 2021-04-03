@@ -1882,26 +1882,37 @@ class AnimalGame(commands.Cog):
                 continue
             invList.append(f"{value}x " + self.fish[name]["name"])
 
+        embed.add_field(
+            name="Inventory (Fish)", value=", ".join(invList) if invList else "*No items to display*", inline=False
+        )
+        invList = []
+
         for name, value in user["bugs"].items():
             if not value:
                 continue
             invList.append(f"{value}x " + self.bugs[name]["name"])
+        embed.add_field(
+            name="Inventory (Bugs)", value=", ".join(invList) if invList else "*No items to display*", inline=False
+        )
+        invList = []
 
         for name, value in user["items"].items():
             if not value:
                 continue
             invList.append(f"{value}x " + self.items[name]["name"])
+        embed.add_field(
+            name="Inventory (Items)", value=", ".join(invList) if invList else "*No items to display*", inline=False
+        )
+        invList = []
 
         for name, value in user["fruit"].items():
             if not value:
                 continue
             invList.append(f"{value}x " + name.capitalize())
-
         embed.add_field(
-            name="Inventory",
-            value=", ".join(invList) if invList else "*No items to display*",
-            inline=False,
+            name="Inventory (Fruit)", value=", ".join(invList) if invList else "*No items to display*", inline=False
         )
+
         await ctx.send(ctx.author.mention, embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
