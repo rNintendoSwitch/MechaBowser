@@ -2013,9 +2013,6 @@ class AnimalGame(commands.Cog):
         await gameMessage.edit(embed=embed)
 
     async def cog_command_error(self, ctx, error):
-        if ctx.command.name in ["dig", "fish"]:
-            return
-
         if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
             await ctx.send(
                 f"{config.redTick} {ctx.author.mention} Please wait before using that command again",
