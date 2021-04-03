@@ -2050,12 +2050,11 @@ class AnimalGame(commands.Cog):
     async def on_message(self, message):
         if message.author.bot:
             return
-        # if message.channel.id not in [
-        #    238081280632160257,
-        #    238081135865757696,
-        #    671003715364192287,
-        # ]:
-        if message.channel.id != 769666021706432532:
+        if message.channel.id not in [
+            238081280632160257,
+            238081135865757696,
+            671003715364192287,
+        ]:
             return  # general, switch-discussion, animal-crossing
 
         if not random.choices([True, False], weights=[0.75, 99.25])[0]:
