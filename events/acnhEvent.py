@@ -783,7 +783,7 @@ class AnimalGame(commands.Cog):
                     )
                 )
 
-            for x, y in locatedNeeded:
+            for x, y in locatedNeeded.items():
                 db.update_one({"_id": ctx.author.id}, {"$inc": {y[0] + "." + x: -1 * y[1]}})
 
             db.update_one({"_id": ctx.author.id}, {"$push": {"diy": saniItem}})
