@@ -494,6 +494,8 @@ class AnimalGame(commands.Cog):
                 "sand-dollar",
                 "cherry-blossom",
                 "turnip",
+                "wood",
+                "wood-egg",
             ]
         )
         for animal, data in self.animals.items():
