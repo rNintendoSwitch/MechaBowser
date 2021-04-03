@@ -391,18 +391,37 @@ class AnimalGame(commands.Cog):
             },
         }
         self.recipes = {
-            "bed": {"wood-egg": 6, "wood": 20, "clay": 8, "iron-nugget": 2},
-            "arch": {"leaf-egg": 2, "wood": 6, "cherry-blossom": 6, "stone": 6},
-            "vanity": {"water-egg": 10, "wood-egg": 4, "wood": 18, "clay": 4},
-            "wardrobe": {"leaf-egg": 2, "wood": 16, "iron-nugget": 4},
+            "bed": {
+                "wood-egg": ("items", 6),
+                "wood": ("items", 20),
+                "clay": ("items", 8),
+                "iron-nugget": ("items", 8),
+            },
+            "arch": {
+                "leaf-egg": ("bugs", 2),
+                "wood": ("items", 6),
+                "cherry-blossom": ("items", 6),
+                "stone": ("items", 6),
+            },
+            "vanity": {
+                "water-egg": ("fish", 10),
+                "wood-egg": ("items", 4),
+                "wood": ("items", 18),
+                "clay": ("items", 4),
+            },
+            "wardrobe": {
+                "leaf-egg": ("bugs", 2),
+                "wood": ("items", 16),
+                "iron-nugget": ("items", 4),
+            },
             "wreath": {
-                "leaf-egg": 4,
-                "water-egg": 4,
-                "wood-egg": 4,
-                "stick": 22,
-                "stone": 6,
-                "clay": 2,
-                "cherry-blossom": 8,
+                "leaf-egg": ("bugs", 4),
+                "water-egg": ("fish", 4),
+                "wood-egg": ("items", 4),
+                "stick": ("items", 22),
+                "stone": ("items", 6),
+                "clay": ("items", 2),
+                "cherry-blossom": ("items", 8),
             },
         }
         self.rarity = {
@@ -522,7 +541,7 @@ class AnimalGame(commands.Cog):
         for x in range(1, 26):
             try:
                 user = users[x - 1]
-                desc += "**#{}** - {:,} bells <@{}>\n".format(x, user["bells"], user["_id"])
+                desc += "**#{}** - {:,} Bells <@{}>\n".format(x, user["bells"], user["_id"])
 
             except IndexError:
                 break
@@ -752,39 +771,53 @@ class AnimalGame(commands.Cog):
                     f"{config.redTick} {ctx.author.mention} Hippity ho, it doesn't seem like I need help making any **{saniItem}** right now!"
                 )
 
-            missingItems = {}
             userItems = {}
-            for fish, value in user["fish"].keys():
+            for fish, value in user["fish"].items():
                 userItems[fish] = ("fish", value)
-            for bug, value in user["bugs"].keys():
-                userItems[bug] = ("bug", value)
-            for item, value in user["items"].keys():
-                userItems[item] = ("item", value)
+            for bug, value in user["bugs"].items():
+                userItems[bug] = ("bugs", value)
+            for item, value in user["items"].items():
+                userItems[item] = ("items", value)
 
-            neededItems = {}
-            for _type, value in self.recipes[saniItem].items():
-                neededItems[_type] = value
+            ITEMTYPE, AMOUNT = (0, 1)
+            missingItems = {}
+            for neededItem, value in self.recipes[saniItem].items():
+                logging.info(userItems)
+                if (
+                    neededItem not in userItems.keys() or userItems[neededItem][1] < value[AMOUNT]
+                ):  # User is missing this item, or has zero left (sold, or quest)
+                    logging.info(value[ITEMTYPE])
+                    if value[ITEMTYPE] == "fish":
+                        logging.info(self.fish[neededItem]["name"])
+                        missingItems[self.fish[neededItem]["name"]] = self.recipes[saniItem][neededItem][AMOUNT] - (
+                            0 if neededItem not in userItems else userItems[neededItem][1]
+                        )
+                    elif value[ITEMTYPE] == "bugs":
+                        logging.info(self.bugs[neededItem]["name"])
+                        missingItems[self.bugs[neededItem]["name"]] = self.recipes[saniItem][neededItem][AMOUNT] - (
+                            0 if neededItem not in userItems else userItems[neededItem][1]
+                        )
+                    elif value[ITEMTYPE] == "items":
+                        logging.info(self.items[neededItem]["name"])
+                        missingItems[self.items[neededItem]["name"]] = self.recipes[saniItem][neededItem][AMOUNT] - (
+                            0 if neededItem not in userItems else userItems[neededItem][1]
+                        )
 
-            locatedNeeded = neededItems.copy()
-            for x, y in userItems.items():
-                if x in neededItems:
-                    if y[1] < neededItems[x]:
-                        missingItems[x] = neededItems[x] - y[1]
-
-                    else:
-                        locatedNeeded[x] = y
-
+            logging.info(missingItems)
             if missingItems:
                 return await ctx.send(
                     "{} {} Hippity ho, it looks like you are missing some items I need to craft that recipe! Hop back over when you have them! (You are missing {})".format(
                         config.redTick,
                         ctx.author.mention,
-                        ", ".join(["{}x {}".format(x, y) for x, y in missingItems]),
+                        ", ".join(["{}x {}".format(y, x) for x, y in missingItems.items()]),
                     )
                 )
 
-            for x, y in locatedNeeded.items():
-                db.update_one({"_id": ctx.author.id}, {"$inc": {y[0] + "." + x: -1 * y[1]}})
+            for neededItem, value in self.recipes[saniItem].items():
+                db.update_one(
+                    {"_id": ctx.author.id},
+                    {"$inc": {value[ITEMTYPE] + "." + neededItem: -1 * value[AMOUNT]}},
+                )
 
             db.update_one({"_id": ctx.author.id}, {"$push": {"diy": saniItem}})
             return await ctx.send(
@@ -926,7 +959,10 @@ class AnimalGame(commands.Cog):
                 elif user["finishedQuests"] and not user["finishedMuseum"]:
                     db.update_one({"_id": ctx.author.id}, {"$set": {"finishedMuseum": True}})
                     mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$pull": {"trophies": "acevent2"}})
-                    mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent2-extra"}})
+                    mclient.bowser.users.update_one(
+                        {"_id": ctx.author.id},
+                        {"$push": {"trophies": "acevent2-extra"}},
+                    )
                     await ctx.send(
                         f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have now earned the advanced event trophy on your `!profile`, great job!"
                     )
