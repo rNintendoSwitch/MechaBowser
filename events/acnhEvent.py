@@ -220,6 +220,13 @@ class AnimalGame(commands.Cog):
                 "weight": 5,
                 "pun": "I have a few questions. Can you answer my tad poll?",
             },
+            "water-egg": {
+                "name": "Water Egg",
+                "image": "https://cdn.mattbsg.xyz/rns/water-egg.png",
+                "value": 50,
+                "weight": 3,
+                "pun": "Water you doing in there little buddy?",
+            },
             "yellow-perch": {
                 "name": "Yellow Perch",
                 "image": "https://cdn.mattbsg.xyz/rns/yellow-perch.png",
@@ -242,6 +249,13 @@ class AnimalGame(commands.Cog):
                 "value": 300,
                 "weight": 3,
                 "pun": "The laziest type of crab.",
+            },
+            "leaf-egg": {
+                "name": "Leaf Egg",
+                "image": "https://cdn.mattbsg.xyz/rns/leaf-egg.png",
+                "value": 50,
+                "weight": 2,
+                "pun": "Wait, thats not a bug?!",
             },
             "moth": {
                 "name": "Moth",
@@ -365,10 +379,30 @@ class AnimalGame(commands.Cog):
                 "image": "https://cdn.mattbsg.xyz/rns/crafting-item-3.png",
                 "value": 150,
             },
+            "wood-egg": {
+                "name": "Wood Egg",
+                "image": "https://cdn.mattbsg.xyz/rns/wood-egg.png",
+                "value": 50,
+            },
             "tree": {
                 "name": "Tree",
                 "image": "https://cdn.mattbsg.xyz/rns/tree-2b.png",
                 "value": 0,
+            },
+        }
+        self.recipes = {
+            "bed": {"wood-egg": 6, "wood": 20, "clay": 8, "iron-nugget": 2},
+            "arch": {"leaf-egg": 2, "wood": 6, "cherry-blossom": 6, "stone": 6},
+            "vanity": {"water-egg": 10, "wood-egg": 4, "wood": 18, "clay": 4},
+            "wardrobe": {"leaf-egg": 2, "wood": 16, "iron-nugget": 4},
+            "wreath": {
+                "leaf-egg": 4,
+                "water-egg": 4,
+                "wood-egg": 4,
+                "stick": 22,
+                "stone": 6,
+                "clay": 2,
+                "cherry-blossom": 8,
             },
         }
         self.rarity = {
@@ -602,7 +636,7 @@ class AnimalGame(commands.Cog):
     @commands.command(name="pricepost")
     async def _pricepost(self, ctx):
         await ctx.message.delete()
-        textPost = f"Hello!\nAre you looking to sell something? You've came to the right place! Use the `!sell amt item` command, replacing \"amt\" with the number of items to sell and \"item\" with the item you want to sell. If you just want to sell 1 item, you can just use the `!sell item` command. To sell all items of a specific category, use `!sell category` replacing \"category\" with the category you want to sell.\nOur prices may change, so please be sure to check back every day!\n\n__Fruit:__\nNative fruit is fruit from your island, while foreign fruit is from other people's islands\n\n**Native Fruit** - 400 Bells\n**Foreign Fruit** - 600 Bells\n**Turnip** - 1000 Bells\n\n__Fish:__\n\n**Black Bass** - {self.fish['black-bass']['value']} Bells\n**Carp** - {self.fish['carp']['value']} Bells\n**Crucian Carp** - {self.fish['crucian-carp']['value']} Bells\n**Dab** - {self.fish['dab']['value']} Bells\n**Freshwater Goby** - {self.fish['freshwater-goby']['value']} Bells\n**Loach** - {self.fish['loach']['value']} Bells\n**Ocean Sunfish** - {self.fish['ocean-sunfish']['value']} Bells\n**Olive Flounder** - {self.fish['olive-flounder']['value']} Bells\n**Red Snapper** - {self.fish['red-snapper']['value']} Bells\n**Sea Bass** - {self.fish['sea-bass']['value']} Bells\n**Sea Butterfly** - {self.fish['sea-butterfly']['value']} Bells\n**Shark** - {self.fish['shark']['value']} Bells\n**Squid** - {self.fish['squid']['value']} Bells\n**Tadpole** - {self.fish['tadpole']['value']} Bells\n**Yellow Perch** - {self.fish['yellow-perch']['value']} Bells\n\n__Bugs:__\n\n**Butterfly** - {self.bugs['butterfly']['value']} Bells\n**Hermit Crab** - {self.bugs['hermit-crab']['value']} Bells\n**Moth** - {self.bugs['moth']['value']} Bells\n**Pill Bug** - {self.bugs['pill-bug']['value']} Bells\n**Spider** - {self.bugs['spider']['value']} Bells\n**Tarantula** - {self.bugs['tarantula']['value']} Bells\n**Wharf Roach** - {self.bugs['wharf-roach']['value']} Bells\n\n__Misc:__\n\n**Bait** - {self.items['bait']['value']} Bells\n**Cherry Blossom** - 200 Bells\n**Clay** - {self.items['clay']['value']} Bells\n**Conch** - {self.items['conch']['value']} Bells\n**Coral** - {self.items['coral']['value']} Bells\n**Cowrie** - {self.items['cowrie']['value']} Bells\n**Iron Nugget** - {self.items['iron-nugget']['value']} Bells\n**Sand Dollar** - {self.items['sand-dollar']['value']} Bells\n**Shell** - {self.items['shell']['value']} Bells\n**Stick** - {self.items['stick']['value']} Bells\n**Stone** - {self.items['stone']['value']} Bells\n**Wood** - 150 Bells"
+        textPost = f"Hello!\nAre you looking to sell something? You've came to the right place! Use the `!sell amt item` command, replacing \"amt\" with the number of items to sell and \"item\" with the item you want to sell. If you just want to sell 1 item, you can just use the `!sell item` command. To sell all items of a specific category, use `!sell category` replacing \"category\" with the category you want to sell.\nOur prices may change, so please be sure to check back every day!\n\n__Fruit:__\nNative fruit is fruit from your island, while foreign fruit is from other people's islands\n\n**Native Fruit** - 400 Bells\n**Foreign Fruit** - 600 Bells\n**Turnip** - 1000 Bells\n\n__Fish:__\n\n**Black Bass** - {self.fish['black-bass']['value']} Bells\n**Carp** - {self.fish['carp']['value']} Bells\n**Crucian Carp** - {self.fish['crucian-carp']['value']} Bells\n**Dab** - {self.fish['dab']['value']} Bells\n**Freshwater Goby** - {self.fish['freshwater-goby']['value']} Bells\n**Loach** - {self.fish['loach']['value']} Bells\n**Ocean Sunfish** - {self.fish['ocean-sunfish']['value']} Bells\n**Olive Flounder** - {self.fish['olive-flounder']['value']} Bells\n**Red Snapper** - {self.fish['red-snapper']['value']} Bells\n**Sea Bass** - {self.fish['sea-bass']['value']} Bells\n**Sea Butterfly** - {self.fish['sea-butterfly']['value']} Bells\n**Shark** - {self.fish['shark']['value']} Bells\n**Squid** - {self.fish['squid']['value']} Bells\n**Tadpole** - {self.fish['tadpole']['value']} Bells\n**Water Egg** - 50 Bells\n**Yellow Perch** - {self.fish['yellow-perch']['value']} Bells\n\n__Bugs:__\n\n**Butterfly** - {self.bugs['butterfly']['value']} Bells\n**Hermit Crab** - {self.bugs['hermit-crab']['value']} Bells\n**Leaf Egg** - 50 Bells\n**Moth** - {self.bugs['moth']['value']} Bells\n**Pill Bug** - {self.bugs['pill-bug']['value']} Bells\n**Spider** - {self.bugs['spider']['value']} Bells\n**Tarantula** - {self.bugs['tarantula']['value']} Bells\n**Wharf Roach** - {self.bugs['wharf-roach']['value']} Bells\n\n__Misc:__\n\n**Bait** - {self.items['bait']['value']} Bells\n**Cherry Blossom** - 200 Bells\n**Clay** - {self.items['clay']['value']} Bells\n**Conch** - {self.items['conch']['value']} Bells\n**Coral** - {self.items['coral']['value']} Bells\n**Cowrie** - {self.items['cowrie']['value']} Bells\n**Iron Nugget** - {self.items['iron-nugget']['value']} Bells\n**Sand Dollar** - {self.items['sand-dollar']['value']} Bells\n**Shell** - {self.items['shell']['value']} Bells\n**Stick** - {self.items['stick']['value']} Bells\n**Stone** - {self.items['stone']['value']} Bells\n**Wood** - 150 Bells\n**Wood Egg**"
         embed = discord.Embed(title="Nooks Cranny", color=0xFFF62D, description=textPost)
         embed = discord.Embed(title="Nooks Cranny", color=0xFFF62D, description=textPost)
         embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Timmy-Tommy-01.png")
@@ -656,6 +690,108 @@ class AnimalGame(commands.Cog):
         return await ctx.send(f"Success! You made a payment of **{amount}** bells towards your loan!")
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @commands.command(name="townhall")
+    async def _townhall(self, ctx, *, item: typing.Optional[str] = ""):
+        db = mclient.bowser.animalEvent
+        user = db.find_one({"_id": ctx.author.id})
+
+        if not user:
+            return await ctx.send(
+                f"{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package",
+                delete_after=10,
+            )
+
+        if not user["finished"]:
+            return await ctx.send(
+                f"{config.redTick} {ctx.author.mention} You stop by the town hall, but the contruction is not finished yet. Try coming back once your loan is paid off with Nook Inc.",
+                delete_after=10,
+            )
+
+        saniItem = item.lower().strip().replace(" ", "-")
+        if not saniItem:
+            embed = discord.Embed(
+                title="[COMPLETE] Town Hall" if len(user["diy"]) >= 5 else "Town Hall",
+                color=0xFF69B4,
+            )
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Zipper-01.png")
+            description = "Hippity ho, whaddaya know! Look who it is! I'm just a hop, skip, and a jump away from finishing my egg furniture collection. Before I bounce after Bunny Day, do ya think you can help this hare out? I'm still missing a few items...\n\nIf ya can lend a paw (or four!) could you bring by some crafting items I need? If you have the items for a DIY recipe, just come back here to the town hall and use the `!townhall` item command, replacing \"item\" with the name of the recipe you want to help me out with!"
+            embed.description = description
+            embed.add_field(
+                name="Bed" if not "bed" in user["diy"] else "✅ Bed",
+                value="6x Wood Egg, 20x Wood, 8x Clay, 2x Iron Nugget",
+                inline=False,
+            )  # Sorry for the sin of not dynamically generating these names
+            embed.add_field(
+                name="Arch" if not "arch" in user["diy"] else "✅ Arch",
+                value="2x Leaf Egg, 6x Wood, 2x Cherry Blossom, 6x Stone",
+                inline=False,
+            )
+            embed.add_field(
+                name="Vanity" if not "vanity" in user["diy"] else "✅ Vanity",
+                value="10x Water Egg, 4x Wood Egg, 18x Wood, 4x Clay",
+                inline=False,
+            )
+            embed.add_field(
+                name="Wardrobe" if not "wardrobe" in user["diy"] else "✅ Wardrobe",
+                value="5x Leaf Egg, 16x Wood, 4x Iron Nugget",
+                inline=False,
+            )
+            embed.add_field(
+                name="Wreath" if not "wreath" in user["diy"] else "✅ Wreath",
+                value="4x Leaf Egg, 4x Water Egg, 4x Wood Egg, 22x Stick, 6x Stone, 2x Clay, 8x Cherry Blossom",
+                inline=False,
+            )
+            return await ctx.send(ctx.author.mention, embed=embed)
+
+        else:
+            if (
+                saniItem not in self.recipes.keys() or saniItem in user["diy"]
+            ):  # Not a real item, or they've already crafted it
+                return await ctx.send(
+                    f"{config.redTick} {ctx.author.mention} Hippity ho, it doesn't seem like I need help making any **{saniItem}** right now!"
+                )
+
+            missingItems = {}
+            userItems = {}
+            for fish, value in user["fish"].keys():
+                userItems[fish] = ("fish", value)
+            for bug, value in user["bugs"].keys():
+                userItems[bug] = ("bug", value)
+            for item, value in user["items"].keys():
+                userItems[item] = ("item", value)
+
+            neededItems = {}
+            for _type, value in self.recipes[saniItem].items():
+                neededItems[_type] = value
+
+            locatedNeeded = neededItems.copy()
+            for x, y in userItems.items():
+                if x in neededItems:
+                    if y[1] < neededItems[x]:
+                        missingItems[x] = neededItems[x] - y[1]
+
+                    else:
+                        locatedNeeded[x] = y
+
+            if missingItems:
+                return await ctx.send(
+                    "{} {} Hippity ho, it looks like you are missing some items I need to craft that recipe! Hop back over when you have them! (You are missing {})".format(
+                        config.redTick,
+                        ctx.author.mention,
+                        ", ".join(["{}x {}".format(x, y) for x, y in missingItems]),
+                    )
+                )
+
+            for x, y in locatedNeeded:
+                db.update_one({"_id": ctx.author.id}, {"$inc": {y[0] + "." + x: -1 * y[1]}})
+
+            db.update_one({"_id": ctx.author.id}, {"$push": {"diy": saniItem}})
+            return await ctx.send(
+                f"{config.greenTick} {ctx.author.mention} Hippity ho, thanks for helping me out! Now I can craft a **{saniItem.capitalize()}**!"
+            )
+
+    @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="donate")
     async def _donate(self, ctx, *, item: typing.Optional[str] = ""):
         db = mclient.bowser.animalEvent
@@ -686,51 +822,18 @@ class AnimalGame(commands.Cog):
             )
 
         if user["townhall"] == 1 and user["bells"] >= 200000:
-            bellsOwed = 0
-            for fish, value in user["fish"].items():
-                if value <= 0:
-                    continue
-                bellsOwed += self.fish[fish]["value"] * value
-
-            for bug, value in user["bugs"].items():
-                if value <= 0:
-                    continue
-                bellsOwed += self.bugs[bug]["value"] * value
-
-            for fruit, value in user["fruit"].items():
-                if value <= 0:
-                    continue
-                if fruit == user["homeFruit"]:
-                    bellsOwed += 400 * value
-
-                else:
-                    bellsOwed += 600 * value
-
-            for misc, value in user["items"].items():
-                if value <= 0:
-                    continue
-                bellsOwed += self.items[misc]["value"] * value
-
             db.update_one(
                 {"_id": ctx.author.id},
                 {
-                    "$set": {
-                        "fish": {},
-                        "bugs": {},
-                        "fruit": {},
-                        "items": {},
-                        "debt": 0,
-                        "bells": (user["bells"] + bellsOwed) - 200000,
-                    },
-                    "$inc": {"lifetimeBells": bellsOwed, "townhall": 1},
+                    "$set": {"debt": 0},
+                    "$inc": {"townhall": 1, "bells": -200000},
                 },
             )
             return await ctx.send(
-                f"{ctx.author.mention} Thanks for stopping by! Awesome, you have the bells and items we need for the project! Oh, the items? I've gone ahead and emptied your backback out since need everything on hand for the project! Timmy and Tommy will compensate you **{bellsOwed}** bells for the trouble. Go out and catch **two of every fish and bug** for the museum! When you've got something stop by and `!donate` it."
+                f"{ctx.author.mention} Thanks for stopping by! Awesome, you have the bells we need to fund the project! Now go out and catch **two of every fish and bug** for the museum! When you've got something stop by and `!donate` it."
             )
 
         saniItem = item.lower().strip().replace(" ", "-")
-        print(saniItem)
         if user["townhall"] == 2 and saniItem:
             if user["museum"].count(saniItem) >= 2:
                 return await ctx.send(
@@ -811,6 +914,25 @@ class AnimalGame(commands.Cog):
 
             embed.description = description
             await ctx.send(ctx.author.mention, embed=embed)
+            userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
+            if not user["hasRole"]:
+                db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
+                mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent"}})
+                await ctx.send(
+                    f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have earned the event trophy on your `!profile`, great job!"
+                )
+
+            elif user["hasRole"] and not "acevent-extra" in userDoc["trophies"]:
+                mclient.bowser.users.update_one(
+                    {"_id": ctx.author.id},
+                    {
+                        "$push": {"trophies": "acevent-extra"},
+                        "$pull": {"trophies": "acevent"},
+                    },
+                )
+                await ctx.send(
+                    f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed the museum! You have now earned the advanced event trophy on your `!profile`, great job!"
+                )
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="sell")
@@ -1062,7 +1184,7 @@ class AnimalGame(commands.Cog):
         await ctx.message.delete()
         user = db.find_one({"_id": ctx.author.id})
 
-        if not db.find_one({"_id": ctx.author.id}):
+        if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package",
                 delete_after=10,
@@ -1073,11 +1195,25 @@ class AnimalGame(commands.Cog):
             if _animal in user["quests"]:
                 trophyProgress += 1
 
+        userDoc = mclient.bowser.users.find_one({"_id": ctx.author.id})
         if trophyProgress == 5 and not user["hasRole"]:
             db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
             mclient.bowser.users.update_one({"_id": ctx.author.id}, {"$push": {"trophies": "acevent"}})
             await ctx.send(
                 f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have earned the event trophy on your `!profile`, great job!"
+            )
+
+        elif trophyProgress == 5 and user["hasRole"] and not "acevent-extra" in userDoc["trophies"]:
+            db.update_one({"_id": ctx.author.id}, {"$set": {"hasRole": True}})
+            mclient.bowser.users.update_one(
+                {"_id": ctx.author.id},
+                {
+                    "$push": {"trophies": "acevent-extra"},
+                    "$pull": {"trophies": "acevent"},
+                },
+            )
+            await ctx.send(
+                f"🎉 Congrats {ctx.author.mention} 🎉! Upon looking at your account it seems you have completed a quest from every villager! You have now earned the advanced event trophy on your `!profile`, great job!"
             )
 
         if not animal:
@@ -1252,7 +1388,12 @@ class AnimalGame(commands.Cog):
 
         await asyncio.sleep(4)
         newWood = random.randint(1, 3)
-        embed.description = f"You cut down the {tree} tree and got {newWood} wood!"
+        description = f"You cut down the {tree} tree and got {newWood} wood!"
+        if random.choices([True, False], weights=[40, 60])[0]:
+            db.update_one({"_id": ctx.author.id}, {"$inc": {"items.wood-egg": 1}})
+            description += " Oh hey, it looks like a **Wood Egg** fell down while cutting the tree. Nice!"
+
+        embed.description = description
         db.update_one({"_id": ctx.author.id}, {"$inc": {"items.wood": newWood}})
 
         await message.edit(embed=embed)
@@ -1282,9 +1423,10 @@ class AnimalGame(commands.Cog):
             )
 
         db = mclient.bowser.animalEvent
+        user = db.find_one({"_id": ctx.author.id})
         await ctx.message.delete()
 
-        if not db.find_one({"_id": ctx.author.id}):
+        if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package",
                 delete_after=10,
@@ -1302,9 +1444,14 @@ class AnimalGame(commands.Cog):
 
         self.durabilities[ctx.author.id]["fishrod"]["value"] -= 1
 
+        items = [x for x in self.fish.keys()]
+        weights = [x["weight"] for x in self.fish.values()]
+        if "cherry" in user["trees"].keys():
+            items.append("cherry-blossom")
+            weights.append(3)
         catch = random.choices(
-            list(self.fish.keys()),
-            weights=[self.fish[x]["weight"] for x in list(self.fish.keys())],
+            items,
+            weights=weights,
             k=1,
         )[0]
         embed = discord.Embed(
@@ -1320,14 +1467,20 @@ class AnimalGame(commands.Cog):
             and random.choices([True, False], weights=[75, 25])[0]
             or random.choices([True, False], weights=[50, 50])[0]
         ):
-            embed.set_thumbnail(url=self.fish[catch]["image"])
-            description = f'You caught a **{self.rarity[self.fish[catch]["weight"]]} {self.fish[catch]["name"]}**! {self.fish[catch]["pun"]}'
+            if catch == "cherry-blossom":
+                embed.set_thumbnail(url=self.items[catch]["image"])
+                description = f'You found a **{self.items[catch]["name"]}**!'
+                db.update_one({"_id": ctx.author.id}, {"$inc": {"items." + catch: 1}})
+            else:
+                embed.set_thumbnail(url=self.fish[catch]["image"])
+                description = f'You caught a **{self.rarity[self.fish[catch]["weight"]]} {self.fish[catch]["name"]}**! {self.fish[catch]["pun"]}'
+                db.update_one({"_id": ctx.author.id}, {"$inc": {"fish." + catch: 1}})
+
             if willBreak:
                 description += (
                     "\n\nWhat's this? Oh darn, __your fishing rod broke__! It will take about 1 hour to craft a new one"
                 )
             embed.description = description
-            db.update_one({"_id": ctx.author.id}, {"$inc": {"fish." + catch: 1}})
 
             await message.edit(embed=embed)
 
@@ -1786,6 +1939,7 @@ class AnimalGame(commands.Cog):
                 "quests": [],
                 "bells": 0,
                 "museum": [],  # Bugs/fish donated
+                "diy": [],  # DIY Recipes completed
                 "townhall": 0,  # Number status of which job currently on. 0=nothing
                 "fish": {},
                 "bugs": {},
