@@ -1430,21 +1430,6 @@ class AnimalGame(commands.Cog):
 
         await message.edit(embed=embed)
 
-    @_cut.error
-    async def _cut_error(self, ctx, error):
-        if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
-            await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You need two hands to fish, how can you use two lines at once? (wait until your fishing is over before trying again)",
-                delete_after=10,
-            )
-            return await ctx.message.delete()
-
-        await ctx.send(
-            f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
-            delete_after=15,
-        )
-        raise error
-
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="fish")
     async def _fish(self, ctx):
@@ -1524,21 +1509,6 @@ class AnimalGame(commands.Cog):
                 )
             embed.description = description
             await message.edit(embed=embed)
-
-    @_fish.error
-    async def _fish_error(self, ctx, error):
-        if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
-            await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You need two hands to fish, how can you use two lines at once? (wait until your fishing is over before trying again)",
-                delete_after=10,
-            )
-            return await ctx.message.delete()
-
-        await ctx.send(
-            f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
-            delete_after=15,
-        )
-        raise error
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="dig")
@@ -1627,22 +1597,6 @@ class AnimalGame(commands.Cog):
                 )
             embed.description = description
             await message.edit(embed=embed)
-
-    @_dig.error
-    async def _dig_error(self, ctx, error):
-        # await ctx.send(type(error))
-        if isinstance(error, commands.MaxConcurrencyReached):  # pylint: disable=no-member
-            await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You need two hands on a shovel, how can you use two at once? (wait until your digging is over before trying again)",
-                delete_after=10,
-            )
-            return await ctx.message.delete()
-
-        await ctx.send(
-            f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
-            delete_after=15,
-        )
-        raise error
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.group(name="use", invoke_without_command=True)
