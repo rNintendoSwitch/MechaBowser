@@ -240,7 +240,7 @@ class AnimalGame(commands.Cog):
                 "name": "Butterfly",
                 "image": "https://cdn.mattbsg.xyz/rns/common-butterfly.png",
                 "value": 100,
-                "weight": 5,
+                "weight": 4,
                 "pun": "It better fly.",
             },
             "hermit-crab": {
@@ -2105,7 +2105,7 @@ class AnimalGame(commands.Cog):
         if message.channel.id != 769666021706432532:
             return  # general, switch-discussion, animal-crossing
 
-        if not random.choices([True, False], weights=[1, 99])[0]:
+        if not random.choices([True, False], weights=[0.75, 99.25])[0]:
             return
 
         db = mclient.bowser.animalEvent
