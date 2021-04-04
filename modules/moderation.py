@@ -462,8 +462,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them about this action'
                 )
 
-            await member.kick(reason='Kick action performed by moderator')
-            return
+        await member.kick(reason='Kick action performed by moderator')
+        return
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
