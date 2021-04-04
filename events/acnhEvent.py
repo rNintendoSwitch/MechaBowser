@@ -715,6 +715,7 @@ class AnimalGame(commands.Cog):
     async def _townhall(self, ctx, *, item: typing.Optional[str] = ""):
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
+        await ctx.message.delete()
 
         if not user:
             return await ctx.send(
@@ -1393,7 +1394,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1436,7 +1438,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1516,7 +1519,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1610,7 +1614,8 @@ class AnimalGame(commands.Cog):
         await ctx.message.delete()
         if ctx.channel.id not in self.commandChannels:
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1651,7 +1656,7 @@ class AnimalGame(commands.Cog):
             await ctx.message.delete()
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=15,
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1700,7 +1705,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1748,7 +1754,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
@@ -1821,7 +1828,8 @@ class AnimalGame(commands.Cog):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>"
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
             )
 
         db = mclient.bowser.animalEvent
