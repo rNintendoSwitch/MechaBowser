@@ -1634,7 +1634,7 @@ class AnimalGame(commands.Cog):
 
         if self.durabilities[ctx.author.id]["bait"]["value"] == 0:
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You can only use one bait per day. Check back in tomorrow!"
+                f"{config.redTick} {ctx.author.mention} You can only use one bait per day. Check back tomorrow!"
             )
 
         if ctx.author.id in self.activeBait.keys():
@@ -1644,7 +1644,7 @@ class AnimalGame(commands.Cog):
 
         db.update_one({"_id": ctx.author.id}, {"$inc": {"items.bait": -1}})
         self.activeBait[ctx.author.id] = time.time() + 7200
-        self.durabilities[ctx.author.id]
+        self.durabilities[ctx.author.id]["bait"]["value"] -= 1
         return await ctx.send(
             f"{ctx.author.mention} You used 1 bait! You have a higher chance to catch fish for 2 hours"
         )
