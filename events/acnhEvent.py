@@ -1810,7 +1810,7 @@ class AnimalGame(commands.Cog):
 
         if saniItem not in items.keys():
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You don't have **{quantity}x {item.lower()}** in your inventory to gift!"
+                f"{config.redTick} {ctx.author.mention} You don't have {quantity}x **{item.lower()}** in your inventory to gift!"
             )
 
         db.update_one({"_id": ctx.author.id}, {"$inc": {items[saniItem] + "." + saniItem: -1 * quantity}})
@@ -1819,7 +1819,7 @@ class AnimalGame(commands.Cog):
         self.durabilities[ctx.author.id]["gift"]["regenAt"] = time.time() + 86400
         self.durabilities[ctx.author.id]["gift"]["value"] -= 1
 
-        await ctx.send(f"Success! You have given 1 **{item.lower()}** to {target.mention}")
+        await ctx.send(f"Success! You have given {quantity}x **{item.lower()}** to {target.mention}")
 
     @commands.command(name="island")
     async def _island(self, ctx):
