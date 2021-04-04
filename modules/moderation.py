@@ -463,7 +463,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 )
 
         await member.kick(reason='Kick action performed by moderator')
-        return
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
