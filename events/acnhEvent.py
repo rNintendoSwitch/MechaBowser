@@ -1750,7 +1750,9 @@ class AnimalGame(commands.Cog):
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="gift")
-    async def _gift(self, ctx, target: typing.Union[discord.Member, discord.User], quantity: int = 1, *, item):
+    async def _gift(
+        self, ctx, target: typing.Union[discord.Member, discord.User], quantity: typing.Optional[int] = 1, *, item
+    ):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
