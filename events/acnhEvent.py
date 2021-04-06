@@ -1634,7 +1634,7 @@ class AnimalGame(commands.Cog):
 
         if self.durabilities[ctx.author.id]["bait"]["value"] == 0:
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You can only use one bait per day. Check back in tomorrow!"
+                f"{config.redTick} {ctx.author.mention} You can only use one bait per day. Check back tomorrow!"
             )
 
         if ctx.author.id in self.activeBait.keys():
@@ -1644,7 +1644,7 @@ class AnimalGame(commands.Cog):
 
         db.update_one({"_id": ctx.author.id}, {"$inc": {"items.bait": -1}})
         self.activeBait[ctx.author.id] = time.time() + 7200
-        self.durabilities[ctx.author.id]
+        self.durabilities[ctx.author.id]["bait"]["value"] -= 1
         return await ctx.send(
             f"{ctx.author.mention} You used 1 bait! You have a higher chance to catch fish for 2 hours"
         )
@@ -1750,7 +1750,9 @@ class AnimalGame(commands.Cog):
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
     @commands.command(name="gift")
-    async def _gift(self, ctx, target: typing.Union[discord.Member, discord.User], *, item):
+    async def _gift(
+        self, ctx, target: typing.Union[discord.Member, discord.User], quantity: typing.Optional[int] = 1, *, item
+    ):
         if ctx.channel.id not in self.commandChannels:
             await ctx.message.delete()
             return await ctx.send(
@@ -1767,7 +1769,7 @@ class AnimalGame(commands.Cog):
 
         if self.durabilities[ctx.author.id]["gift"]["value"] <= 0:
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You can make 3 gifts per day. Check back in tomorrow!"
+                f"{config.redTick} {ctx.author.mention} You can only make 3 gifts per day. Check back in tomorrow!"
             )
 
         if not targetUser:
@@ -1782,46 +1784,44 @@ class AnimalGame(commands.Cog):
 
         if self.durabilities[ctx.author.id]["gift"]["value"] == 0:
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You can make 3 gifts per day. Check back in tomorrow!"
+                f"{config.redTick} {ctx.author.mention} You can only make 3 gifts per day. Check back in tomorrow!"
             )
 
         items = {}
         saniItem = item.lower().strip().replace(" ", "-")
 
         for name, value in initUser["fish"].items():
-            if value == 0:
+            if value < quantity:
                 continue
             items[name] = "fish"
 
         for name, value in initUser["bugs"].items():
-            if value == 0:
+            if value < quantity:
                 continue
             items[name] = "bugs"
 
         for name, value in initUser["items"].items():
-            if value == 0:
+            if value < quantity:
                 continue
             items[name] = "items"
 
         for name, value in initUser["fruit"].items():
-            if value == 0:
+            if value < quantity:
                 continue
             items[name] = "fruit"
 
         if saniItem not in items.keys():
             return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You don't have any **{item.lower()}** in your inventory that you can gift!"
+                f"{config.redTick} {ctx.author.mention} You don't have {quantity}x **{item.lower()}** in your inventory to gift!"
             )
 
-        db.update_one({"_id": ctx.author.id}, {"$inc": {items[saniItem] + "." + saniItem: -1}})
-        db.update_one({"_id": target.id}, {"$inc": {items[saniItem] + "." + saniItem: 1}})
+        db.update_one({"_id": ctx.author.id}, {"$inc": {items[saniItem] + "." + saniItem: -1 * quantity}})
+        db.update_one({"_id": target.id}, {"$inc": {items[saniItem] + "." + saniItem: quantity}})
 
         self.durabilities[ctx.author.id]["gift"]["regenAt"] = time.time() + 86400
         self.durabilities[ctx.author.id]["gift"]["value"] -= 1
 
-        await ctx.send(
-            f"Success! You have given 1 **{item.lower()}** to {target.mention}. You can only send 3 gifts per day, if you would like to send more try again tomorrow"
-        )
+        await ctx.send(f"Success! You have given {quantity}x **{item.lower()}** to {target.mention}")
 
     @commands.command(name="island")
     async def _island(self, ctx):
