@@ -646,7 +646,7 @@ class AnimalGame(commands.Cog):
         )
         embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Isabelle-01.png")
         await self.discussionChannel.send(embed=embed)
-        db.update_one({"_type": "server"}, {"day": {"$inc": 1}})
+        db.update_one({"_type": "server"}, {"$inc": {"day": 1}})
 
     @commands.is_owner()
     @commands.command(name="savequests")
