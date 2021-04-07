@@ -20,6 +20,7 @@ class AnimalGame(commands.Cog):
         self.eventRole = self.bot.get_guild(238080556708003851).get_role(761047949328646144)
         self.shopChannel = self.bot.get_channel(757411216774791189)
         self.leaderboard = self.bot.get_channel(769663694778400808)
+        self.discussionChannel = self.bot.get_channel(675517556659978240)
         self.commandChannels = [
             769665679593832458,
             769665954241970186,
@@ -637,6 +638,15 @@ class AnimalGame(commands.Cog):
 
         # Reset quests
         self._roll_quests()
+        doc = db.find_one({"_type": "server"})
+        embed = discord.Embed(
+            title=f"Welcome to Day {doc['day'] + 1}!",
+            description="Isn't it nice outside? A calm breeze is all I need to feel all fuzzy inside!\nCheck out your garden! Saplings are growing, fruit is bearing, and turnips-a-plenty. We even repaired your tools for ya!\n\nIsabelle Signing Off!",
+            color=0xFFF588,
+        )
+        embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Isabelle-01.png")
+        await self.discussionChannel.send(embed=embed)
+        db.update_one({"_type": "server"}, {"day": {"$inc": 1}})
 
     @commands.is_owner()
     @commands.command(name="savequests")
