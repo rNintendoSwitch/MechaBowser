@@ -1869,7 +1869,7 @@ class AnimalGame(commands.Cog):
             treeCnt += value
             treeDesc += str(value) + " " + tree.capitalize()
             if tree == "turnip":
-                treeDesc += " plant" if value == 1 else "plants"
+                treeDesc += " plant" if value == 1 else " plants"
             else:
                 treeDesc += " tree" if value == 1 else " trees"
             if tree in user["saplings"].keys():
