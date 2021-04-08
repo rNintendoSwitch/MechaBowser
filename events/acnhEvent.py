@@ -1410,6 +1410,8 @@ class AnimalGame(commands.Cog):
 
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
+        await ctx.message.delete()
+
         if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package",
