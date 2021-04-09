@@ -751,7 +751,7 @@ class AnimalGame(commands.Cog):
             embed.description = description
             embed.add_field(
                 name="Bed" if not "bed" in user["diy"] else "✅ Bed",
-                value="6x Wood Egg, 20x Wood, 8x Clay, 2x Iron Nugget",
+                value="6x Wood Egg, 20x Wood, 8x Clay, 8x Iron Nugget",
                 inline=False,
             )  # Sorry for the sin of not dynamically generating these names
             embed.add_field(
