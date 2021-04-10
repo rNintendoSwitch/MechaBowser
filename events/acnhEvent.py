@@ -844,6 +844,13 @@ class AnimalGame(commands.Cog):
         user = db.find_one({"_id": ctx.author.id})
         await ctx.message.delete()
 
+        if ctx.channel.id not in self.commandChannels:
+            await ctx.message.delete()
+            return await ctx.send(
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
+                delete_after=10,
+            )
+
         if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package",
