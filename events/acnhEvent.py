@@ -1779,6 +1779,9 @@ class AnimalGame(commands.Cog):
                 delete_after=10,
             )
 
+        if quantity <= 0:
+            return await ctx.send(f"{config.redTick} {ctx.author.mention} You cannot gift less than 1 of an item!")
+
         db = mclient.bowser.animalEvent
         targetUser = db.find_one({"_id": target.id})
         initUser = db.find_one({"_id": ctx.author.id})
