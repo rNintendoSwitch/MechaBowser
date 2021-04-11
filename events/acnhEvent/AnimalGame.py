@@ -9,7 +9,9 @@ import discord
 import PIL
 import pymongo
 from discord.ext import commands, tasks
+
 from . import consts
+
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
