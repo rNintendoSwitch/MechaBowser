@@ -1,4 +1,5 @@
 import logging
+
 from .AnimalGame import AnimalGame
 
 
