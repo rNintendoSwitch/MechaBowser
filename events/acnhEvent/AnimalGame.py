@@ -4,6 +4,8 @@ import random
 import time
 import typing
 
+from discord.ext.commands.errors import CheckFailure
+
 import config
 import discord
 import PIL
@@ -16,6 +18,33 @@ from . import consts
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 
+class NotInChannel(CheckFailure):
+    pass
+
+
+def is_in_channel(channel_ids: typing.List[int]):
+    channs = ["<#{x}>" for x in channel_ids]
+
+    async def predicate(ctx):
+        if ctx.channel and ctx.channel.id in channel_ids:
+            return True
+        else:
+            errormsg = (
+                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, "
+                f"instead use one of {', '.join(channs)}"
+            )
+            raise NotInChannel(errormsg)
+
+    return commands.check(predicate)
+
+
+commandChannels = [
+    769665679593832458,
+    769665954241970186,
+    769666021706432532,
+]
+
+
 class AnimalGame(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -23,11 +52,7 @@ class AnimalGame(commands.Cog):
         self.shopChannel = self.bot.get_channel(757411216774791189)
         self.leaderboard = self.bot.get_channel(769663694778400808)
         self.discussionChannel = self.bot.get_channel(675517556659978240)
-        self.commandChannels = [
-            769665679593832458,
-            769665954241970186,
-            769666021706432532,
-        ]
+        self.commandChannels = commandChannels
 
         self.animals = consts.animals
         self.fruits = consts.fruits
@@ -284,6 +309,7 @@ class AnimalGame(commands.Cog):
         await self.shopChannel.send(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="pay")
     async def _pay(self, ctx, amount: int):
         db = mclient.bowser.animalEvent
@@ -331,6 +357,7 @@ class AnimalGame(commands.Cog):
         return await ctx.send(f"Success! You made a payment of **{amount}** bells towards your loan!")
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="townhall")
     async def _townhall(self, ctx, *, item: typing.Optional[str] = ""):
         db = mclient.bowser.animalEvent
@@ -448,18 +475,12 @@ class AnimalGame(commands.Cog):
             )
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="donate")
     async def _donate(self, ctx, *, item: typing.Optional[str] = ""):
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
         await ctx.message.delete()
-
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
 
         if not user:
             return await ctx.send(
@@ -601,15 +622,11 @@ class AnimalGame(commands.Cog):
             await ctx.send(ctx.author.mention, embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel([757411216774791189])  # shop channel
     @commands.command(name="sell")
     async def _sell(self, ctx, quantity: typing.Optional[int] = 1, *, item):
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
-        if ctx.channel.id != 757411216774791189:
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} You can only use this command in {self.shopChannel.mention}!",
-                delete_after=10,
-            )
 
         await ctx.message.delete()
         if not user:
@@ -837,15 +854,9 @@ class AnimalGame(commands.Cog):
             )
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="quests", aliases=["quest"])
     async def _quests(self, ctx, animal: typing.Optional[str]):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         await ctx.message.delete()
         user = db.find_one({"_id": ctx.author.id})
@@ -1015,15 +1026,10 @@ class AnimalGame(commands.Cog):
                     return await ctx.send(ctx.author.mention, embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="cut", aliases=["chop"])
     async def _cut(self, ctx, tree):
         tree = tree.lower()
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
 
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
@@ -1062,15 +1068,9 @@ class AnimalGame(commands.Cog):
         await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="fish")
     async def _fish(self, ctx):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
         await ctx.message.delete()
@@ -1143,15 +1143,9 @@ class AnimalGame(commands.Cog):
             await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="dig")
     async def _dig(self, ctx):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         await ctx.message.delete()
 
@@ -1232,23 +1226,20 @@ class AnimalGame(commands.Cog):
             await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.group(name="use", invoke_without_command=True)
     async def _use(self, ctx):
         await ctx.message.delete()
         return
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @_use.command(name="bait")
     async def _use_bait(self, ctx):
         await ctx.message.delete()
-        if ctx.channel.id not in self.commandChannels:
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
+
         if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You need to register before using bait! Run the `!play` command in <#{self.commandChannels[0]}>",
@@ -1279,18 +1270,13 @@ class AnimalGame(commands.Cog):
         )
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="harvest")
     async def _harvest(self, ctx, fruit):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
         await ctx.message.delete()
+
         if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You need to register before harvesting! Run the `!play` command in <#{self.commandChannels[0]}>",
@@ -1329,18 +1315,13 @@ class AnimalGame(commands.Cog):
         await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="plant")
     async def _plant(self, ctx, fruit):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         user = db.find_one({"_id": ctx.author.id})
         await ctx.message.delete()
+
         if not user:
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You need to register before planting! Run the `!play` command in <#{self.commandChannels[0]}>",
@@ -1378,16 +1359,11 @@ class AnimalGame(commands.Cog):
         await message.edit(embed=embed)
 
     @commands.max_concurrency(1, per=commands.BucketType.user)  # pylint: disable=no-member
+    @is_in_channel(commandChannels)
     @commands.command(name="gift")
     async def _gift(
         self, ctx, target: typing.Union[discord.Member, discord.User], quantity: typing.Optional[int] = 1, *, item
     ):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
 
         if quantity <= 0:
             return await ctx.send(f"{config.redTick} {ctx.author.mention} You cannot gift less than 1 of an item!")
@@ -1456,16 +1432,11 @@ class AnimalGame(commands.Cog):
         await ctx.send(f"Success! You have given {quantity}x **{item.lower()}** to {target.mention}")
 
     @commands.command(name="island")
+    @is_in_channel(commandChannels)
     async def _island(self, ctx):
-        if ctx.channel.id not in self.commandChannels:
-            await ctx.message.delete()
-            return await ctx.send(
-                f"{config.redTick} {ctx.author.mention} Do not use this channel for event commands, instead one of <#{self.commandChannels[0]}>, <#{self.commandChannels[1]}>, or <#{self.commandChannels[2]}>",
-                delete_after=10,
-            )
-
         db = mclient.bowser.animalEvent
         await ctx.message.delete()
+
         if not db.find_one({"_id": ctx.author.id}):
             return await ctx.send(
                 f"{config.redTick} {ctx.author.mention} You have not started your island adventure yet! Run the `!play` command to start your vacation getaway package",
@@ -1687,9 +1658,12 @@ class AnimalGame(commands.Cog):
 
         elif isinstance(error, commands.BadUnionArgument):
             await ctx.send(
-                f"{config.redTick} A part of that command is not correct. Check <#826914316846366721> for command usage"
+                f"{config.redTick} A part of that command is not correct. Check <#826914316846366721> for command usage",
+                delete_after=10,
             )
-
+            return await ctx.message.delete()
+        elif isinstance(error, NotInChannel):
+            await ctx.send(error.args[0])
         else:
             await ctx.send(
                 f"{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.",
