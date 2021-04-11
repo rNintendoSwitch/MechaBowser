@@ -4,13 +4,12 @@ import random
 import time
 import typing
 
-from discord.ext.commands.errors import CheckFailure
-
 import config
 import discord
 import PIL
 import pymongo
 from discord.ext import commands, tasks
+from discord.ext.commands.errors import CheckFailure
 
 from . import consts
 
