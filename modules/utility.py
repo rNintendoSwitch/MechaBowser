@@ -1145,8 +1145,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
 
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
             return
 

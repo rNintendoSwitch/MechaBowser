@@ -453,22 +453,20 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         await tools.send_modlog(
             self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
         )
+        additional = ""
         try:
             await member.send(tools.format_pundm('kick', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError):
             if not tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(
-                    f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them about this action'
-                )
+                additional = ' I was not able to DM them about this action'
 
-            await member.kick(reason='Kick action performed by moderator')
-            return
+        await member.kick(reason='Kick action performed by moderator')
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked{additional}')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -737,12 +735,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{member} ({member.id}) has had {activeStrikes - count} strikes removed, '
-                f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} '
-                f'({activeStrikes+count} - {count}) {error}'
+                f'{member} ({member.id}) has had {diff} strikes removed, '
+                f'they now have {count} strike{"s" if count > 1 else ""} '
+                f'({activeStrikes} - {count}) {error}'
             )
 
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
             return
 

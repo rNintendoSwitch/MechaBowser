@@ -99,6 +99,22 @@ class Splatfest(commands.Cog):
                 except ValueError:
                     await ctx.send(f'{config.redTick} That is not a valid role, please send a valid role ID')
 
+            # Channel logic
+            await ctx.send(f'What channel should team choosing be in? (Please send the ID)')
+            while True:
+                try:
+                    _channel = await self.bot.wait_for('message', check=check, timeout=60.0)
+                    _channel = _channel.content
+                    if _channel == 'cancel':
+                        return await ctx.send('Canceled setup. Rerun command to try again')
+                    _channel = ctx.guild.get_channel(int(_channel))
+                    if not _channel:
+                        raise ValueError
+                    break
+
+                except ValueError:
+                    await ctx.send(f'{config.redTick} That is not a valid channel, please send a valid channel ID')
+
         except discord.Forbidden:
             return await ctx.send(
                 f'{config.redTick} I am missing react permissions, please resolve this and rerun the command'
@@ -109,6 +125,7 @@ class Splatfest(commands.Cog):
 
         self.team1 = {'name': _team1, 'emote': _team1_emote, 'role': _team1_role.id}
         self.team2 = {'name': _team2, 'emote': _team2_emote, 'role': _team2_role.id}
+        self.channel = _channel.id
         self.ACTIVE = True
         await ctx.send(
             f'{config.greenTick} Team 2 has been set as {_team2}. The event is now activated! To end the event, run `{ctx.prefix}splatfest end`'
@@ -118,13 +135,14 @@ class Splatfest(commands.Cog):
     @_splatfest.command(name='end')
     async def _splatfest_end(self, ctx):
         self.ACTIVE = False
+        self.channel = None
         self.team1 = None
         self.team2 = None
         await ctx.send(f'{config.greenTick} Splatfest ended!')
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.channel.id in [config.commandsChannel, config.splatoon2Channel] and self.ACTIVE:
+        if message.channel.id in [config.commandsChannel, self.channel] and self.ACTIVE:
             team1Emote = re.compile(f'({self.team1["emote"]})+', re.I)
             team1Role = message.guild.get_role(self.team1['role'])
             team2Emote = re.compile(f'({self.team2["emote"]})+', re.I)

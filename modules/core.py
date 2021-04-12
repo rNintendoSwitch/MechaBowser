@@ -418,6 +418,8 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
+        if payload.channel_id in [757411216774791189, 769665679593832458, 769665954241970186, 769666021706432532]:
+            return  # temp ignorance of acevent channels
         if payload.cached_message:
             if payload.cached_message.type != discord.MessageType.default or payload.cached_message.author.bot:
                 return  # No system messages
