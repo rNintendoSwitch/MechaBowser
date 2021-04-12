@@ -87,11 +87,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.boostChannel = self.bot.get_channel(config.boostChannel)
         self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
         self.voiceTextAccess = self.bot.get_guild(config.nintendoswitch).get_role(config.voiceTextAccess)
-        self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
-        self.SMM2LevelPost = re.compile(
-            r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)',
-            re.I,
-        )
         self.affiliateTags = {
             "*": ["awc"],
             "amazon.*": ["colid", "coliid", "tag", "ascsubtag"],
@@ -171,71 +166,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 await self.adminChannel.send(
                     f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}'
                 )
-
-        # Filter for #mario
-        if message.channel.id == config.marioluigiChannel:  # #mario
-            if tools.re_match_nonlink(self.SMM2LevelID, message.content):
-                await message.delete()
-                response = await message.channel.send(
-                    f'{config.redTick} <@{message.author.id}> Please do not post Super Mario Maker 2 level codes '
-                    f'here. Post in <#{config.smm2Channel}> with the pinned template instead.'
-                )
-
-                await response.delete(delay=20)
-            return
-
-        # Filter for #smm2-levels
-        if message.channel.id == config.smm2Channel:
-            if not re.search(self.SMM2LevelID, message.content):
-                # We only want to filter posts with a level id
-                return
-
-            block = re.search(self.SMM2LevelPost, message.content)
-            if not block:
-                # No match for a properly formatted level post
-                response = await message.channel.send(
-                    f'{config.redTick} <@{message.author.id}> Your level is formatted incorrectly, please see the pinned messages for the format. A copy '
-                    f'of your message is included and will be deleted shortly. You can resubmit your level at any time.\n\n```{message.content}```'
-                )
-                await message.delete()
-                return await response.delete(delay=25)
-
-            # Lets make this readable
-            levelName = block.group(1)
-            levelID = block.group(2)
-            levelStyle = block.group(3)
-            levelTheme = block.group(4)
-            levelTags = block.group(5)
-            levelDifficulty = block.group(6)
-            levelDescription = block.group(7)
-
-            embed = discord.Embed(color=discord.Color(0x6600FF))
-            # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
-            embed.set_author(
-                name=f'{str(message.author)} ({message.author.id})',
-                icon_url=f'{message.author.avatar_url}#mab_remover_{message.author.id}',
-            )
-            embed.set_footer(text='The author may react with 🗑️ to delete this message.')
-
-            embed.add_field(name='Name', value=levelName, inline=True)
-            embed.add_field(name='Level ID', value=levelID, inline=True)
-            embed.add_field(name='Description', value=levelDescription, inline=False)
-            embed.add_field(name='Style', value=levelStyle, inline=True)
-            embed.add_field(name='Difficulty', value=levelDifficulty, inline=True)
-            if levelTheme:
-                embed.add_field(name='Theme', value=levelTheme, inline=False)
-            if levelTags:
-                embed.add_field(name='Tags', value=levelTags, inline=False)
-
-            try:
-                new_message = await message.channel.send(embed=embed)
-                await new_message.add_reaction('🗑️')
-                await message.delete()
-
-            except discord.errors.Forbidden:
-                # Fall back to leaving user text
-                logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
-            return
 
         # Filter and clean affiliate links
         # We want to call this last to ensure all above items are complete.
