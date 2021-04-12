@@ -31,7 +31,6 @@ spoilers: int = spoilers
 suggestions: int = suggestions
 voiceTextChannel: int = voice_text
 commandsChannel: int = commands
-marioluigiChannel: int = mario_and_luigi
 splatoon2Channel: int = splatoon2
 automodChannel: int = automod_alerts
 
