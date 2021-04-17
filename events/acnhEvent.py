@@ -525,7 +525,7 @@ class AnimalGame(commands.Cog):
         )
         self._regen_tools.cancel()  # pylint: disable=no-member
         self._leaderboard_update.cancel()  # pylint: disable=no-member
-        self._reset_cron.cancel()
+        self._reset_cron.stop()
 
     def _roll_quests(self):
         """
