@@ -288,7 +288,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if not allowed_remover:  # No special url tag detected
             return
         if str(payload.user_id) != str(allowed_remover):  # Reactor is not the allowed remover
-            await message.remove_reaction(payload.emoji, payload.user_id)
+            try:
+                await message.remove_reaction(payload.emoji, payload.member)
+            except:
+                pass
             return
 
         try:
