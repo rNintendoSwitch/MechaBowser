@@ -3,10 +3,11 @@ import logging
 import random
 import time
 import typing
+import pytz
 
 import config
 import discord
-import PIL
+import aiocron
 import pymongo
 from discord.ext import commands, tasks
 
@@ -454,6 +455,60 @@ class AnimalGame(commands.Cog):
         self._regen_tools.start()  # pylint: disable=no-member
         self._leaderboard_update.start()  # pylint: disable=no-member
 
+        @aiocron.crontab('0 0 * * *', tz=pytz.utc)
+        async def _reset_cron():
+            await self._daily_reset(self)
+
+    @commands.is_owner()
+    @commands.command(name="reset")
+    async def _daily_reset(self, ctx=None):
+        db = mclient.bowser.animalEvent
+
+        # Forget durability usage and restore tools
+        self.durabilities = {}
+        self.completedQuests = {}
+
+        for user in db.find({"_type": "user"}):
+            self.durabilities[user["_id"]] = {
+                "fishrod": {"value": 25, "regenAt": None},
+                "shovel": {"value": 20, "regenAt": None},
+                "bait": {"value": 1, "regenAt": None},
+                "gift": {"value": 3, "regenAt": None},
+            }
+
+            # Advance saplings and regrow fruit
+            newTrees = {}
+            availableFruit = {}
+            runTrees = False
+            for treeType, saplings in user["saplings"].items():
+                newTrees[treeType] = saplings
+                if saplings:
+                    runTrees = True
+
+            for treeType, trees in user["trees"].items():
+                availableFruit[treeType] = trees * 3
+
+            unpickedFruit = {"unpickedFruit." + x: availableFruit[x] for x in availableFruit.keys()}
+            unpickedFruit["saplings"] = {}
+            db.update_one({"_id": user["_id"]}, {"$set": unpickedFruit})
+            if runTrees:
+                db.update_one(
+                    {"_id": user["_id"]},
+                    {"$inc": {"trees." + x: newTrees[x] for x in newTrees.keys()}},
+                )
+
+        # Reset quests
+        self._roll_quests()
+        doc = db.find_one({"_type": "server"})
+        embed = discord.Embed(
+            title=f"Welcome to Day {doc['day'] + 1}!",
+            description="Isn't it nice outside? A calm breeze is all I need to feel all fuzzy inside!\nCheck out your garden! Saplings are growing, fruit is bearing, and turnips-a-plenty. We even repaired your tools for ya!\n\nIsabelle Signing Off!",
+            color=0xFFF588,
+        )
+        embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Isabelle-01.png")
+        await self.discussionChannel.send(embed=embed)
+        db.update_one({"_type": "server"}, {"$inc": {"day": 1}})
+
     def cog_unload(self):
         db = mclient.bowser.animalEvent
         newDura = {str(x): y for x, y in self.durabilities.items()}
@@ -470,6 +525,7 @@ class AnimalGame(commands.Cog):
         )
         self._regen_tools.cancel()  # pylint: disable=no-member
         self._leaderboard_update.cancel()  # pylint: disable=no-member
+        self._reset_cron.cancel()
 
     def _roll_quests(self):
         """
@@ -596,57 +652,6 @@ class AnimalGame(commands.Cog):
         for user, expiry in localActiveBait.items():
             if expiry < time.time():
                 del self.activeBait[user]
-
-    # @tasks.loop(hours=24)
-    @commands.is_owner()
-    @commands.command(name="reset")
-    async def _daily_reset(self, ctx):
-        db = mclient.bowser.animalEvent
-
-        # Forget durability usage and restore tools
-        self.durabilities = {}
-        self.completedQuests = {}
-
-        for user in db.find({"_type": "user"}):
-            self.durabilities[user["_id"]] = {
-                "fishrod": {"value": 25, "regenAt": None},
-                "shovel": {"value": 20, "regenAt": None},
-                "bait": {"value": 1, "regenAt": None},
-                "gift": {"value": 3, "regenAt": None},
-            }
-
-            # Advance saplings and regrow fruit
-            newTrees = {}
-            availableFruit = {}
-            runTrees = False
-            for treeType, saplings in user["saplings"].items():
-                newTrees[treeType] = saplings
-                if saplings:
-                    runTrees = True
-
-            for treeType, trees in user["trees"].items():
-                availableFruit[treeType] = trees * 3
-
-            unpickedFruit = {"unpickedFruit." + x: availableFruit[x] for x in availableFruit.keys()}
-            unpickedFruit["saplings"] = {}
-            db.update_one({"_id": user["_id"]}, {"$set": unpickedFruit})
-            if runTrees:
-                db.update_one(
-                    {"_id": user["_id"]},
-                    {"$inc": {"trees." + x: newTrees[x] for x in newTrees.keys()}},
-                )
-
-        # Reset quests
-        self._roll_quests()
-        doc = db.find_one({"_type": "server"})
-        embed = discord.Embed(
-            title=f"Welcome to Day {doc['day'] + 1}!",
-            description="Isn't it nice outside? A calm breeze is all I need to feel all fuzzy inside!\nCheck out your garden! Saplings are growing, fruit is bearing, and turnips-a-plenty. We even repaired your tools for ya!\n\nIsabelle Signing Off!",
-            color=0xFFF588,
-        )
-        embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Isabelle-01.png")
-        await self.discussionChannel.send(embed=embed)
-        db.update_one({"_type": "server"}, {"$inc": {"day": 1}})
 
     @commands.is_owner()
     @commands.command(name="savequests")
