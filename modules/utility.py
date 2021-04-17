@@ -285,10 +285,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             target_message = match.group(2)
             break
 
-        if not allowed_remover:
-            return  # No special url tag detected
-        if str(payload.user_id) != str(allowed_remover):
-            return  # Reactor is not the allowed remover
+        if not allowed_remover:  # No special url tag detected
+            return
+        if str(payload.user_id) != str(allowed_remover):  # Reactor is not the allowed remover
+            await message.remove_reaction(payload.emoji.name, payload.user_id)
+            return
+
         try:
             if target_message:
                 msg = await channel.fetch_message(target_message)
