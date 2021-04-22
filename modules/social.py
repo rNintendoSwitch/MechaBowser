@@ -43,6 +43,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             125233822760566784,  # MattBSG
             123879073972748290,  # Lyrus
             108429628560924672,  # Alex from Alaska
+            115840403458097161,  # FlapSnapple
         ]
 
         # Profile generation - precaching
