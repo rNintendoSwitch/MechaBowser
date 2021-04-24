@@ -1,4 +1,5 @@
 git+git://github.com/MattBSG/token-bucket.git
+git+git://github.com/rNintendoSwitch/nsecpy/@v0.4.0#egg=nsecpy
 discord.py
 pymongo
 jishaku
