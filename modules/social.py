@@ -472,7 +472,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
         phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
         phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
-        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
+        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`\n\nNote: Games released after April 2020 may not be selected due to an API issue. A rebuild of our games system is currently in progress to address this limitation.'
         phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
 
         # Lookup tables of values dependant on if user has setup their profile
