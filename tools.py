@@ -13,7 +13,7 @@ import pymongo
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
-linkRe = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+linkRe = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', re.I)
 
 archiveHeader = '# Message archive for guild "{0.name}" ({0.id})\nIncluded channels: {1}\n# Format:\n[date + time] Member ID/Message ID/Channel/Username - Message content\n----------------\n'
 timeUnits = {
@@ -139,7 +139,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                     'avatar_url': '',
                     'mod': False,
                 },
-                'closer': {'id': str(0), 'name': 'message edited', 'discriminator': 0, 'avatar_url': ''},
+                'closer': {'id': str(0), 'name': 'message archived', 'discriminator': 0, 'avatar_url': ''},
                 'messages': messages,
             }
         )
@@ -318,25 +318,29 @@ async def send_modlog(
     timestamp=None,
     public=False,
     delay=300,
+    updated=None,
 ):
-    if (
-        user
-    ):  # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
+    if user:
+        # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
         userid = user.id
 
-    if _type == 'strike':
-        author = f'{extra_author} ' + config.punStrs[_type]
-        author += 's ' if extra_author > 1 else ' '
-
-    elif _type == 'destrike':
-        author = f'Removed {extra_author} ' + config.punStrs['strike']
-        author += 's ' if extra_author > 1 else ' '
+    if _type in ['duration-update', 'reason-update']:
+        author = config.punStrs[_type] + f' ({extra_author}) '
 
     else:
-        author = f'{config.punStrs[_type]} '
-        if extra_author:
-            author += f'({extra_author}) '
+        if _type == 'strike':
+            author = f'{extra_author} ' + config.punStrs[_type]
+            author += 's ' if extra_author > 1 else ' '
+
+        elif _type == 'destrike':
+            author = f'Removed {extra_author} ' + config.punStrs['strike']
+            author += 's ' if extra_author > 1 else ' '
+
+        else:
+            author = f'{config.punStrs[_type]} '
+            if extra_author:
+                author += f'({extra_author}) '
 
     author += f'| {username} ({userid})'
 
@@ -354,8 +358,11 @@ async def send_modlog(
         embed.add_field(name='Moderator', value=moderator, inline=True)
 
     if expires:
-        embed.add_field(name='Expires', value=expires)
-    embed.add_field(name='Reason', value=reason)
+        embed.add_field(name='Expires' if _type != 'duration-update' else 'Now expires', value=expires)
+
+    embed.add_field(name='Reason' if _type != 'reason-update' else 'New reason', value=reason)
+    if _type == 'reason-update':
+        embed.add_field(name='Old reason', value=updated)
 
     await channel.send(embed=embed)
     if public:
@@ -368,7 +375,7 @@ async def send_modlog(
         return post_action
 
 
-async def send_public_modlog(bot, id, channel, expires=None, mock_document=None):
+async def send_public_modlog(bot, id, channel, mock_document=None):
     db = mclient.bowser.puns
     doc = mock_document if not id else db.find_one({'_id': id})
 
@@ -398,8 +405,11 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
     embed.set_author(name=author)
     embed.set_footer(text=id)
     embed.add_field(name='User', value=user.mention, inline=True)
-    if expires:
-        embed.add_field(name='Expires', value=expires)
+    if doc['expiry']:
+        expires = datetime.datetime.utcfromtimestamp(doc['expiry'])
+        embed.add_field(
+            name='Expires', value=f'{expires.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanize_duration(expires)})'
+        )
     if doc['sensitive']:
         embed.add_field(
             name='Reason',
@@ -419,27 +429,38 @@ async def send_public_modlog(bot, id, channel, expires=None, mock_document=None)
         db.update_one({'_id': id}, {'$set': {'public_log_message': message.id, 'public_log_channel': channel.id}})
 
 
-def format_pundm(_type, reason, moderator, details=None, auto=False):
+def format_pundm(_type, reason, moderator=None, details=None, auto=False):
+    details_int = details if isinstance(details, int) else 0
+    details_str = details if isinstance(details, str) else ""
+    details_tup = details if isinstance(details, tuple) else ("", "")
     infoStrs = {
-        'strike': f'You have received **{details} strike{"s" if (_type == "strike") and (details > 1) else ""}** on',
-        'destrike': f'Your **active strikes** have been reduced by **{details} strike{"s" if (_type == "destrike") and (details > 1) else ""}** on',
-        'warn': f'You have been **warned (now {details})** on',
-        'warnup': f'Your **warning level** has been **increased (now {details})** on',
-        'warndown': f'Your **warning level** has been **decreased (now {details})** on',
+        'strike': f'You have received **{details_int} strike{"s" if details_int > 1 else ""}** on',
+        'destrike': f'Your **active strikes** have been reduced by **{details_int} strike{"s" if details_int > 1 else ""}** on',
+        'warn': f'You have been **warned (now {details_str})** on',
+        'warnup': f'Your **warning level** has been **increased (now {details_str})** on',
+        'warndown': f'Your **warning level** has been **decreased (now {details_str})** on',
         'warnclear': f'Your **warning** has been **cleared** on',
-        'mute': f'You have been **muted ({details})** on',
+        'mute': f'You have been **muted ({details_str})** on',
         'unmute': f'Your **mute** has been **removed** on',
-        'blacklist': f'Your **{details} permissions** have been **restricted** on',
-        'unblacklist': f'Your **{details} permissions** have been **restored** on',
+        'blacklist': f'Your **{details_str} permissions** have been **restricted** on',
+        'unblacklist': f'Your **{details_str} permissions** have been **restored** on',
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on',
+        'duration-update': f'The **duration** for your {details_tup[0]} has been updated and **will now expire on {details_tup[0]}** on',
+        'reason-update': f'The **reasoning** for your {details_tup[0]} issued on {details_tup[1]} has been updated on',
     }
-    mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
 
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
-    punDM += f'Reason:```{reason}```'
-    punDM += f'Responsible moderator: {mod}\n\n'
+    if _type == 'reason-update':
+        punDM += f'Updated reason:```{reason}```'
+    else:
+        punDM += f'Reason:```{reason}```'
+
+    if moderator:
+        mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
+        punDM += f'Responsible moderator: {mod}\n\n'
+
     if details == 'modmail':
         punDM += 'If you have questions concerning this matter, please feel free to contact the moderator that took this action or another member of the moderation team.\n'
 
@@ -534,6 +555,7 @@ async def send_paginated_embed(
         remaining_chars = page_char_cap
         page = []
 
+        # Make sure a field won't max out this page
         for field in fields.copy():
             field_length = len(field['name']) + len(field['value'])
 

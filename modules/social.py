@@ -11,13 +11,14 @@ from pathlib import Path
 import codepoints
 import config
 import discord
+import emoji_data
 import gridfs
 import numpy as np
 import pymongo
 import pytz
 import requests
+import token_bucket
 from discord.ext import commands
-from emoji import UNICODE_EMOJI
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
 
@@ -31,40 +32,36 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
-        self.letterCodepoints = [
-            '1f1e6',
-            '1f1e7',
-            '1f1e8',
-            '1f1e9',
-            '1f1ea',
-            '1f1eb',
-            '1f1ec',
-            '1f1ed',
-            '1f1ee',
-            '1f1ef',
-            '1f1f0',
-            '1f1f1',
-            '1f1f2',
-            '1f1f3',
-            '1f1f4',
-            '1f1f5',
-            '1f1f6',
-            '1f1f7',
-            '1f1f8',
-            '1f1f9',
-            '1f1fa',
-            '1f1fb',
-            '1f1fc',
-            '1f1fd',
-            '1f1fe',
-            '1f1ff',
-        ]
+
+        # !profile ratelimits
+        self.bucket_storage = token_bucket.MemoryStorage()
+        self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
+
+        # Profile generation
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
         self.bot_contributors = [
             125233822760566784,  # MattBSG
             123879073972748290,  # Lyrus
             108429628560924672,  # Alex from Alaska
         ]
+
+        # Profile generation - precaching
+        self.profileFonts = self._load_fonts(
+            {
+                'meta': ('Regular', 36),
+                'user': ('Regular', 48),
+                'subtext': ('Light', 48),
+                'medium': ('Light', 36),
+                'small': ('Light', 30),
+            }
+        )
+        self.pfpBackground = Image.open('resources/pfp-background.png').convert('RGBA')
+        self.profileStatic = self._init_profile_static()
+        self.missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
+        self.fsImgCache = {}
+        self.flagImgCache = {}
+        self.gameImgCache = {}
+
         # Friend Code Regexs (\u2014 = em-dash)
         self.friendCodeRegex = {
             # Profile setup/editor (lenient)
@@ -77,12 +74,23 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
     @commands.group(name='profile', invoke_without_command=True)
-    @commands.cooldown(2, 60, commands.BucketType.channel)
-    async def _profile(self, ctx, user: typing.Optional[discord.User]):
-        if user:
-            member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
-        else:
+    async def _profile(self, ctx, member: typing.Optional[discord.Member]):
+        if not member:
             member = ctx.author
+
+        # If channel can be ratelimited
+        if ctx.message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
+            channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
+            if channel_being_rate_limited:
+
+                #  Moderators consume a ratelimit token but are not limited
+                if not ctx.guild.get_role(config.moderator) in ctx.author.roles:
+                    await ctx.send(
+                        f'{config.redTick} That command is being used too often, try again in a few seconds.',
+                        delete_after=15,
+                    )
+                    await ctx.message.delete(delay=15)
+                    return
 
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
@@ -134,64 +142,122 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         font = fonts[self._determine_cjk_font(text)]
         return draw.text(xy, text, fill, font)
 
-    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
-        db = mclient.bowser.users
-        fs = gridfs.GridFS(mclient.bowser)
-        dbUser = db.find_one({'_id': member.id})
-        guild = member.guild
+    def _init_profile_static(self) -> Image:
+        '''Inits static elements above background for profile card precache'''
+        fonts = self.profileFonts
+        img = Image.new('RGBA', self.pfpBackground.size, (0, 0, 0, 0))
 
-        fonts = self._load_fonts(
-            {
-                'meta': ('Regular', 36),
-                'user': ('Regular', 48),
-                'subtext': ('Light', 48),
-                'medium': ('Light', 36),
-                'small': ('Light', 30),
-            }
-        )
-
-        # Start construction of key features
-        pfp = (
-            Image.open(io.BytesIO(await member.avatar_url_as(format='png', size=256).read()))
-            .convert("RGBA")
-            .resize((250, 250))
-        )
-        pfpBack = Image.open('resources/pfp-background.png').convert('RGBA')
-        pfpBack.paste(pfp, (50, 170), pfp)
-        card = Image.open('resources/profile-{}.png'.format(dbUser['background'])).convert("RGBA")
-        pfpBack.paste(card, mask=card)
-        card = pfpBack
         snoo = Image.open('resources/snoo.png').convert("RGBA")
         trophyUnderline = Image.open('resources/trophy-case-underline.png').convert("RGBA")
         gameUnderline = Image.open('resources/favorite-games-underline.png').convert("RGBA")
 
-        card.paste(snoo, (50, 50), snoo)
-        card.paste(trophyUnderline, (1150, 100), trophyUnderline)
-        card.paste(gameUnderline, (60, 645), gameUnderline)
+        img.paste(snoo, (50, 50), snoo)
+        img.paste(trophyUnderline, (1150, 100), trophyUnderline)
+        img.paste(gameUnderline, (60, 645), gameUnderline)
 
-        # Start header/static text
-        draw = ImageDraw.Draw(card)
+        draw = ImageDraw.Draw(img)
         self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), fonts['meta'])
         self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
         self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (440, 470), 'Messages sent', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (800, 470), 'Timezone', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (435, 470), 'Messages sent', (126, 126, 126), fonts['small'])
+        self._draw_text(draw, (790, 470), 'Local time', (126, 126, 126), fonts['small'])
         self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
         self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
 
-        # Start customized content -- userinfo
+        return img
+
+    def _cache_fs_image(self, type: str, name: str) -> Image:
+        if type == 'background':
+            filename = 'resources/profile-{}.png'.format(name)
+        elif type == 'trophy':
+            filename = 'resources/trophies/{}.png'.format(name)
+        else:
+            raise ValueError('Unupported type: ' + type)
+
+        if not filename in self.fsImgCache:
+            self.fsImgCache[filename] = Image.open(filename).convert("RGBA")
+
+        return self.fsImgCache[filename]
+
+    def _cache_flag_image(self, name) -> Image:
+        SHADOW_OFFSET = 2
+
+        if not name in self.flagImgCache:
+
+            regionImg = Image.open(self.twemojiPath + name + '.png').convert('RGBA')
+
+            # Drop Shadow
+            shadowData = np.array(regionImg)
+            shadowData[..., :-1] = (128, 128, 128)  # Set RGB but not alpha for all pixels
+            shadowImg = Image.fromarray(shadowData)
+
+            # Combine shadow
+            w, h = regionImg.size
+            img = Image.new('RGBA', (w + SHADOW_OFFSET, h + SHADOW_OFFSET), (0, 0, 0, 0))
+            img.paste(shadowImg, (SHADOW_OFFSET, SHADOW_OFFSET), shadowImg)
+            img.paste(regionImg, (0, 0), regionImg)
+
+            self.flagImgCache[name] = img
+
+        return self.flagImgCache[name]
+
+    def _cache_game_img(self, fs: gridfs.GridFS, id: str) -> Image:
+        EXPIRY, IMAGE = 0, 1
+        do_recache = False
+
+        if id in self.gameImgCache:
+            if time.time() > self.gameImgCache[id][EXPIRY]:  # Expired in cache
+                do_recache = True
+        else:  # Not in cache
+            do_recache = True
+
+        if do_recache:
+            if fs.exists(id):
+                gameImg = fs.get(id)
+                gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+            else:
+                gameIcon = None
+
+            self.gameImgCache[id] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
+
+        if self.gameImgCache[id][IMAGE] is None:
+            return self.missingImage
+
+        return self.gameImgCache[id][IMAGE]
+
+    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
+        db = mclient.bowser.users
+        fs = gridfs.GridFS(mclient.bowser)
+        dbUser = db.find_one({'_id': member.id})
+
+        pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
+        pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
+        background = self._cache_fs_image('background', dbUser['background'])
+
+        card = self.pfpBackground.copy()
+        card.paste(pfp, (50, 170), pfp)
+        card.paste(background, mask=background)
+        card.paste(self.profileStatic, mask=self.profileStatic)
+
+        guild = member.guild
+        draw = ImageDraw.Draw(card)
+        fonts = self.profileFonts
+
+        # userinfo
         memberName = ''
         nameW = 350
-        nameH = 0
+
+        # Member name may be rendered in parts, so we want to ensure the font stays the same for the entire thing
+        member_name_font = fonts['user'][self._determine_cjk_font(member.name)]
+
         for char in member.name:
-            if char not in UNICODE_EMOJI:
+            if char not in emoji_data.EmojiSequence:
                 memberName += char
 
             else:
                 if memberName:
-                    member_name_font = fonts['users'][self._determine_cjk_font(memberName)]
-                    W, nameH = draw.textsize(memberName, font=member_name_font)
-                    self._draw_text(draw, (nameW, 215), memberName, (80, 80, 80), fonts['user'])
+                    W, _ = draw.textsize(memberName, font=member_name_font)
+                    draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
                     nameW += W
                     memberName = ''
 
@@ -206,12 +272,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW += 46
 
         if memberName:  # Leftovers, text
-            self._draw_text(draw, (nameW, 215), memberName, (80, 80, 80), fonts['user'])
+            draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
 
         self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
 
         if dbUser['regionFlag']:
-            regionImg = Image.open(self.twemojiPath + dbUser['regionFlag'] + '.png').convert('RGBA')
+            regionImg = self._cache_flag_image(dbUser['regionFlag'])
             card.paste(regionImg, (976, 50), regionImg)
 
         # Friend code
@@ -220,7 +286,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Start customized content -- stats
         message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
-        self._draw_text(draw, (440, 505), message_count, (80, 80, 80), fonts['medium'])
+        self._draw_text(draw, (435, 505), message_count, (80, 80, 80), fonts['medium'])
 
         joins = dbUser['joins']
         joins.sort()
@@ -232,11 +298,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 505), joinDateF, (80, 80, 80), fonts['medium'])
 
         if not dbUser['timezone']:
-            self._draw_text(draw, (800, 505), 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (790, 505), 'Not specified', (126, 126, 126), fonts['medium'])
 
         else:
-            tzOffset = datetime.datetime.now(pytz.timezone(dbUser['timezone'])).strftime('%z')
-            self._draw_text(draw, (800, 505), 'GMT' + tzOffset, (80, 80, 80), fonts['medium'])
+            tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
+            localtime = tznow.strftime('%H:%M')
+            tzOffset = tznow.strftime('%z')
+
+            if tzOffset[-2:] == '00':  # Remove 00 at end, if present
+                tzOffset = tzOffset[:-2]
+            if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
+                tzOffset = tzOffset[0] + tzOffset[2:]
+
+            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', (80, 80, 80), fonts['medium'])
 
         # Start trophies
         trophyLocations = {
@@ -261,7 +335,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for x in dbUser:
                 trophies.append(x)
 
-        # Hardcoding IDs like a genius
         if member.id == guild.owner.id:  # Server owner
             trophies.append('owner')
 
@@ -295,7 +368,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         trophyNum = 0
         for x in trophies:
-            trophyBadge = Image.open('resources/trophies/' + x + '.png').convert('RGBA')
+            trophyBadge = self._cache_fs_image('trophy', x)
             card.paste(trophyBadge, trophyLocations[trophyNum], trophyBadge)
             trophyNum += 1
 
@@ -311,14 +384,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             gamesDb = mclient.bowser.games
             for game in setGames:
                 gameDoc = gamesDb.find_one({'_id': game})
-                if fs.exists(game):
-                    gameImg = fs.get(game)
-                    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-                    card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
-
-                else:
-                    missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-                    card.paste(missingImage, gameIconLocations[gameCount], missingImage)
+                gameIcon = self._cache_game_img(fs, game)
+                card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 if gameDoc['titles']['NA']:
                     gameName = gameDoc['titles']['NA']
@@ -347,8 +414,40 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
+    def check_flag(self, emoji: str) -> typing.Optional[typing.Iterable[int]]:
+        # For some reason emoji emoji_data.is_emoji_tag_sequence() does not return correctly, so we have to write our own function
+        def is_valid_tag_flag(sequence: emoji_data.EmojiSequence) -> bool:
+            BLACK_FLAG_EMOJI = u'\U0001F3F4'
+            TAG_CHARACTERS = [chr(c) for c in range(ord('\U000E0020'), ord('\U000E007E') + 1)]
+            TAG_TERMINATOR = u'\U000E007F'
+
+            if seq.string[0] != BLACK_FLAG_EMOJI:  # First character
+                return False
+            if seq.string[-1] != TAG_TERMINATOR:  # Middle character
+                return False
+            for character in seq.string[1:-1]:  # Middle characters
+                if character not in TAG_CHARACTERS:
+                    return False
+
+            return emoji_data.QualifiedType.FULLY_QUALIFIED
+
+        # Locate EmojiSequence for given emoji
+        for uni, seq in emoji_data.EmojiSequence:
+            if uni == emoji:
+                # Normal unicode flags
+                is_emoji_flag = emoji_data.is_emoji_flag_sequence(emoji)
+                # Flags such as england, scotland, and wales
+                is_tag_flag = is_valid_tag_flag(seq)
+                # Flags such as pirate, lgbt, and trans flag
+                is_zwj_flag = emoji_data.is_emoji_zwj_sequence(emoji) and 'flag' in seq.description
+
+                return seq.code_points if (is_emoji_flag or is_tag_flag or is_zwj_flag) else None
+
+        # Emoji not found
+        return None
+
     @_profile.command(name='edit')
-    async def _profile_edit(self, ctx):
+    async def _profile_edit(self, ctx: commands.Context):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': ctx.author.id})
         mainMsg = None
@@ -373,7 +472,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
         phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
         phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
-        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
+        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`\n\nNote: Games released after April 2020 may not be selected due to an API issue. A rebuild of our games system is currently in progress to address this limitation.'
         phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
 
         # Lookup tables of values dependant on if user has setup their profile
@@ -424,22 +523,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 await message.channel.send('I\'ve gone ahead and reset your setting for **regional flag**')
                 return True
 
-            for x in content:
-                if x not in UNICODE_EMOJI:
-                    return False
+            code_points = self.check_flag(content)
+            if code_points is None:
+                return False
 
-            rawPoints = tuple(codepoints.from_unicode(content))
-            points = []
+            # Convert list of ints to lowercase hex code points, seperated by dashes
+            pointStr = '-'.join('{:04x}'.format(n) for n in code_points)
 
-            for x in rawPoints:
-                if (
-                    str(hex(x)[2:]) not in self.letterCodepoints
-                ):  # Flags are the 2 letter abbrev. in regional letter emoji
-                    return False
-
-                points.append(str(hex(x)[2:]))
-
-            pointStr = '-'.join(points)
             if not Path(f'{self.twemojiPath}{pointStr}.png').is_file():
                 return False
 
@@ -513,10 +603,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if results and results[0][1] >= 86:
                     if gameCnt == 0 and dbUser['favgames']:
                         db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+                    msg = f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__'
                     while True:
-                        await message.channel.send(
-                            f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__'
-                        )
+                        await message.channel.send(msg)
                         checkResp = await self.bot.wait_for('message', timeout=120, check=check)
                         if checkResp.content.lower().strip() in ['yes', 'y']:
                             gameObj = games[titleList[results[0][0]]]
@@ -531,6 +620,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                         elif checkResp.content.lower().strip() in ['no', 'n']:
                             break
+                        msg = "Your input was not __yes__ or __no__. Please say exactly __yes__ or __no__."
 
                 else:
                     failedFetch = True
@@ -679,28 +769,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
 
-    @_profile.error
-    async def social_error(self, ctx, error):
+    async def cog_command_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
 
-        if isinstance(error, commands.CommandOnCooldown):
-            if cmd_str == 'profile' and (
-                ctx.message.channel.id in [config.commandsChannel, config.voiceTextChannel]
-                or ctx.guild.get_role(config.moderator) in ctx.author.roles
-            ):
-                await self._profile.__call__(ctx, None if not ctx.args else ctx.args[0])
-            else:
-                return await ctx.send(
-                    f'{config.redTick} That command is being used too often, try again in a few seconds.',
-                    delete_after=15,
-                )
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+        await ctx.send(
+            f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+            delete_after=15,
+        )
+        raise error
 
 
 def setup(bot):

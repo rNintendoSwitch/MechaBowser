@@ -32,6 +32,10 @@ bot = commands.Bot(
     activity=activityStatus,
     case_insensitive=True,
 )
+if config.DSN:
+    from discord_sentry_reporting import use_sentry
+
+    use_sentry(bot, dsn=config.DSN, traces_sample_rate=1.0, environment='production')
 
 
 class BotCache(commands.Cog):
@@ -74,6 +78,23 @@ class BotCache(commands.Cog):
             self.READY = True
 
 
+class AutomodSubstitute(commands.Cog):
+    # If antispam is not loaded, ensure on_automod_finished() from utility.py will run'''
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.READY = False
+        self.antispam_loaded = False
+
+    def set_antispam_loaded(self):
+        self.antispam_loaded = True
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if not self.antispam_loaded:
+            await self.bot.get_cog('Utility Commands').on_automod_finished(message)
+
+
 async def safe_send_message(channel, content=None, embeds=None):
     await channel.send(content, embed=embeds)
 
@@ -87,5 +108,6 @@ if __name__ == '__main__':
     print('\033[94mMechaBowser by MattBSG#8888 2019\033[0m')
 
     bot.add_cog(BotCache(bot))
+    bot.add_cog(AutomodSubstitute(bot))
     bot.load_extension('jishaku')
     bot.run(config.token)

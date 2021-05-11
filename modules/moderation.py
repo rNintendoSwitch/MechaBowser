@@ -73,13 +73,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         pendingLogs = db.find({'public': True, 'public_log_message': None, 'type': {'$ne': 'note'}})
         loop = bot.loop
         for log in pendingLogs:
-            if log['type'] == 'mute':
-                expires = tools.humanize_duration(datetime.datetime.utcfromtimestamp(log['expiry']))
-
-            else:
-                expires = None
-
-            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs, expires))
+            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs))
 
         # Run expiration tasks
         userDB = mclient.bowser.users
@@ -113,7 +107,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             elif pun['type'] == 'mute':
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
-                logging.info(f'using {tryTime} for mute')
                 self.taskHandles.append(
                     self.bot.loop.call_later(
                         tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)
@@ -159,7 +152,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             embed = message.embeds[0]
             embedDict = embed.to_dict()
-            print(embedDict['fields'])
             newEmbedDict = copy.deepcopy(embedDict)
             listIndex = 0
             for field in embedDict['fields']:
@@ -178,8 +170,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     break
 
                 listIndex += 1
-            print(embedDict['fields'][listIndex]['value'])
-            print(newEmbedDict['fields'][listIndex]['value'])
+
             assert (
                 embedDict['fields'] != newEmbedDict['fields']
             )  # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow
@@ -188,6 +179,151 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await message.edit(embed=newEmbed)
 
         await ctx.send(f'{config.greenTick} Successfully toggled the sensitive status for that infraction')
+
+    @commands.group(name='infraction', aliases=['inf'], invoke_without_command=True)
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _infraction(self, ctx):
+        return
+
+    @_infraction.command(name='reason')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _infraction_reason(self, ctx, infraction, *, reason):
+        if len(reason) > 990:
+            return await ctx.send(
+                f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters'
+            )
+
+        await self._infraction_editing(ctx, infraction, reason)
+
+    @_infraction.command(name='duration', aliases=['dur', 'time'])
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _infraction_duration(self, ctx, infraction, duration, *, reason):
+        await self._infraction_editing(ctx, infraction, reason, duration)
+
+    async def _infraction_editing(self, ctx, infraction, reason, duration=None):
+        db = mclient.bowser.puns
+        doc = db.find_one({'_id': infraction})
+        if not doc:
+            return await ctx.send(f'{config.redTick} An invalid infraction id was provided')
+
+        if not doc['active'] and duration:
+            return await ctx.send(
+                f'{config.redTick} That infraction has already expired and the duration cannot be edited'
+            )
+
+        if duration and doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
+            return ctx.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}')
+
+        user = await self.bot.fetch_user(doc['user'])
+        if duration:
+            try:
+                _duration = tools.resolve_duration(duration)
+                humanized = tools.humanize_duration(_duration)
+                expireStr = f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanized})'
+                stamp = _duration.timestamp()
+                try:
+                    if int(duration):
+                        raise TypeError
+
+                except ValueError:
+                    pass
+
+            except (KeyError, TypeError):
+                return await ctx.send(f'{config.redTick} Invalid duration passed')
+
+            if stamp - time.time() < 60:  # Less than a minute
+                return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
+
+            db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
+            await tools.send_modlog(
+                self.bot,
+                self.modLogs,
+                'duration-update',
+                doc['_id'],
+                reason,
+                user=user,
+                moderator=ctx.author,
+                expires=expireStr,
+                extra_author=doc['type'].capitalize(),
+            )
+
+        else:
+            db.update_one({'_id': infraction}, {'$set': {'reason': reason}})
+            await tools.send_modlog(
+                self.bot,
+                self.modLogs,
+                'reason-update',
+                doc['_id'],
+                reason,
+                user=user,
+                moderator=ctx.author,
+                extra_author=doc['type'].capitalize(),
+                updated=doc['reason'],
+            )
+
+        try:
+            pubChannel = self.bot.get_channel(doc['public_log_channel'])
+            pubMessage = await pubChannel.fetch_message(doc['public_log_message'])
+            embed = pubMessage.embeds[0]
+            embedDict = embed.to_dict()
+            newEmbedDict = copy.deepcopy(embedDict)
+            listIndex = 0
+            for field in embedDict['fields']:
+                # We are working with the dict because some logs can have `reason` at different indexes and we should not assume index position
+                if duration and field['name'] == 'Expires':
+                    # This is subject to a breaking change if `name` updated, but I'll take the risk
+                    newEmbedDict['fields'][listIndex]['value'] = expireStr
+                    break
+
+                elif not duration and field['name'] == 'Reason':
+                    newEmbedDict['fields'][listIndex]['value'] = reason
+                    break
+
+                listIndex += 1
+
+            assert (
+                embedDict['fields'] != newEmbedDict['fields']
+            )  # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow
+            newEmbed = discord.Embed.from_dict(newEmbedDict)
+            await pubMessage.edit(embed=newEmbed)
+
+        except Exception as e:
+            logging.error(f'[Moderation] _infraction_duration: {e}')
+
+        error = ''
+        try:
+            member = await ctx.guild.fetch_member(doc['user'])
+            if duration:
+                await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
+
+            else:
+                await member.send(
+                    tools.format_pundm(
+                        'reason-update',
+                        reason,
+                        details=(
+                            doc['type'],
+                            datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime("%B %d, %Y %H:%M:%S UTC"),
+                        ),
+                    )
+                )
+
+        except (discord.NotFound, discord.Forbidden, AttributeError):
+            error = '. I was not able to DM them about this action'
+
+        await ctx.send(
+            f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}'
+        )
+
+    @commands.is_owner()
+    @_infraction.command('remove')
+    async def _inf_revoke(self, ctx, _id):
+        db = mclient.bowser.puns
+        doc = db.find_one_and_delete({'_id': _id})
+        if not doc:  # Delete did nothing if doc is None
+            return ctx.send(f'{config.redTick} No matching infraction found')
+
+        await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
 
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
@@ -222,7 +358,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
             try:
-                await user.send(tools.format_pundm('ban', reason, ctx.author))
+                await user.send(tools.format_pundm('ban', reason, ctx.author, auto=ctx.author.id == self.bot.user.id))
 
             except (discord.Forbidden, AttributeError):
                 pass
@@ -255,14 +391,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        if len(users) == 1:
-            await ctx.send(f'{config.greenTick} {users[0]} has been successfully banned')
+        if ctx.author.id != self.bot.user.id:  # Non-command invoke, such as automod
+            if len(users) == 1:
+                await ctx.send(f'{config.greenTick} {users[0]} has been successfully banned')
 
-        else:
-            resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
-            if failedBans:
-                resp += f'. Failed to ban **{failedBans}** from the provided list'
-            return await ctx.send(resp)
+            else:
+                resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
+                if failedBans:
+                    resp += f'. Failed to ban **{failedBans}** from the provided list'
+                return await ctx.send(resp)
 
     @commands.command(name='unban')
     @commands.has_any_role(config.moderator, config.eh)
@@ -317,22 +454,20 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         await tools.send_modlog(
             self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
         )
+        additional = ""
         try:
             await member.send(tools.format_pundm('kick', reason, ctx.author))
 
         except (discord.Forbidden, AttributeError):
             if not tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(
-                    f'{config.greenTick} {member} ({member.id}) has been successfully kicked. I was not able to DM them about this action'
-                )
+                additional = ' I was not able to DM them about this action'
 
-            await member.kick(reason='Kick action performed by moderator')
-            return
+        await member.kick(reason='Kick action performed by moderator')
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked')
+        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked{additional}')
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -384,7 +519,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())
-        logging.info(f'using {expireTime}')
         tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
         self.taskHandles.append(
             self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
@@ -602,38 +736,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{member} ({member.id}) has had {activeStrikes - count} strikes removed, '
-                f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} '
-                f'({activeStrikes+count} - {count}) {error}'
+                f'{member} ({member.id}) has had {diff} strikes removed, '
+                f'they now have {count} strike{"s" if count > 1 else ""} '
+                f'({activeStrikes} - {count}) {error}'
             )
 
-    @commands.is_owner()
-    @commands.group(name='inf', invoke_without_command=True)
-    async def _inf(self, ctx):
-        return
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        if not ctx.command:
+            return
 
-    @commands.is_owner()
-    @_inf.command('remove')
-    async def _inf_revoke(self, ctx, _id):
-        db = mclient.bowser.puns
-        doc = db.find_one_and_delete({'_id': _id})
-        if not doc:  # Delete did nothing if doc is None
-            return ctx.send(f'{config.redTick} No matching infraction found')
-
-        await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
-
-    @_banning.error
-    @_unbanning.error
-    @_kicking.error
-    @_strike.error
-    @_strike_set.error
-    @_muting.error
-    @_unmuting.error
-    @_warning.error
-    @_strike.error
-    @_note.error
-    @_hide_modlog.error
-    async def mod_error(self, ctx, error):
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(
@@ -722,6 +833,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         elif doc['type'] == 'mute' and doc['expiry']:  # A mute that has an expiry
             # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
+            # This could also fail if the expiry time is changed by a mod
             if doc['expiry'] > time.time():
                 retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
                 self.taskHandles.append(

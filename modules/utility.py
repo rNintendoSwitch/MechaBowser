@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import io
 import logging
 import pathlib
 import re
@@ -86,11 +87,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.boostChannel = self.bot.get_channel(config.boostChannel)
         self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
         self.voiceTextAccess = self.bot.get_guild(config.nintendoswitch).get_role(config.voiceTextAccess)
-        self.SMM2LevelID = re.compile(r'([0-9a-z]{3}-[0-9a-z]{3}-[0-9a-z]{3})', re.I | re.M)
-        self.SMM2LevelPost = re.compile(
-            r'Name: ?(\S.*)\n\n?(?:Level )?ID:\s*((?:[0-9a-z]{3}-){2}[0-9a-z]{3})(?:\s+)?\n\n?Style: ?(\S.*)\n\n?(?:Theme: ?(\S.*)\n\n?)?(?:Tags: ?(\S.*)\n\n?)?Difficulty: ?(\S.*)\n\n?Description: ?(\S.*)',
-            re.I,
-        )
         self.affiliateTags = {
             "*": ["awc"],
             "amazon.*": ["colid", "coliid", "tag", "ascsubtag"],
@@ -145,12 +141,16 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     if x not in fetchedInvites:
                         fetchedInvites.append(x)
                         invite = await self.bot.fetch_invite(x)
-                        if invite.guild.id in guildWhitelist:
-                            continue
-                        if 'VERIFIED' in invite.guild.features:
-                            continue
-                        if 'PARTNERED' in invite.guild.features:
-                            continue
+                        if not invite.guild:
+                            pass
+
+                        else:
+                            if invite.guild.id in guildWhitelist:
+                                continue
+                            if 'VERIFIED' in invite.guild.features:
+                                continue
+                            if 'PARTNERED' in invite.guild.features:
+                                continue
 
                         inviteInfos.append(invite)
 
@@ -160,77 +160,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if inviteInfos:
                 await message.delete()
                 await message.channel.send(
-                    f':bangbang: {message.author.mention} please do not post invite links to other Discord servers. If you believe the linked server(s) should be whitelisted, contact a moderator',
+                    f':bangbang: {message.author.mention} please do not post invite links to other Discord servers or groups. If you believe the linked server(s) should be whitelisted, contact a moderator',
                     delete_after=10,
                 )
                 await self.adminChannel.send(
                     f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}'
                 )
-
-        # Filter for #mario
-        if message.channel.id == config.marioluigiChannel:  # #mario
-            if tools.re_match_nonlink(self.SMM2LevelID, message.content):
-                await message.delete()
-                response = await message.channel.send(
-                    f'{config.redTick} <@{message.author.id}> Please do not post Super Mario Maker 2 level codes '
-                    f'here. Post in <#{config.smm2Channel}> with the pinned template instead.'
-                )
-
-                await response.delete(delay=20)
-            return
-
-        # Filter for #smm2-levels
-        if message.channel.id == config.smm2Channel:
-            if not re.search(self.SMM2LevelID, message.content):
-                # We only want to filter posts with a level id
-                return
-
-            block = re.search(self.SMM2LevelPost, message.content)
-            if not block:
-                # No match for a properly formatted level post
-                response = await message.channel.send(
-                    f'{config.redTick} <@{message.author.id}> Your level is formatted incorrectly, please see the pinned messages for the format. A copy '
-                    f'of your message is included and will be deleted shortly. You can resubmit your level at any time.\n\n```{message.content}```'
-                )
-                await message.delete()
-                return await response.delete(delay=25)
-
-            # Lets make this readable
-            levelName = block.group(1)
-            levelID = block.group(2)
-            levelStyle = block.group(3)
-            levelTheme = block.group(4)
-            levelTags = block.group(5)
-            levelDifficulty = block.group(6)
-            levelDescription = block.group(7)
-
-            embed = discord.Embed(color=discord.Color(0x6600FF))
-            # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
-            embed.set_author(
-                name=f'{str(message.author)} ({message.author.id})',
-                icon_url=f'{message.author.avatar_url}#mab_remover_{message.author.id}',
-            )
-            embed.set_footer(text='The author may react with 🗑️ to delete this message.')
-
-            embed.add_field(name='Name', value=levelName, inline=True)
-            embed.add_field(name='Level ID', value=levelID, inline=True)
-            embed.add_field(name='Description', value=levelDescription, inline=False)
-            embed.add_field(name='Style', value=levelStyle, inline=True)
-            embed.add_field(name='Difficulty', value=levelDifficulty, inline=True)
-            if levelTheme:
-                embed.add_field(name='Theme', value=levelTheme, inline=False)
-            if levelTags:
-                embed.add_field(name='Tags', value=levelTags, inline=False)
-
-            try:
-                new_message = await message.channel.send(embed=embed)
-                await new_message.add_reaction('🗑️')
-                await message.delete()
-
-            except discord.errors.Forbidden:
-                # Fall back to leaving user text
-                logging.error(f'[Filter] Unable to send embed to {message.channel.id}')
-            return
 
         # Filter and clean affiliate links
         # We want to call this last to ensure all above items are complete.
@@ -298,7 +233,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         wait=True,
                     )
 
-                    await message.delete()
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
 
                     embed = discord.Embed(
                         description='The above message was automatically reposted by Mecha Bowser to remove an affiliate marketing link. The author may react with 🗑️ to delete these messages.'
@@ -347,10 +285,15 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             target_message = match.group(2)
             break
 
-        if not allowed_remover:
-            return  # No special url tag detected
-        if str(payload.user_id) != str(allowed_remover):
-            return  # Reactor is not the allowed remover
+        if not allowed_remover:  # No special url tag detected
+            return
+        if str(payload.user_id) != str(allowed_remover):  # Reactor is not the allowed remover
+            try:
+                await message.remove_reaction(payload.emoji, payload.member)
+            except:
+                pass
+            return
+
         try:
             if target_message:
                 msg = await channel.fetch_message(target_message)
@@ -729,9 +672,30 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 else:
                     inf = punNames[pun['type']]
 
-                fields.append(
-                    {'name': datestamp, 'value': f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'}
-                )
+                value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
+
+                if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
+
+                    strings = []
+                    offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
+
+                    for i, o in enumerate(offsets):
+                        segment = value[o : (o + 1018)]
+
+                        if i == 0:  # First segment
+                            segment = f'{segment}...'
+                        elif i == len(offsets) - 1:  # Last segment
+                            segment = f'...{segment}'
+                        else:
+                            segment = f'...{segment}...'
+
+                        strings.append(segment)
+
+                    for i, string in enumerate(strings):
+                        fields.append({'name': f'{datestamp} ({i+1}/{len(strings)})', 'value': string})
+
+                else:
+                    fields.append({'name': datestamp, 'value': value})
 
             if totalStrikes:
                 desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
@@ -759,6 +723,26 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 )
             else:
                 raise
+
+    @commands.command(name='echoreply')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _reply(self, ctx: commands.Context, message: discord.Message, *, text: str = ""):
+        files = []
+        for file in ctx.message.attachments:
+            data = io.BytesIO()
+            await file.save(data)
+            files.append(discord.File(data, file.filename))
+        await message.reply(text, files=files)
+
+    @commands.command(name='echo')
+    @commands.has_any_role(config.moderator, config.eh)
+    async def _echo(self, ctx: commands.Context, channel: discord.TextChannel, *, text: str = ""):
+        files = []
+        for file in ctx.message.attachments:
+            data = io.BytesIO()
+            await file.save(data)
+            files.append(discord.File(data, file.filename))
+        await channel.send(text, files=files)
 
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
@@ -809,10 +793,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if not tagList:
             return await ctx.send('{config.redTick} This server has no tags!')
 
-        if ctx.invoked_with in [
-            'tag',
-            'tags',
-        ]:  # Called from the !tag command instead of !tag list, so we print the simple list
+        # Called from the !tag command instead of !tag list, so we print the simple list
+        if ctx.invoked_with.lower() in ['tag', 'tags']:
 
             tags = ', '.join([tag['name'] for tag in tagList])
 
@@ -1168,19 +1150,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
 
-    @_clean.error
-    @_info.error
-    @_history.error
-    @_roles.error
-    @_roles_set.error
-    @_tag.error
-    @_tag_list.error
-    @_tag_create.error
-    @_tag_delete.error
-    @_tag_setdesc.error
-    @_tag_setimg.error
-    @_tag_source.error
-    async def utility_error(self, ctx, error):
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        if not ctx.command:
+            return
+
         cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         if isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(

@@ -21,7 +21,6 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.private_modules_loaded = False
 
         try:
             self.bot.load_extension('tools')
@@ -31,8 +30,6 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('modules.social')
             try:  # Private submodule extensions
                 self.bot.load_extension('private.automod')
-                self.private_modules_loaded = True
-
             except commands.errors.ExtensionNotFound:
                 logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
 
@@ -55,7 +52,10 @@ class MainEvents(commands.Cog):
         logging.info('[Core] Starting sanitzation of old EUD')
         msgDB = mclient.bowser.messages
         msgDB.update_many(
-            {'timestamp': {"$lte": time.time() - (86400 * 30)}, 'sanitized': False},
+            {
+                'timestamp': {"$lte": time.time() - (86400 * 365)},
+                'sanitized': False,
+            },  # Store message data upto 1 year old
             {"$set": {'content': None, 'sanitized': True}},
         )
 
@@ -91,7 +91,21 @@ class MainEvents(commands.Cog):
     async def _ping(self, ctx):
         initiated = ctx.message.created_at
         msg = await ctx.send('Evaluating...')
-        return await msg.edit(content=f'Pong! Roundtrip latency {(msg.created_at - initiated).total_seconds()} seconds')
+        roundtrip = (msg.created_at - initiated).total_seconds() * 1000
+
+        database_start = time.time()
+        mclient.bowser.command('ping')
+        database = (time.time() - database_start) * 1000
+
+        websocket = self.bot.latency * 1000
+
+        return await msg.edit(
+            content=(
+                'Pong! Latency: **Roundtrip** `{:1.0f}ms`, **Websocket** `{:1.0f}ms`, **Database** `{:1.0f}ms`'.format(
+                    roundtrip, websocket, database
+                )
+            )
+        )
 
     @commands.Cog.listener()
     async def on_resume(self):
@@ -259,9 +273,7 @@ class MainEvents(commands.Cog):
     async def on_member_remove(self, member):
         # log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
         db = mclient.bowser.puns
-        puns = db.find(
-            {'user': member.id, 'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3', 'mute', 'blacklist']}}
-        )
+        puns = db.find({'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}})
 
         mclient.bowser.users.update_one(
             {'_id': member.id},
@@ -293,7 +305,7 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':outbox_tray: User left', embed=embed)
 
     @commands.Cog.listener()
-    async def on_member_ban(self, guild, user):
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User):
         if guild.id != config.nintendoswitch:
             return
 
@@ -301,14 +313,14 @@ class MainEvents(commands.Cog):
         await asyncio.sleep(10)  # Wait 10 seconds to allow audit log to update
         if not db.find_one({'user': user.id, 'type': 'ban', 'active': True, 'timestamp': {'$gt': time.time() - 60}}):
             # Manual ban
-            audited = False
+            audited = None
             async for entry in guild.audit_logs(action=discord.AuditLogAction.ban):
                 if entry.target == user:
                     audited = entry
                     break
 
             if audited:
-                reason = '-No reason specified-' if not audited.reason else audited.reason
+                reason = audited.reason or '-No reason specified-'
                 docID = await tools.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 
                 await tools.send_modlog(
@@ -322,21 +334,26 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':rotating_light: User banned', embed=embed)
 
     @commands.Cog.listener()
-    async def on_member_unban(self, guild, user):
+    async def on_member_unban(self, guild: discord.Guild, user: discord.User):
         if guild.id != config.nintendoswitch:
             return
 
         db = mclient.bowser.puns
         if not db.find_one({'user': user.id, 'type': 'unban', 'timestamp': {'$gt': time.time() - 60}}):
             # Manual unban
-            audited = False
+
+            audited = None
             async for entry in guild.audit_logs(action=discord.AuditLogAction.unban):
                 if entry.target == user:
                     audited = entry
                     break
 
             if audited:
-                reason = '-No reason specified-' if not audited.reason else audited.reason
+                reason = (
+                    "Ban appeal accepted"
+                    if audited.user.id == config.parakarry
+                    else audited.reason or '-No reason specified-'
+                )
                 docID = await tools.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
                 db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
 
@@ -374,10 +391,6 @@ class MainEvents(commands.Cog):
         )
 
         await self.bot.process_commands(message)  # Allow commands to fire
-
-        if not self.private_modules_loaded:
-            await self.bot.get_cog('Utility Commands').on_automod_finished(message)
-
         return
 
     @commands.Cog.listener()
@@ -440,41 +453,54 @@ class MainEvents(commands.Cog):
     #        return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
 
     @commands.Cog.listener()
-    async def on_message_delete(self, message):
-        if message.type != discord.MessageType.default or message.author.bot:
-            return  # No system messages
+    async def on_raw_message_delete(self, payload):
+        if payload.channel_id in [757411216774791189, 769665679593832458, 769665954241970186, 769666021706432532]:
+            return  # temp ignorance of acevent channels
+        if payload.cached_message:
+            if payload.cached_message.type != discord.MessageType.default or payload.cached_message.author.bot:
+                return  # No system messages
 
-        if not message.content and not message.attachments:
-            return  # Blank or null content (could be embed)
+            if not payload.cached_message.content and not payload.cached_message.attachments:
+                return  # Blank or null content (could be embed)
 
-        content = message.content if message.content else '-No message content-'
+            user = payload.cached_message.author
+            jump_url = payload.cached_message.jump_url
+            content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
 
-        # log = f':wastebasket: Message by **{str(message.author)}** ({message.author.id}) in <#{message.channel.id}> deleted:\n'
-        # content = message.content if (len(log) + len(message.clean_content)) < 2000 else 'Message exceeds character limit, ' \
-        #    f'view at {config.baseUrl}/archive/{await utils.message_archive(message)}'
-        # log += content
+        else:
+            db = mclient.bowser.messages
+            dbMessage = db.find_one({'_id': payload.message_id, 'channel': payload.channel_id})
+            if not dbMessage:
+                logging.warning(
+                    f'[Core] Missing message metadata for deletion of {payload.channel_id}-{payload.message_id}'
+                )
+                return
+
+            user = await self.bot.fetch_user(dbMessage['author'])
+            jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
+            content = dbMessage['content'] or '-No saved copy of message content available-'
 
         embed = discord.Embed(
-            description=f'[Jump to message]({message.jump_url})\n{content}',
+            description=f'[Jump to message]({jump_url})\n{content}',
             color=0xF8E71C,
             timestamp=datetime.datetime.utcnow(),
         )
-        embed.set_author(name=f'{str(message.author)} ({message.author.id})', icon_url=message.author.avatar_url)
-        embed.add_field(name='Mention', value=f'<@{message.author.id}>')
-        if len(message.attachments) == 1:
-            embed.set_image(url=message.attachments[0].proxy_url)
+        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar_url)
+        embed.add_field(name='Mention', value=f'<@{user.id}>')
+        if payload.cached_message and len(payload.cached_message.attachments) == 1:
+            embed.set_image(url=payload.cached_message.attachments[0].proxy_url)
 
-        elif len(message.attachments) > 1:
+        elif payload.cached_message and len(payload.cached_message.attachments) > 1:
             # More than one attachment, use fields
-            attachments = [x.proxy_url for x in message.attachments]
+            attachments = [x.proxy_url for x in payload.cached_message.attachments]
             for a in range(len(attachments)):
                 embed.add_field(name=f'Attachment {a + 1}', value=attachments[a])
 
         if len(content) > 1950:  # Too long to safely add jump to message in desc, use field
             embed.description = content
-            embed.add_field(name='Jump', value=f'[Jump to message]({message.jump_url})')
+            embed.add_field(name='Jump', value=f'[Jump to message]({jump_url})')
 
-        await self.serverLogs.send(f':wastebasket: Message deleted in <#{message.channel.id}>', embed=embed)
+        await self.serverLogs.send(f':wastebasket: Message deleted in <#{payload.channel_id}>', embed=embed)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):

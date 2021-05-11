@@ -3,6 +3,9 @@
 token = 'token'
 command_prefixes = ['!', ',', '.']
 
+# Sentry DSN
+DSN = ''
+
 # Mongo Credentials
 mongoUser = 'user'
 mongoPass = 'password'
@@ -27,9 +30,7 @@ switchHelp: int = switch_help
 spoilers: int = spoilers
 suggestions: int = suggestions
 voiceTextChannel: int = voice_text
-smm2Channel: int = smm2
 commandsChannel: int = commands
-marioluigiChannel: int = mario_and_luigi
 splatoon2Channel: int = splatoon2
 automodChannel: int = automod_alerts
 
@@ -103,6 +104,8 @@ punStrs = {
     'unblacklist': 'Unblacklist',
     'note': 'Note',
     'appealdeny': 'Denied ban appeal',
+    'duration-update': 'Duration updated',
+    'reason-update': 'Reason updated',
 }
 
 punColors = {
@@ -116,4 +119,6 @@ punColors = {
     'mute': 0x3680A4,
     'unblacklist': 0x80E59A,
     'unmute': 0x39C05D,
+    'duration-update': 0x58B9FF,
+    'reason-update': 0x58B9FF,
 }
