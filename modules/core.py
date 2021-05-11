@@ -385,6 +385,7 @@ class MainEvents(commands.Cog):
                 'guild': message.guild.id,
                 'channel': message.channel.id,
                 'content': message.content,
+                'attachments': [a.url for a in message.attachments],
                 'timestamp': timestamp,
                 'sanitized': False,
             }
@@ -394,21 +395,54 @@ class MainEvents(commands.Cog):
         return
 
     @commands.Cog.listener()
-    async def on_bulk_message_delete(self, messages):  # TODO: Work with archives channel attribute to list channels
+    async def on_raw_bulk_message_delete(self, payload):  # TODO: Work with archives channel attribute to list channels
         # Lets do some processing and gather meta data
         db = mclient.modmail.pending
-        authors = []
-        channels = []
-        for msg in messages:
+        authors = {}
+        channels = {}
+        finalized = []
+        for msg in payload.cached_messages:
             if msg.author.id not in authors:
-                authors.append(msg.author.id)
+                authors[msg.author.id] = msg.author
             if msg.channel.id not in channels:
-                channels.append(msg.channel.id)
+                channel = await self.bot.fetch_channel(msg.channel)
+                channel[msg.channel] = channel
+
+        if len(payload.cached_messages) != len(payload.message_ids):
+            # Some or all messages are out of cache. Fetch rest from DB and merge with cache
+            cachedIDs = [m.id for m in payload.cached_messages]
+            missingMessages = [m for m in payload.message_ids if m not in cachedIDs]
+            msgDB = mclient.bowser.messages
+            fetchedMessages = msgDB.find({'_id': {'$in': missingMessages}})
+
+            for msg in fetchedMessages:
+                if msg['author'] not in authors:
+                    user = await self.bot.fetch_user(msg['author'])
+                    authors[msg['author']] = user
+                if msg['channel'] not in channels:
+                    channel = await self.bot.fetch_channel(msg['channel'])
+                    channel[msg['channel']] = channel
+                finalized.append(
+                    {
+                        'timestamp': discord.utils.snowflake_time(msg['_id']),
+                        'message_id': msg['_id'],
+                        'content': msg['content'],
+                        'author': {
+                            'id': msg['author'],
+                            'name': authors[msg['author']].name,
+                            'discriminator': authors[msg['author']].discriminator,
+                            'avatar_url': str(authors[msg['author']].avatar_url_as(static_format='png', size=1024)),
+                            'mod': False,
+                        },
+                        'channel': {'id': msg['channel'], 'name': channels[msg['channel']].name},
+                        'attachments': msg['attachments'],
+                    }
+                )
 
         if len(authors) == 1:
             # This is likely: a) a ban or b) user specified clean. Lets rule out a)
             try:
-                await messages[0].guild.fetch_ban(messages[0].author.id)
+                await self.bot.get_guild(payload.guild_id).fetch_ban(authors[0])
 
             except (discord.Forbidden, discord.NotFound):
                 # Not banned, continue on
@@ -416,7 +450,7 @@ class MainEvents(commands.Cog):
 
             except:
                 # This is a discord.HTTPException derivitive or bad exception. Just push the bulk_delete since we do not know
-                archiveID = await tools.message_archive(messages)
+                archiveID = await tools.message_archive(finalized)
                 embed = discord.Embed(
                     description=f'Archive URL: {config.baseUrl}/logs/{archiveID}',
                     color=0xF5A623,
@@ -426,7 +460,7 @@ class MainEvents(commands.Cog):
 
             else:
                 # User got banned.
-                user = messages[0].author.id
+                user = list(authors.keys())[0]
                 pending = db.find({'type': 'ban', 'users': {'$elemMatch': {'$eq': user}}})
                 if pending:
                     db.update_one({'type': 'ban', 'users': {'$elemMatch': {'$eq': user}}}, {'$push'})

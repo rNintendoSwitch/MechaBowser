@@ -96,7 +96,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
 
     else:
         messages = []
-        for msg in archive:  # TODO: attachment CDN urls should be posted as message
+        for msg in archive:
             messages.append(
                 {
                     'timestamp': str(msg.created_at),
