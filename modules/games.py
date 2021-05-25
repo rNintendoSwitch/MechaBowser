@@ -1,13 +1,13 @@
-import aiohttp
-from typing import Generator
-
-import config
 import datetime
 import logging
-import token_bucket
-import pymongo
+from typing import Generator
 
+import aiohttp
+import config
+import pymongo
+import token_bucket
 from discord.ext import commands
+
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
