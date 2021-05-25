@@ -578,6 +578,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 content = response.content.lower().strip()
 
+                # TODO: REDO WITH NEW GAMES SYSTEM
+                message.channel.send("Sorry, something broke :(")
+                return
+
                 NintenDeals = self.bot.get_cog('Game Commands')
                 if not NintenDeals.gamesReady:
                     waitMsg = await message.channel.send(
