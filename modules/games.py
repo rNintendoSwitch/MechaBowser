@@ -1,12 +1,12 @@
 import datetime
 import logging
-from enum import unique
 from typing import Generator
 
 import aiohttp
 import config
 import pymongo
 import token_bucket
+from fuzzywuzzy import fuzz
 from dateutil import parser
 from discord.ext import commands, tasks
 
@@ -72,6 +72,9 @@ class GiantBomb:
                     if offset >= resp_json['number_of_total_results']:
                         break  # no more results
 
+    # TODO: I think a game might actually get stuck in the database if the NSW platform is removed from it, so we might
+    # either have to requery games manually, or re-do the entire database hmm
+
     # async def fetch_game(self, guid: str) -> dict:
     #     async with aiohttp.ClientSession() as session:
     #         self.raise_for_ratelimit()
@@ -115,10 +118,56 @@ class Games(commands.Cog, name='Games'):
                 if game[key]:
                     game[key] = parser.parse(game[key])
 
+            if game['aliases']:
+                game['aliases'] = game['aliases'].splitlines()
+
             self.db.replace_one({'id': game['id']}, game, upsert=True)
             count += 1
 
         logging.info(f'[Games] Finished syncing {count} games')
+
+    def search(self, query: str):
+        match_ratio = 0
+        match_game = None
+        match_name = None
+
+        pipeline = [
+            {'$match': {'original_release_date': {'$ne': None}}},
+            {'$project': {'name': 1, 'aliases': 1}},
+        ]
+
+        for game in self.db.aggregate(pipeline):
+            names = [game['name']]
+            if game['aliases']:
+                names += game['aliases']
+
+            for name in names:
+                methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
+
+                scores = [method(name.lower(), query.lower()) for method in methods]
+                ratio = sum(scores) / len(methods)
+
+                if ratio > match_ratio:
+                    match_ratio = ratio
+                    match_game = game
+                    match_name = name
+
+        if not match_game:
+            return None
+
+        document = self.db.find({'_id': match_game['_id']})
+        alias = match_name if match_name in (match_game['aliases'] or []) else None
+        return (document.next(), match_ratio, alias)
+
+    @commands.command(name='gs')
+    async def _search(self, ctx, *, query: str):
+        result, score, alias = self.search(query)
+
+        name = result["name"]
+        aliases = f' *({alias})*' if alias else ''
+        url = result["site_detail_url"]
+
+        await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
 
 
 def setup(bot):
