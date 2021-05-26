@@ -6,9 +6,9 @@ import aiohttp
 import config
 import pymongo
 import token_bucket
-from fuzzywuzzy import fuzz
 from dateutil import parser
 from discord.ext import commands, tasks
+from fuzzywuzzy import fuzz
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
