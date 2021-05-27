@@ -1,11 +1,8 @@
-git+git://github.com/MattBSG/token-bucket.git
+git+git://github.com/falconry/token-bucket
 discord.py
 pymongo
 jishaku
 pylint
-markovify
-dialogflow
-google-cloud-storage
 fuzzywuzzy[speedup]
 pillow
 pytz
@@ -13,7 +10,6 @@ codepoints
 emoji_data
 sentry-sdk
 discord-sentry-reporting
-aiocron
 aiohttp
 
 # Workaround for numpy issue on windows. https://stackoverflow.com/a/64661876
