@@ -92,6 +92,11 @@ class Games(commands.Cog, name='Games'):
         self.GiantBomb = GiantBomb(config.giantbomb)
         self.db = mclient.bowser.games
 
+        self.last_sync = {
+            'part': {'at': None, 'count': 0, 'running': False},
+            'full': {'at': None, 'count': 0, 'running': False},
+        }
+
         # Ensure indices exist
         self.db.create_index([("name", pymongo.ASCENDING), ("aliases", pymongo.ASCENDING)])
         self.db.create_index([("date_last_updated", pymongo.DESCENDING)])
@@ -103,28 +108,51 @@ class Games(commands.Cog, name='Games'):
         self.sync_games.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=1)
-    async def sync_games(self):
-        try:
-            latest_doc = self.db.find().sort("date_last_updated", pymongo.DESCENDING).limit(1).next()
-            after = latest_doc['date_last_updated']
-        except StopIteration:
-            after = None
+    async def sync_games(self, force_full=False):
+        # If last full sync was more then a week ago (or on restart/forced), preform a new full sync
+        week_ago = datetime.datetime.utcnow() - datetime.timedelta(weeks=1)
+        full = force_full or ((self.last_sync['full']['at'] < week_ago) if self.last_sync['full']['at'] else True)
 
-        logging.info(f'[Games] Syncing games database (updated after {after})...')
+        if not full:
+            try:
+                latest_doc = self.db.find().sort("date_last_updated", pymongo.DESCENDING).limit(1).next()
+                after = latest_doc['date_last_updated']
+            except StopIteration:  # Do full sync if we're having issues getting latest updated
+                full = True
+
+        logging.info('[Games] Syncing games database ' + ('(full)...' if full else f'(partial after {after})...'))
+        self.last_sync['full' if full else 'part']['running'] = True
+
+        if full:
+            # Flag items so we can detect if they are not updated.
+            self.db.update_many({}, {'$set': {'_sync_updated': False}})
 
         count = 0
-        async for game in self.GiantBomb.fetch_games(after):
-            for key in ['date_added', 'date_last_updated', 'original_release_date']:
+        async for game in self.GiantBomb.fetch_games(None if full else after):
+            for key in ['date_added', 'date_last_updated', 'original_release_date']:  # Parse dates
                 if game[key]:
                     game[key] = parser.parse(game[key])
 
             if game['aliases']:
                 game['aliases'] = game['aliases'].splitlines()
 
+            if full:
+                game['_sync_updated'] = True
+
             self.db.replace_one({'id': game['id']}, game, upsert=True)
             count += 1
 
+        if full:
+            x = self.db.delete_many({'_sync_updated': False})  # If items were not updated, delete them
+
         logging.info(f'[Games] Finished syncing {count} games')
+        self.last_sync['full' if full else 'part'] = {
+            'at': datetime.datetime.utcnow(),
+            'count': count,
+            'running': False,
+        }
+
+        return count
 
     def search(self, query: str):
         match_ratio = 0
