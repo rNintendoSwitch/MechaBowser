@@ -12,7 +12,7 @@ import aiohttp
 import config
 import discord
 import pymongo
-from discord import Webhook
+from discord import AsyncWebhookAdapter, Webhook
 from discord.ext import commands, tasks
 
 import tools
@@ -170,7 +170,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     )
 
                 async with aiohttp.ClientSession() as session:
-                    webhook = Webhook.from_url(useHook.url, session=session)
+                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
                     webhook_message = await webhook.send(
                         content=content,
                         username=message.author.display_name,
