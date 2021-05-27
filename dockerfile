@@ -1,4 +1,4 @@
-FROM gorialis/discord.py:master
+FROM gorialis/discord.py:pypi-minimal
 
 WORKDIR /MechaBowser
 COPY . /MechaBowser
