@@ -23,19 +23,12 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     @commands.group(name='stats', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats(self, ctx):
-        return await ctx.send(
-            "Valid subcommands:```\n"
-            "stats server\n    -Returns server activity statistics\n\n"
-            "stats users\n    -Returns most active users\n\n"
-            "stats roles\n    -Returns statistics on the ownership of roles\n\n"
-            "stats emoji\n    -Returns stats on emoji usage\n\n"
-            "stats channels\n    -Returns most active channels"
-            "stats statuses\n    -Returns user statuses over the last 24 hours```"
-        )
+        return await ctx.send_help(self._stats)
 
     @_stats.command(name='server')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_server(self, ctx, start_date=None, end_date=None):
+        '''Returns server activity statistics'''
         msg = await ctx.send('One moment, crunching message and channel data...')
 
         try:
@@ -166,6 +159,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     @_stats.command(name='users')
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_users(self, ctx):
+        '''Returns most active users'''
         msg = await ctx.send('One moment, crunching the numbers...')
         messages = mclient.bowser.messages.find({'timestamp': {'$gt': (int(time.time()) - (60 * 60 * 24 * 30))}})
         msgCounts = {}
@@ -198,6 +192,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
     async def _stats_roles(
         self, ctx, *, role: typing.Optional[typing.Union[discord.Role, int, str]]
     ):  # TODO: create and pull role add/remove data from events
+        '''Returns statistics on the ownership of roles'''
 
         if role:
             if type(role) is int:
@@ -242,9 +237,10 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
 
             return await ctx.send(embed=embed)
 
-    @_stats.command(name='channels')
+    @_stats.command(name='channels', hidden=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _stats_channels(self, ctx):
+        '''Returns most active channels'''
         return await ctx.send(f'{config.redTick} Channel statistics are not ready for use')
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
