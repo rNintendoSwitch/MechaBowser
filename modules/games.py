@@ -89,6 +89,7 @@ class GiantBomb:
 
 class Games(commands.Cog, name='Games'):
     def __init__(self, bot):
+        self.bot = bot
         self.GiantBomb = GiantBomb(config.giantbomb)
         self.db = mclient.bowser.games
 
@@ -102,7 +103,7 @@ class Games(commands.Cog, name='Games'):
         self.db.create_index([("date_last_updated", pymongo.DESCENDING)])
         self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
 
-        self.sync_games.start()  # pylint: disable=no-member
+        # self.sync_games.start()  # pylint: disable=no-member ## TODO remove
 
     def cog_unload(self):
         self.sync_games.cancel()  # pylint: disable=no-member
@@ -117,15 +118,15 @@ class Games(commands.Cog, name='Games'):
             try:
                 latest_doc = self.db.find().sort("date_last_updated", pymongo.DESCENDING).limit(1).next()
                 after = latest_doc['date_last_updated']
-            except StopIteration:  # Do full sync if we're having issues getting latest updated
-                full = True
+            except StopIteration:
+                full = True  # Do full sync if we're having issues getting latest updated
 
         logging.info('[Games] Syncing games database ' + ('(full)...' if full else f'(partial after {after})...'))
         self.last_sync['full' if full else 'part']['running'] = True
 
         if full:
             # Flag items so we can detect if they are not updated.
-            self.db.update_many({}, {'$set': {'_sync_updated': False}})
+            self.db.update_many({}, {'$set': {'_full_sync_updated': False}})
 
         count = 0
         async for game in self.GiantBomb.fetch_games(None if full else after):
@@ -137,13 +138,13 @@ class Games(commands.Cog, name='Games'):
                 game['aliases'] = game['aliases'].splitlines()
 
             if full:
-                game['_sync_updated'] = True
+                game['_full_sync_updated'] = True
 
             self.db.replace_one({'id': game['id']}, game, upsert=True)
             count += 1
 
         if full:
-            x = self.db.delete_many({'_sync_updated': False})  # If items were not updated, delete them
+            self.db.delete_many({'_full_sync_updated': False})  # If items were not updated, delete them
 
         logging.info(f'[Games] Finished syncing {count} games')
         self.last_sync['full' if full else 'part'] = {
@@ -160,6 +161,7 @@ class Games(commands.Cog, name='Games'):
         match_name = None
 
         pipeline = [
+            # original_release_date - This only really works for games not released on other platforms
             {'$match': {'original_release_date': {'$ne': None}}},
             {'$project': {'name': 1, 'aliases': 1}},
         ]
@@ -187,15 +189,59 @@ class Games(commands.Cog, name='Games'):
         alias = match_name if match_name in (match_game['aliases'] or []) else None
         return (document.next(), match_ratio, alias)
 
-    @commands.command(name='gs')
-    async def _search(self, ctx, *, query: str):
+    @commands.group(name='games', aliases=['game'], invoke_without_command=True)
+    async def _games(self, ctx):
+        '''Search for games or check search database status'''
+        return await ctx.send_help(self._games)
+
+    @_games.command(name='search')
+    async def _games_search(self, ctx, *, query: str):
+        '''TODO Search for Nintendo Switch games'''
         result, score, alias = self.search(query)
 
         name = result["name"]
         aliases = f' *({alias})*' if alias else ''
         url = result["site_detail_url"]
 
-        await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
+        return await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
+
+    @_games.command(name='information', aliases=['info'])
+    async def _games_info(self, ctx):
+        '''TODO Check search database status'''
+        return
+
+    @_games.command(name='sync')
+    @commands.is_owner()
+    async def _games_sync(self, ctx, full: bool):
+        '''TODO Force a database synchronization'''
+        return
+
+    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        if not ctx.command:
+            return
+
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(
+                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
+
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(
+                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
+
+        elif isinstance(error, commands.CheckFailure):
+            return await ctx.send(f'{config.redTick} You do not have permission to run this command', delete_after=15)
+
+        else:
+            await ctx.send(
+                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+                delete_after=15,
+            )
+            raise error
 
 
 def setup(bot):
