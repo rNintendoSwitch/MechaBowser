@@ -20,6 +20,15 @@ GIANTBOMB_NSW_ID = 157
 AUTO_SYNC = False
 SEARCH_RATIO_THRESHOLD = 50
 
+#  **********         *******         *******           *******         TODO
+# /////**///         **/////**       /**////**         **/////**        I just found out now that the GiantBomb API
+#     /**           **     //**      /**    /**       **     //**       has a releases route as well. That will make
+#     /**          /**      /**      /**    /**      /**      /**       things give way better results (hopefully)
+#     /**          /**      /**      /**    /**      /**      /**       but it sounds likes a massive pain in the ass
+#     /**          //**     **       /**    **       //**     **        to implement.
+#     /**           //*******        /*******         //*******
+#     //             ///////         ///////           ///////
+
 
 class RatelimitException(Exception):
     pass
