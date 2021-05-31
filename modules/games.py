@@ -218,8 +218,8 @@ class Games(commands.Cog, name='Games'):
             description=(
                 'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api/), '
                 'filtered to [Nintendo Switch releases]'
-                f'(https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}) (with a release date). '
-                'Please feel free to contribute corrections to any inaccuracies to their wiki.'
+                f'(https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}) Please feel free to '
+                'contribute corrections to any inaccuracies to their wiki.'
             ),
         )
 
