@@ -18,6 +18,7 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 
 GIANTBOMB_NSW_ID = 157
 AUTO_SYNC = False
+SEARCH_RATIO_THRESHOLD = 50
 
 
 class RatelimitException(Exception):
@@ -188,7 +189,7 @@ class Games(commands.Cog, name='Games'):
                     match_game = game
                     match_name = name
 
-        if not match_game:
+        if not match_game or match_ratio < SEARCH_RATIO_THRESHOLD:
             return (None, None, None)
 
         document = self.db.find({'_id': match_game['_id']})
