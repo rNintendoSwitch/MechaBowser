@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Generator, Optional, Union
+from typing import Generator, Optional, Tuple
 
 import aiohttp
 import config  # type: ignore
@@ -85,7 +85,7 @@ class GiantBomb:
                 resp.raise_for_status()
                 resp_json = await resp.json()
 
-                return resp_json['results'][0] if resp_json['results'] else None
+                return resp_json['results'] if resp_json['results'] else None
 
 
 class Games(commands.Cog, name='Games'):
@@ -161,7 +161,7 @@ class Games(commands.Cog, name='Games'):
 
         return self.db.replace_one({'id': game['id']}, game, upsert=True)
 
-    def search(self, query: str) -> Union[(dict, int, Optional[str]), (None, None, None)]:
+    def search(self, query: str) -> Tuple[Optional[dict], Optional[int], Optional[str]]:
         match_ratio = 0
         match_game = None
         match_name = None
