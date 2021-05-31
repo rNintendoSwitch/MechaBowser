@@ -1,9 +1,9 @@
 import datetime
 import logging
-from typing import Generator
+from typing import Generator, Optional, Union
 
 import aiohttp
-import config
+import config  # type: ignore
 import discord
 import pymongo
 import token_bucket
@@ -11,13 +11,13 @@ from dateutil import parser
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
 
-import tools
+import tools  # type: ignore
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 GIANTBOMB_NSW_ID = 157
-AUTO_SYNC = True
+AUTO_SYNC = False
 
 
 class RatelimitException(Exception):
@@ -76,19 +76,16 @@ class GiantBomb:
                     if offset >= resp_json['number_of_total_results']:
                         break  # no more results
 
-    # TODO: I think a game might actually get stuck in the database if the NSW platform is removed from it, so we might
-    # either have to requery games manually, or re-do the entire database hmm
+    async def fetch_game(self, guid: str) -> Optional[dict]:
+        async with aiohttp.ClientSession() as session:
+            self.raise_for_ratelimit()
 
-    # async def fetch_game(self, guid: str) -> dict:
-    #     async with aiohttp.ClientSession() as session:
-    #         self.raise_for_ratelimit()
+            params = {'api_key': self.api_key, 'format': 'json'}
+            async with session.get(f'{self.BASE_URL}/game/{guid}', params=params) as resp:
+                resp.raise_for_status()
+                resp_json = await resp.json()
 
-    #         params = {'api_key': self.api_key, 'format': 'json'}
-    #         async with session.get(f'{self.BASE_URL}/game/{guid}', params=params) as resp:
-    #             resp.raise_for_status()
-    #             resp_json = await resp.json()
-
-    #             return resp_json['results']
+                return resp_json['results'][0] if resp_json['results'] else None
 
 
 class Games(commands.Cog, name='Games'):
@@ -115,8 +112,8 @@ class Games(commands.Cog, name='Games'):
             self.sync_games.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=1)
-    async def sync_games(self, force_full=False):
-        # If last full sync was more then a week ago (or on restart/forced), preform a new full sync
+    async def sync_games(self, force_full=False) -> int:
+        # If last full sync was more then a day ago (or on restart/forced), preform a new full sync
         day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
         full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
 
@@ -136,17 +133,10 @@ class Games(commands.Cog, name='Games'):
 
         count = 0
         async for game in self.GiantBomb.fetch_games(None if full else after):
-            for key in ['date_added', 'date_last_updated', 'original_release_date']:  # Parse dates
-                if game[key]:
-                    game[key] = parser.parse(game[key])
-
-            if game['aliases']:
-                game['aliases'] = game['aliases'].splitlines()
-
             if full:
                 game['_full_sync_updated'] = True
 
-            self.db.replace_one({'id': game['id']}, game, upsert=True)
+            self.update_game_in_db(game)
             count += 1
 
         if full:
@@ -161,7 +151,17 @@ class Games(commands.Cog, name='Games'):
 
         return count
 
-    def search(self, query: str):
+    def update_game_in_db(self, game):
+        for key in ['date_added', 'date_last_updated', 'original_release_date']:  # Parse dates
+            if game[key]:
+                game[key] = parser.parse(game[key])
+
+        if game['aliases']:
+            game['aliases'] = game['aliases'].splitlines()
+
+        return self.db.replace_one({'id': game['id']}, game, upsert=True)
+
+    def search(self, query: str) -> Union[(dict, int, Optional[str]), (None, None, None)]:
         match_ratio = 0
         match_game = None
         match_name = None
@@ -189,11 +189,19 @@ class Games(commands.Cog, name='Games'):
                     match_name = name
 
         if not match_game:
-            return None
+            return (None, None, None)
 
         document = self.db.find({'_id': match_game['_id']})
         alias = match_name if match_name in (match_game['aliases'] or []) else None
         return (document.next(), match_ratio, alias)
+
+    async def fetch_game_detail(self, guid: str) -> dict:
+        game = await self.GiantBomb.fetch_game(guid)
+
+        if game:
+            self.update_game_in_db(game)
+
+        return game
 
     @commands.group(name='games', aliases=['game'], invoke_without_command=True)
     async def _games(self, ctx):
@@ -202,12 +210,18 @@ class Games(commands.Cog, name='Games'):
 
     @_games.command(name='search')
     async def _games_search(self, ctx, *, query: str):
-        '''TODO Search for Nintendo Switch games'''
+        '''Search for Nintendo Switch games'''
         result, score, alias = self.search(query)
+
+        if result:
+            detail = await self.fetch_game_detail(result['guid'])  # type: ignore
+
+        if result is None or detail is None:
+            return await ctx.send(f'{config.redTick} No results found!')
 
         name = result["name"]
         aliases = f' *({alias})*' if alias else ''
-        url = result["site_detail_url"]
+        url = result["site_detail_url"]  # type: ignore
 
         return await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
 
@@ -218,8 +232,8 @@ class Games(commands.Cog, name='Games'):
             title='Game Search Database Status',
             description=(
                 'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api), filtered to'
-                '[Nintendo Switch releases](https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}).'
-                'Please feel free to contribute corrections of any inaccuracies to their wiki.'
+                '[Nintendo Switch releases](https://www.giantbomb.com/games?game_filter[platform]={GIANTBOMB_NSW_ID}). '
+                'Please contribute corrections of any data inaccuracies to their wiki.'
             ),
         )
 
