@@ -4,9 +4,11 @@ from typing import Generator
 
 import aiohttp
 import config
+import tools
 import pymongo
 import token_bucket
 from dateutil import parser
+import discord
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
 
@@ -14,6 +16,7 @@ from fuzzywuzzy import fuzz
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 GIANTBOMB_NSW_ID = 157
+AUTO_SYNC = True
 
 
 class RatelimitException(Exception):
@@ -103,16 +106,18 @@ class Games(commands.Cog, name='Games'):
         self.db.create_index([("date_last_updated", pymongo.DESCENDING)])
         self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
 
-        # self.sync_games.start()  # pylint: disable=no-member ## TODO remove
+        if AUTO_SYNC:
+            self.sync_games.start()  # pylint: disable=no-member
 
     def cog_unload(self):
-        self.sync_games.cancel()  # pylint: disable=no-member
+        if AUTO_SYNC:
+            self.sync_games.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=1)
     async def sync_games(self, force_full=False):
         # If last full sync was more then a week ago (or on restart/forced), preform a new full sync
-        week_ago = datetime.datetime.utcnow() - datetime.timedelta(weeks=1)
-        full = force_full or ((self.last_sync['full']['at'] < week_ago) if self.last_sync['full']['at'] else True)
+        day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
 
         if not full:
             try:
@@ -205,16 +210,42 @@ class Games(commands.Cog, name='Games'):
 
         return await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
 
-    @_games.command(name='information', aliases=['info'])
+    @_games.command(name='info', aliases=['information'])
     async def _games_info(self, ctx):
-        '''TODO Check search database status'''
-        return
+        '''Check search database status'''
+        embed = discord.Embed(
+            title='Game Search Database Status',
+            description=(
+                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api/), '
+                'filtered to [Nintendo Switch releases]'
+                f'(https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}) (with a release date). '
+                'Please feel free to contribute corrections to any inaccuracies to their wiki.'
+            ),
+        )
 
-    @_games.command(name='sync')
+        count = self.db.find({}).count()
+        embed.add_field(name='Games Stored', value=count, inline=False)
+
+        for key, string in [('part', 'Partial'), ('full', 'Full')]:
+            sync = self.last_sync[key]
+            if sync['running']:
+                value = 'In progress...'
+            elif sync['at'] is None:
+                value = 'Never ran'
+            else:
+                value = f'{tools.humanize_duration(sync["at"])}: {sync["count"]} games'
+
+            embed.add_field(name=f'Last {string} Sync', value=value, inline=True)
+
+        return await ctx.send(embed=embed)
+
+    @_games.command(name='sync', aliases=['synchronize'])
     @commands.is_owner()
-    async def _games_sync(self, ctx, full: bool):
-        '''TODO Force a database synchronization'''
-        return
+    async def _games_sync(self, ctx, full: bool = False):
+        '''Force a database sync'''
+        await ctx.reply('Running sync...')
+        count = await self.sync_games(full)
+        return await ctx.reply(f'Finished syncing {count} games')
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
