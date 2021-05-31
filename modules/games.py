@@ -217,10 +217,9 @@ class Games(commands.Cog, name='Games'):
         embed = discord.Embed(
             title='Game Search Database Status',
             description=(
-                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api/), '
-                'filtered to [Nintendo Switch releases]'
-                f'(https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}) Please feel free to '
-                'contribute corrections to any inaccuracies to their wiki.'
+                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api), filtered to'
+                '[Nintendo Switch releases](https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}).'
+                'Please feel free to contribute corrections of any inaccuracies to their wiki.'
             ),
         )
 
