@@ -4,13 +4,14 @@ from typing import Generator
 
 import aiohttp
 import config
-import tools
+import discord
 import pymongo
 import token_bucket
 from dateutil import parser
-import discord
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
+
+import tools
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
