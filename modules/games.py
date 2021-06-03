@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Generator, Optional, Tuple
+from typing import Generator, Literal, Optional, Tuple
 
 import aiohttp
 import config  # type: ignore
@@ -48,7 +48,12 @@ class GiantBomb:
         if rate_limited:
             raise RatelimitException()
 
-    async def fetch_games(self, after: datetime.datetime = None) -> Generator[dict, None, None]:
+    async def fetch_items(
+        self, path: Literal['games', 'releases'], after: datetime.datetime = None
+    ) -> Generator[dict, None, None]:
+        if path not in ['games', 'releases']:
+            raise ValueError(f'invalid path: {path}')
+
         offset = 0
 
         for _ in range(1, 1000):
@@ -75,23 +80,26 @@ class GiantBomb:
                 else:
                     params['platforms'] = GIANTBOMB_NSW_ID
 
-                async with session.get(f'{self.BASE_URL}/games', params=params) as resp:
+                async with session.get(f'{self.BASE_URL}/{path}', params=params) as resp:
                     resp.raise_for_status()
                     resp_json = await resp.json()
 
-                    for game in resp_json['results']:
-                        yield game
+                    for item in resp_json['results']:
+                        yield item
 
                     offset += resp_json['number_of_page_results']
                     if offset >= resp_json['number_of_total_results']:
                         break  # no more results
 
-    async def fetch_game(self, guid: str) -> Optional[dict]:
+    async def fetch_item(self, path: Literal['game', 'release'], guid: str) -> Optional[dict]:
+        if path not in ['game', 'release']:
+            raise ValueError(f'invalid path: {path}')
+
         async with aiohttp.ClientSession() as session:
             self.raise_for_ratelimit()
 
             params = {'api_key': self.api_key, 'format': 'json'}
-            async with session.get(f'{self.BASE_URL}/game/{guid}', params=params) as resp:
+            async with session.get(f'{self.BASE_URL}/{path}/{guid}', params=params) as resp:
                 resp.raise_for_status()
                 resp_json = await resp.json()
 
@@ -142,7 +150,7 @@ class Games(commands.Cog, name='Games'):
             self.db.update_many({}, {'$set': {'_full_sync_updated': False}})
 
         count = 0
-        async for game in self.GiantBomb.fetch_games(None if full else after):
+        async for game in self.GiantBomb.fetch_items('games', None if full else after):
             if full:
                 game['_full_sync_updated'] = True
 
@@ -206,7 +214,7 @@ class Games(commands.Cog, name='Games'):
         return (document.next(), match_ratio, alias)
 
     async def fetch_game_detail(self, guid: str) -> dict:
-        game = await self.GiantBomb.fetch_game(guid)
+        game = await self.GiantBomb.fetch_item('game', guid)
 
         if game:
             self.update_game_in_db(game)
