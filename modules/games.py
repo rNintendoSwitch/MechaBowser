@@ -115,10 +115,8 @@ class Games(commands.Cog, name='Games'):
         }
 
         # Ensure indices exist
-        self.db.create_index([("name", pymongo.ASCENDING), ("aliases", pymongo.ASCENDING)])
         self.db.create_index([("date_last_updated", pymongo.DESCENDING)])
         self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
-        self.db.create_index([("type", pymongo.ASCENDING)])
 
         if AUTO_SYNC:
             self.sync_db.start()  # pylint: disable=no-member
