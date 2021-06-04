@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Generator, Literal, Optional, Tuple, Dict
+from typing import Dict, Generator, Literal, Optional, Tuple
 
 import aiohttp
 import config  # type: ignore
