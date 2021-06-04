@@ -34,8 +34,11 @@ class GiantBomb:
         self.bucket_storage = token_bucket.MemoryStorage()
         self.ratelimit = token_bucket.Limiter(200 / (60 * 60), 200, self.bucket_storage)
 
-    def raise_for_ratelimit(self):
-        rate_limited = not self.ratelimit.consume('global')
+    def raise_for_ratelimit(self, resource: str):
+        if '/' in resource:
+            raise ValueError(f'malformed resource: {resource}')
+
+        rate_limited = not self.ratelimit.consume(resource)
         if rate_limited:
             raise RatelimitException()
 
@@ -49,7 +52,7 @@ class GiantBomb:
 
         for _ in range(1, 1000):
             async with aiohttp.ClientSession() as session:
-                self.raise_for_ratelimit()
+                self.raise_for_ratelimit(path)
 
                 params = {
                     'api_key': self.api_key,
