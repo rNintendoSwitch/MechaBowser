@@ -126,7 +126,7 @@ class Games(commands.Cog, name='Games'):
             self.sync_db.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=1)
-    async def sync_db(self, force_full: bool = False) -> Dict[str, int]:
+    async def sync_db(self, force_full: bool = False) -> Tuple[int, str]:
         # If last full sync was more then a day ago (or on restart/forced), preform a new full sync
         day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
         full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
@@ -138,7 +138,8 @@ class Games(commands.Cog, name='Games'):
             except StopIteration:
                 full = True  # Do full sync if we're having issues getting latest updated
 
-        logging.info('[Games] Syncing games database ' + ('(full)...' if full else f'(partial after {after})...'))
+        detail_str = '(full)' if full else f'(partial after {after})'
+        logging.info(f'[Games] Syncing games database {detail_str}...')
         self.last_sync['full' if full else 'part']['running'] = True
 
         if full:
@@ -158,14 +159,14 @@ class Games(commands.Cog, name='Games'):
         if full:
             self.db.delete_many({'_full_sync_updated': False})  # If items were not updated, delete them
 
-        logging.info(f'[Games] Finished syncing {count["games"]} games and {count["releases"]} releases')
+        logging.info(f'[Games] Finished syncing {count["games"]} games and {count["releases"]} releases {detail_str}')
         self.last_sync['full' if full else 'part'] = {
             'at': datetime.datetime.utcnow(),
             'count': count,
             'running': False,
         }
 
-        return count
+        return count, detail_str
 
     def update_item_in_db(self, type: Literal['game', 'release'], game: dict):
         if type not in ['game', 'release']:
@@ -183,9 +184,9 @@ class Games(commands.Cog, name='Games'):
         if type == 'game' and game['aliases']:
             game['aliases'] = game['aliases'].splitlines()
 
-        game['type'] = type
+        game['_type'] = type
 
-        return self.db.replace_one({'id': game['id']}, game, upsert=True)
+        return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
 
     # def search(self, query: str) -> Tuple[Optional[dict], Optional[int], Optional[str]]:
     #     match_ratio = 0
@@ -255,8 +256,8 @@ class Games(commands.Cog, name='Games'):
             ),
         )
 
-        game_count = self.db.find({'type': 'game'}).count()
-        release_count = self.db.find({'type': 'release'}).count()
+        game_count = self.db.find({'_type': 'game'}).count()
+        release_count = self.db.find({'_type': 'release'}).count()
         embed.add_field(name='Games Stored', value=game_count, inline=True)
         embed.add_field(name='Releases Stored', value=release_count, inline=True)
 
@@ -279,8 +280,8 @@ class Games(commands.Cog, name='Games'):
     async def _games_sync(self, ctx, full: bool = False):
         '''Force a database sync'''
         await ctx.reply('Running sync...')
-        count = await self.sync_db(full)
-        return await ctx.reply(f'Finished syncing {count["games"]} games and {count["releases"]} releases')
+        count, detail_str = await self.sync_db(full)
+        return await ctx.reply(f'Finished syncing {count["games"]} games and {count["releases"]} releases {detail_str}')
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
