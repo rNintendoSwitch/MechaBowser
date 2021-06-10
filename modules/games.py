@@ -1,3 +1,4 @@
+import collections
 import datetime
 import logging
 from typing import Dict, Generator, Literal, Optional, Tuple
@@ -117,6 +118,7 @@ class Games(commands.Cog, name='Games'):
         # Ensure indices exist
         self.db.create_index([("date_last_updated", pymongo.DESCENDING)])
         self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
+        self.db.create_index([("game.id", pymongo.ASCENDING)])
 
         if AUTO_SYNC:
             self.sync_db.start()  # pylint: disable=no-member
@@ -184,65 +186,76 @@ class Games(commands.Cog, name='Games'):
         if type == 'game' and game['aliases']:
             game['aliases'] = game['aliases'].splitlines()
 
+        if type == 'release':
+            game['_gameid'] = game['game']['id']
+
         game['_type'] = type
 
         return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
 
-    # def search(self, query: str) -> Tuple[Optional[dict], Optional[int], Optional[str]]:
-    #     match_ratio = 0
-    #     match_game = None
-    #     match_name = None
+    def search(self, query: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
+        SCORE = 1
+        match = (None, None, None)
 
-    #     pipeline = [
-    #         # original_release_date - This only really works for games not released on other platforms
-    #         {'$match': {'original_release_date': {'$ne': None}}},
-    #         {'$project': {'name': 1, 'aliases': 1}},
-    #     ]
+        pipeline = [
+            {'$match': {'_type': 'game'}},  # Select games
+            {
+                '$graphLookup': {
+                    'from': 'games',
+                    'startWith': '$id',
+                    'connectFromField': 'id',
+                    'connectToField': 'game.id',
+                    'as': '_releases',
+                    'restrictSearchWithMatch': {'_type': 'release'},
+                }
+            },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
+            {'$project': {'guid': 1, 'name': 1, 'aliases': 1, '_releases.name': 1}},
+        ]
 
-    #     for game in self.db.aggregate(pipeline):
-    #         names = [game['name']]
-    #         if game['aliases']:
-    #             names += game['aliases']
+        for game in self.db.aggregate(pipeline):
+            names = collections.Counter([game['name']])
+            if game['aliases']:
+                names.update(game['aliases'])
+            if game['_releases']:
+                names.update([release['name'] for release in game['_releases']])
 
-    #         for name in names:
-    #             methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
+            for name in names:
+                methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
 
-    #             scores = [method(name.lower(), query.lower()) for method in methods]
-    #             ratio = sum(scores) / len(methods)
+                scores = [method(name.lower(), query.lower()) for method in methods]
+                score = sum(scores) / len(methods)
 
-    #             if ratio > match_ratio:
-    #                 match_ratio = ratio
-    #                 match_game = game
-    #                 match_name = name
+                if not match[SCORE] or (score > match[SCORE]):
+                    match = (game['guid'], score, name)
 
-    #     if not match_game or match_ratio < SEARCH_RATIO_THRESHOLD:
-    #         return (None, None, None)
+        if match[SCORE] < SEARCH_RATIO_THRESHOLD:
+            return (None, None, None)
 
-    #     document = self.db.find({'_id': match_game['_id']})
-    #     alias = match_name if match_name in (match_game['aliases'] or []) else None
-    #     return (document.next(), match_ratio, alias)
+        return match
 
     @commands.group(name='games', aliases=['game'], invoke_without_command=True)
     async def _games(self, ctx):
         '''Search for games or check search database status'''
         return await ctx.send_help(self._games)
 
-    # @_games.command(name='search')
-    # async def _games_search(self, ctx, *, query: str):
-    #     '''Search for Nintendo Switch games'''
-    #     result, score, alias = self.search(query)
+    @_games.command(name='search')
+    async def _games_search(self, ctx, *, query: str):
+        '''Search for Nintendo Switch games'''
+        guid, score, name = self.search(query)
+        await ctx.reply(f'{guid}@{score}: {name}')
+        # result, score, alias = self.search(query)
 
-    #     if result:
-    #         detail = await self.fetch_game_detail(result['guid'])  # type: ignore
+        # if result:
+        #     detail = await self.fetch_game_detail(result['guid'])  # type: ignore
 
-    #     if result is None or detail is None:
-    #         return await ctx.send(f'{config.redTick} No results found!')
+        # if result is None or detail is None:
+        #     return await ctx.send(f'{config.redTick} No results found!')
 
-    #     name = result["name"]
-    #     aliases = f' *({alias})*' if alias else ''
-    #     url = result["site_detail_url"]  # type: ignore
+        # name = result["name"]
+        # aliases = f' *({alias})*' if alias else ''
+        # url = result["site_detail_url"]  # type: ignore
 
-    #     return await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
+        # return await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
 
     @_games.command(name='info', aliases=['information'])
     async def _games_info(self, ctx):
