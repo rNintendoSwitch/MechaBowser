@@ -209,7 +209,16 @@ class Games(commands.Cog, name='Games'):
                     'restrictSearchWithMatch': {'_type': 'release'},
                 }
             },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
-            {'$project': {'guid': 1, 'name': 1, 'aliases': 1, '_releases.name': 1}},
+            {
+                '$project': {
+                    'guid': 1,
+                    'name': 1,
+                    'aliases': 1,
+                    'original_release_date': 1,
+                    '_releases.name': 1,
+                    '_releases.release_date': 1,
+                }
+            },  # Filter to only stuff we want
         ]
 
         for game in self.db.aggregate(pipeline):
@@ -218,6 +227,14 @@ class Games(commands.Cog, name='Games'):
                 names.update(game['aliases'])
             if game['_releases']:
                 names.update([release['name'] for release in game['_releases']])
+
+                # Ignore this game if it has no release dates (if has releases), or release date if no releases
+                if all(release['release_date'] is None for release in game['_releases']):
+                    continue
+
+            else:  # no releases
+                if game['original_release_date'] is None:
+                    continue
 
             for name in names:
                 methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
@@ -233,6 +250,26 @@ class Games(commands.Cog, name='Games'):
 
         return match
 
+    def get_preferred_name(self, guid: str) -> Optional[str]:
+        game = self.db.find_one({'_type': 'game', 'guid': guid}, projection={'name': 1, 'id': 1})
+        if not game:
+            return None
+
+        releases_cursor = self.db.find({'_type': 'release', 'game.id': game['id']}, projection={'name': 1})
+        release_names = [release['name'] for release in list(releases_cursor)] if releases_cursor else []
+
+        # If all releases share a common root, use the common name of the releases, otherwise use the game name
+        if release_names:
+            # Get common starting part of releases name
+            # https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
+            names = [r.lower() for r in release_names]
+            common_start = names[0][: ([min([x[0] == elem for elem in x]) for x in zip(*names)] + [0]).index(0)]
+
+            if len(common_start) >= 8:
+                return release_names[0][: len(common_start)]  # Access the name of a release to preserve sane casing
+
+        return game['name']
+
     @commands.group(name='games', aliases=['game'], invoke_without_command=True)
     async def _games(self, ctx):
         '''Search for games or check search database status'''
@@ -242,7 +279,7 @@ class Games(commands.Cog, name='Games'):
     async def _games_search(self, ctx, *, query: str):
         '''Search for Nintendo Switch games'''
         guid, score, name = self.search(query)
-        await ctx.reply(f'{guid}@{score}: {name}')
+        await ctx.reply(f'{guid}@{score}: {name} / Preferred: {self.get_preferred_name(guid)}')
         # result, score, alias = self.search(query)
 
         # if result:
