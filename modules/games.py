@@ -259,9 +259,11 @@ class Games(commands.Cog, name='Games'):
         release_names = [release['name'] for release in list(releases_cursor)] if releases_cursor else []
 
         # If all releases share a common root, use the common name of the releases, otherwise use the game name
+        # This approch might fail for games with completely diffrent names like "Pokemon Sword" and "Pokemon Shield",
+        # so hopefully the length statement might help in this edge case.
         if release_names:
-            # Get common starting word for releases name
-            # Adaption https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
+            # Get common starting word for releases name, Adapted from:
+            # https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
             names = [r.lower() for r in release_names]
             words = [n.split(' ') for n in names]
             common_start_words = words[0][: ([min([x[0] == elem for elem in x]) for x in zip(*words)] + [0]).index(0)]
