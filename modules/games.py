@@ -260,10 +260,12 @@ class Games(commands.Cog, name='Games'):
 
         # If all releases share a common root, use the common name of the releases, otherwise use the game name
         if release_names:
-            # Get common starting part of releases name
-            # https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
+            # Get common starting word for releases name
+            # Adaption https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
             names = [r.lower() for r in release_names]
-            common_start = names[0][: ([min([x[0] == elem for elem in x]) for x in zip(*names)] + [0]).index(0)]
+            words = [n.split(' ') for n in names]
+            common_start_words = words[0][: ([min([x[0] == elem for elem in x]) for x in zip(*words)] + [0]).index(0)]
+            common_start = ' '.join(common_start_words)
 
             if len(common_start) >= 8:
                 return release_names[0][: len(common_start)]  # Access the name of a release to preserve sane casing
