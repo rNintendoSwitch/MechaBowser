@@ -288,25 +288,24 @@ class Games(commands.Cog, name='Games'):
         if game:
             name = self.get_preferred_name(result['guid'])
 
-            # Build description
-            description = game["deck"]
-            if (result['name'] != name) and (result['name'] != game['name']):  # Hit name is an alias
-                description = f'*(aka "{result["name"]}")*\n\n{description}'
-
             embed = discord.Embed(
                 title=name,
-                description=description,
+                description=game["deck"],
                 url=game['site_detail_url'],
                 timestamp=game['date_last_updated'],
             )
-
             embed.set_author(
                 name='Data via GiantBomb',
                 url='https://www.giantbomb.com/games/',
                 icon_url='https://www.giantbomb.com/a/bundles/giantbombsite/images/win8pin.png',
             )
-            embed.set_footer(text=f'{result["score"] }% confident || Entry last updated')
             embed.set_thumbnail(url=game['image']['small_url'])
+
+            # Build footer; if an match was an alias/release name, add it to footer
+            has_alias = (result['name'] != name) and (result['name'] != game['name'])
+            alias_str = ('("' + result['name'] + '") ') if has_alias else ''
+
+            embed.set_footer(text=f'{result["score"] }% confident {alias_str} || Entry last updated')
 
             # Build info about overall game release
             game_desc = '**Developers:** TODO'
@@ -326,7 +325,7 @@ class Games(commands.Cog, name='Games'):
                 switch_desc += '\n**Developers:** TODO'
                 switch_desc += '\n**Publishers:** TODO'
 
-                embed.add_field(name=f'Known Nintendo Switch Releases', value=switch_desc, inline=False)
+                embed.add_field(name=f'Nintendo Switch Releases', value=switch_desc, inline=False)
 
             return await ctx.send(embed=embed)
 
