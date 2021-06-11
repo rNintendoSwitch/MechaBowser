@@ -242,7 +242,7 @@ class Games(commands.Cog, name='Games'):
                 score = sum(scores) / len(methods)
 
                 if not match['score'] or (score > match['score']):
-                    match = (game['guid'], score, name)
+                    match = {'guid': game['guid'], 'score': score, 'name': name}
 
         if match['score'] < SEARCH_RATIO_THRESHOLD:
             return None
@@ -287,24 +287,11 @@ class Games(commands.Cog, name='Games'):
 
         if game:
             name = self.get_preferred_name(result['guid'])
-            release_count = self.db.count({'_type': 'release', 'game.id': game['id']})
 
-            # Add extra info about other names to top of description
-            desc_extra = []
-            if name != game['name']:  # Our preferred name is not actual name
-                desc_extra.append(f'Formally `{game["name"]}`')
+            # Build description
+            description = game["deck"]
             if (result['name'] != name) and (result['name'] != game['name']):  # Hit name is an alias
-                desc_extra.append(f'aka `{result["name"]}`')
-            description = f'*({", ".join(desc_extra)})*\n\n' if desc_extra else ''
-
-            description += game["deck"]
-
-            if release_count:
-                description += '\n\n'
-                description += (
-                    f'[{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}]'
-                    f'({game["site_detail_url"]}releases)'
-                )
+                description = f'*(aka "{result["name"]}")*\n\n{description}'
 
             embed = discord.Embed(
                 title=name,
@@ -320,6 +307,26 @@ class Games(commands.Cog, name='Games'):
             )
             embed.set_footer(text=f'{result["score"] }% confident || Entry last updated')
             embed.set_thumbnail(url=game['image']['small_url'])
+
+            # Build info about overall game release
+            game_desc = '**Developers:** TODO'
+            game_desc += '\n**Publishers:** TODO'
+            if name != game['name']:  # Our preferred name is not actual name
+                game_desc = f'**Common title:** {game["name"]}\n{game_desc}'
+
+            embed.add_field(name=f'General Game Details', value=game_desc, inline=False)
+
+            # Build info about switch releases
+            release_count = self.db.count({'_type': 'release', 'game.id': game['id']})
+            if release_count:
+                switch_desc = (
+                    f'[**{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}**]'
+                    f'({game["site_detail_url"]}releases)'
+                )
+                switch_desc += '\n**Developers:** TODO'
+                switch_desc += '\n**Publishers:** TODO'
+
+                embed.add_field(name=f'Known Nintendo Switch Releases', value=switch_desc, inline=False)
 
             return await ctx.send(embed=embed)
 
