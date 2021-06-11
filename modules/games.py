@@ -258,7 +258,7 @@ class Games(commands.Cog, name='Games'):
         releases_cursor = self.db.find({'_type': 'release', 'game.id': game['id']}, projection={'name': 1})
         release_names = [release['name'] for release in list(releases_cursor)] if releases_cursor else []
 
-        # If all releases share a common root, use the common name of the releases, otherwise use the game name
+        # If all releases share a common root, use the common name of the releases, otherwise use the game name.
         # This approch might fail for games with completely diffrent names like "Pokemon Sword" and "Pokemon Shield",
         # so hopefully the length statement might help in this edge case.
         if release_names:
@@ -282,21 +282,50 @@ class Games(commands.Cog, name='Games'):
     @_games.command(name='search')
     async def _games_search(self, ctx, *, query: str):
         '''Search for Nintendo Switch games'''
-        guid, score, name = self.search(query)
-        await ctx.reply(f'{guid}@{score}: {name} / Preferred: {self.get_preferred_name(guid)}')
-        # result, score, alias = self.search(query)
+        guid, ratio, match_name = self.search(query)
 
-        # if result:
-        #     detail = await self.fetch_game_detail(result['guid'])  # type: ignore
+        game = self.db.find_one({'_type': 'game', 'guid': guid}) if guid else None
 
-        # if result is None or detail is None:
-        #     return await ctx.send(f'{config.redTick} No results found!')
+        if game:
+            name = self.get_preferred_name(guid)
+            release_count = self.db.count({'_type': 'release', 'game.id': game['id']})
 
-        # name = result["name"]
-        # aliases = f' *({alias})*' if alias else ''
-        # url = result["site_detail_url"]  # type: ignore
+            # Add extra info about other names to top of description
+            desc_extra = []
+            if name != game['name']:  # Our preferred name is not actual name
+                desc_extra.append(f'Formally `{game["name"]}`')
+            if (match_name != name) and (match_name != game['name']):  # Hit name is an alias
+                desc_extra.append(f'aka `{match_name}`')
+            description = f'*({", ".join(desc_extra)})*\n\n' if desc_extra else ''
 
-        # return await ctx.reply(f'**{name}**{aliases} - {score}\n{url}')
+            description += game["deck"]
+
+            if release_count:
+                description += '\n\n'
+                description += (
+                    f'[{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}]'
+                    f'({game["site_detail_url"]}releases)'
+                )
+
+            embed = discord.Embed(
+                title=name,
+                description=description,
+                url=game['site_detail_url'],
+                timestamp=game['date_last_updated'],
+            )
+
+            embed.set_author(
+                name='Data via GiantBomb',
+                url='https://www.giantbomb.com/games/',
+                icon_url='https://www.giantbomb.com/a/bundles/giantbombsite/images/win8pin.png',
+            )
+            embed.set_footer(text=f'{ratio}% confident || Entry last updated')
+            embed.set_thumbnail(url=game['image']['small_url'])
+
+            return await ctx.send(embed=embed)
+
+        else:
+            return await ctx.send(f'{config.redTick} No results found.')
 
     @_games.command(name='info', aliases=['information'])
     async def _games_info(self, ctx):
@@ -304,9 +333,8 @@ class Games(commands.Cog, name='Games'):
         embed = discord.Embed(
             title='Game Search Database Status',
             description=(
-                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api), filtered to'
-                ' [Nintendo Switch releases](https://www.giantbomb.com/games?game_filter[platform]={GIANTBOMB_NSW_ID}).'
-                ' Please contribute corrections of any data inaccuracies to their wiki.'
+                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api). Please '
+                'contribute corrections of any data inaccuracies to [their wiki](https://www.giantbomb.com/games/).'
             ),
         )
 
