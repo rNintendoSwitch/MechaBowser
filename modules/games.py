@@ -1,7 +1,7 @@
 import collections
 import datetime
 import logging
-from typing import Dict, Generator, Literal, Optional, Tuple
+from typing import Generator, Literal, Optional, Tuple
 
 import aiohttp
 import config  # type: ignore
@@ -193,9 +193,8 @@ class Games(commands.Cog, name='Games'):
 
         return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
 
-    def search(self, query: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
-        SCORE = 1
-        match = (None, None, None)
+    def search(self, query: str) -> Optional[dict]:
+        match = {'guid': None, 'score': None, 'name': None}
 
         pipeline = [
             {'$match': {'_type': 'game'}},  # Select games
@@ -242,11 +241,11 @@ class Games(commands.Cog, name='Games'):
                 scores = [method(name.lower(), query.lower()) for method in methods]
                 score = sum(scores) / len(methods)
 
-                if not match[SCORE] or (score > match[SCORE]):
+                if not match['score'] or (score > match['score']):
                     match = (game['guid'], score, name)
 
-        if match[SCORE] < SEARCH_RATIO_THRESHOLD:
-            return (None, None, None)
+        if match['score'] < SEARCH_RATIO_THRESHOLD:
+            return None
 
         return match
 
@@ -282,20 +281,20 @@ class Games(commands.Cog, name='Games'):
     @_games.command(name='search')
     async def _games_search(self, ctx, *, query: str):
         '''Search for Nintendo Switch games'''
-        guid, ratio, match_name = self.search(query)
+        result = self.search(query)
 
-        game = self.db.find_one({'_type': 'game', 'guid': guid}) if guid else None
+        game = self.db.find_one({'_type': 'game', 'guid': result['guid']}) if result['guid'] else None
 
         if game:
-            name = self.get_preferred_name(guid)
+            name = self.get_preferred_name(result['guid'])
             release_count = self.db.count({'_type': 'release', 'game.id': game['id']})
 
             # Add extra info about other names to top of description
             desc_extra = []
             if name != game['name']:  # Our preferred name is not actual name
                 desc_extra.append(f'Formally `{game["name"]}`')
-            if (match_name != name) and (match_name != game['name']):  # Hit name is an alias
-                desc_extra.append(f'aka `{match_name}`')
+            if (result['name'] != name) and (result['name'] != game['name']):  # Hit name is an alias
+                desc_extra.append(f'aka `{result["name"]}`')
             description = f'*({", ".join(desc_extra)})*\n\n' if desc_extra else ''
 
             description += game["deck"]
@@ -319,7 +318,7 @@ class Games(commands.Cog, name='Games'):
                 url='https://www.giantbomb.com/games/',
                 icon_url='https://www.giantbomb.com/a/bundles/giantbombsite/images/win8pin.png',
             )
-            embed.set_footer(text=f'{ratio}% confident || Entry last updated')
+            embed.set_footer(text=f'{result["score"] }% confident || Entry last updated')
             embed.set_thumbnail(url=game['image']['small_url'])
 
             return await ctx.send(embed=embed)
