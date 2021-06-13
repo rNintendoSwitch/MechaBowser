@@ -128,7 +128,7 @@ class ChatRoleEvent(commands.Cog):
             if self.notify:
                 await message.reply(f'You have been given the **{str(role)}** role!', delete_after=10)
 
-            returnthis
+            return
 
 
 def setup(bot):
