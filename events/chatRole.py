@@ -116,7 +116,7 @@ class ChatRoleEvent(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if not self.active or message.author.bot or not isinstance(message.channel, discord.channel.TextChannel):
+        if not self.active or message.author.bot or isinstance(message.channel, discord.channel.DMChannel):
             return
 
         if (message.channel.id not in self.ids['text']) and (message.channel.category_id not in self.ids['cat']):
@@ -128,7 +128,7 @@ class ChatRoleEvent(commands.Cog):
             if self.notify:
                 await message.reply(f'You have been given the **{str(role)}** role!', delete_after=10)
 
-            return await message.author.add_roles(role)
+            returnthis
 
 
 def setup(bot):
