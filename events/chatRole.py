@@ -116,7 +116,7 @@ class ChatRoleEvent(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if not self.active or message.author.bot:
+        if not self.active or message.author.bot or not isinstance(message.channel, discord.channel.TextChannel):
             return
 
         if (message.channel.id not in self.ids['text']) and (message.channel.category_id not in self.ids['cat']):
