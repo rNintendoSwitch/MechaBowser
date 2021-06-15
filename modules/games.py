@@ -193,7 +193,7 @@ class Games(commands.Cog, name='Games'):
 
         return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
 
-    def search(self, query: str) -> Optional[dict]:
+    def search(self, query: str, ignore_unreleased: bool = False) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
 
         pipeline = [
@@ -227,13 +227,13 @@ class Games(commands.Cog, name='Games'):
             if game['_releases']:
                 names.update([release['name'] for release in game['_releases']])
 
-                # Ignore this game if it has no release dates (if has releases), or release date if no releases
-                if all(release['release_date'] is None for release in game['_releases']):
-                    continue
-
-            else:  # no releases
-                if game['original_release_date'] is None:
-                    continue
+            # If ignore unreleased flag is set, we must consider ignoring this game
+            if ignore_unreleased and game['original_release_date'] is None:
+                if game['_releases']:
+                    if all(release['release_date'] is None for release in game['_releases']):
+                        continue  # Has releases, but no release with release date, nor any orig. release date -- ignore
+                else:
+                    continue  # No releases, no release date -- ignore
 
             for name in names:
                 methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
@@ -303,13 +303,14 @@ class Games(commands.Cog, name='Games'):
 
             # Build footer; if an match was an alias/release name, add it to footer
             has_alias = (result['name'] != name) and (result['name'] != game['name'])
-            alias_str = ('("' + result['name'] + '") ') if has_alias else ''
+            alias_str = (' ("' + result['name'] + '")') if has_alias else ''
 
-            embed.set_footer(text=f'{result["score"] }% confident {alias_str} || Entry last updated')
+            embed.set_footer(text=f'{result["score"] }% confident{alias_str} ⯁ Entry last updated')
 
             # Build info about overall game release
-            game_desc = '**Developers:** TODO'
-            game_desc += '\n**Publishers:** TODO'
+            game_desc = '**Developer(s):** TODO'
+            game_desc += '\n**Publisher(s):** TODO'
+            game_desc += '\n**(Expected) Release Date:** TODO'
             if name != game['name']:  # Our preferred name is not actual name
                 game_desc = f'**Common title:** {game["name"]}\n{game_desc}'
 
@@ -322,8 +323,9 @@ class Games(commands.Cog, name='Games'):
                     f'[**{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}**]'
                     f'({game["site_detail_url"]}releases)'
                 )
-                switch_desc += '\n**Developers:** TODO'
-                switch_desc += '\n**Publishers:** TODO'
+                switch_desc += '\n**Developer(s):** TODO'
+                switch_desc += '\n**Publisher(s):** TODO'
+                game_desc += '\n**(Expected) Release Dates:** TODO'
 
                 embed.add_field(name=f'Nintendo Switch Releases', value=switch_desc, inline=False)
 
