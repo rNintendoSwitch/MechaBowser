@@ -20,7 +20,7 @@ import tools  # type: ignore
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 GIANTBOMB_NSW_ID = 157
-AUTO_SYNC = False
+AUTO_SYNC = True
 SEARCH_RATIO_THRESHOLD = 50
 
 
@@ -357,12 +357,16 @@ class Games(commands.Cog, name='Games'):
         '''Search for games or check search database status'''
         return await ctx.send_help(self._games)
 
+    @commands.cooldown(2, 60, type=commands.BucketType.user)
     @_games.command(name='search')
     async def _games_search(self, ctx, *, query: str):
         '''Search for Nintendo Switch games'''
         result = self.search(query)
 
-        game = self.db.find_one({'_type': 'game', 'guid': result['guid']}) if result['guid'] else None
+        if result and result['guid']:
+            game = self.db.find_one({'_type': 'game', 'guid': result['guid']})
+        else:
+            game = None
 
         if game:
             name = self.get_preferred_name(result['guid'])
@@ -497,12 +501,13 @@ class Games(commands.Cog, name='Games'):
     @_games.command(name='info', aliases=['information'])
     async def _games_info(self, ctx):
         '''Check search database status'''
+        releases_url = f'https://www.giantbomb.com/games?game_filter[platform]={GIANTBOMB_NSW_ID}'
         embed = discord.Embed(
             title='Game Search Database Status',
             description=(
-                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api). Please '
-                'contribute corrections of any data inaccuracies to '
-                f'[their wiki](https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}).'
+                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api), filtered to'
+                f' [Nintendo Switch releases]({releases_url}). Please contribute corrections of any data inaccuracies'
+                f' to [their wiki](https://www.giantbomb.com/games).'
             ),
         )
 
@@ -553,6 +558,11 @@ class Games(commands.Cog, name='Games'):
             return await ctx.send(
                 f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
                 delete_after=15,
+            )
+
+        elif isinstance(error, commands.CommandOnCooldown):
+            return await ctx.send(
+                f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=15
             )
 
         elif isinstance(error, commands.CheckFailure):
