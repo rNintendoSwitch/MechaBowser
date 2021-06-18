@@ -4,7 +4,6 @@ import logging
 from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
-from pymongo import message
 import config  # type: ignore
 import discord
 import pymongo
@@ -394,7 +393,7 @@ class Games(commands.Cog, name='Games'):
                     else:
                         date_strs[key] = release["release_date"].strftime("%b. %d, %Y")
 
-                if release_count == 1:
+                if dates['newest'] == dates['oldest']:  # Only 1 date
                     expected_prefix = 'Expected ' if self.parse_expected_release_date(dates['oldest']) else ""
                     switch_desc += f'\n**{expected_prefix}Release Date:** {date_strs["oldest"]}'
 
@@ -448,8 +447,13 @@ class Games(commands.Cog, name='Games'):
     async def _games_sync(self, ctx, full: bool = False):
         '''Force a database sync'''
         await ctx.reply('Running sync...')
-        count, detail_str = await self.sync_db(full)
-        return await ctx.reply(f'Finished syncing {count["games"]} games and {count["releases"]} releases {detail_str}')
+        try:
+            c, detail = await self.sync_db(full)
+            message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
+            return await ctx.reply(message)
+
+        except RatelimitException:
+            return await ctx.reply(f'{config.redTick} Unable to complete sync, ratelimiting')
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
