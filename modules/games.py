@@ -90,19 +90,19 @@ class GiantBomb:
                     if offset >= int(resp_json['number_of_total_results']):  # releases returns this as a str
                         break  # no more results
 
-    # async def fetch_item(self, path: Literal['game', 'release'], guid: str) -> Optional[dict]:
-    #     if path not in ['game', 'release']:
-    #         raise ValueError(f'invalid path: {path}')
+    async def fetch_item(self, path: Literal['game', 'release'], guid: str) -> Optional[dict]:
+        if path not in ['game', 'release']:
+            raise ValueError(f'invalid path: {path}')
 
-    #     async with aiohttp.ClientSession() as session:
-    #         self.raise_for_ratelimit()
+        async with aiohttp.ClientSession() as session:
+            self.raise_for_ratelimit(path)
 
-    #         params = {'api_key': self.api_key, 'format': 'json'}
-    #         async with session.get(f'{self.BASE_URL}/{path}/{guid}', params=params) as resp:
-    #             resp.raise_for_status()
-    #             resp_json = await resp.json()
+            params = {'api_key': self.api_key, 'format': 'json'}
+            async with session.get(f'{self.BASE_URL}/{path}/{guid}', params=params) as resp:
+                resp.raise_for_status()
+                resp_json = await resp.json()
 
-    #             return resp_json['results'] if resp_json['results'] else None
+                return resp_json['results'] if resp_json['results'] else None
 
 
 class Games(commands.Cog, name='Games'):
@@ -309,6 +309,30 @@ class Games(commands.Cog, name='Games'):
         # Has month, day, and year:
         return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime.datetime(year, month, day)
 
+    async def fetch_developers_publishers(
+        self, type: Literal['games', 'releases'], guid: str
+    ) -> Tuple[Optional[list], Optional[list]]:
+        if type not in ['game', 'release']:
+            raise ValueError(f'invalid type: {type}')
+
+        db_item = self.db.find_one({'_type': type, 'guid': guid})
+
+        if not db_item:
+            return None, None
+
+        if '_developers' in db_item and '_publishers' in db_item:  # Already cached
+            return db_item['_developers'], db_item['_publishers']
+
+        item_details = await self.GiantBomb.fetch_item(type, guid)
+        developers = item_details['developers'] if 'developers' in item_details else []
+        publishers = item_details['publishers'] if 'publishers' in item_details else []
+
+        self.db.update_one(
+            {'_type': type, 'guid': guid}, {'$set': {'_developers': developers, '_publishers': publishers}}
+        )
+
+        return developers, publishers
+
     @commands.group(name='games', aliases=['game'], invoke_without_command=True)
     async def _games(self, ctx):
         '''Search for games or check search database status'''
@@ -343,9 +367,17 @@ class Games(commands.Cog, name='Games'):
 
             embed.set_footer(text=f'{result["score"] }% confident{alias_str} ⯁ Entry last updated')
 
-            # Build info about overall game release
-            game_desc = '**Developer(s):** TODO'
-            game_desc += '\n**Publisher(s):** TODO'
+            # Build developers/publisher info
+            try:
+                gme_devs, gme_pubs = await self.fetch_developers_publishers('game', result['guid'])
+                gme_dev_str = ', '.join([x["name"] for x in gme_devs])
+                gme_pub_str = ', '.join([x["name"] for x in gme_pubs])
+
+                game_desc = f'**Developer{"" if len(gme_devs) == 1 else "s"}:** {gme_dev_str}'
+                game_desc += f'\n**Publisher{"" if len(gme_pubs) == 1 else "s"}:** {gme_pub_str}'
+            except RatelimitException:
+                game_desc = f'**Developers:** *Unavailable*'
+                game_desc += f'\n**Publishers:** *Unavailable*'
 
             # Build release date line
             if self.parse_expected_release_date(game):
@@ -364,6 +396,9 @@ class Games(commands.Cog, name='Games'):
                 releases = self.db.find({'_type': 'release', 'game.id': game['id']})
 
                 dates = {'oldest': None, 'newest': releases[0]}
+                ratelimited = False
+                dev_counter = collections.Counter()
+                pub_counter = collections.Counter()
 
                 for release in releases:
                     release['_date'] = release['release_date'] or self.parse_expected_release_date(release)
@@ -378,12 +413,29 @@ class Games(commands.Cog, name='Games'):
                     if release['_date'] > dates['newest']['_date']:
                         dates['newest'] = release
 
+                    try:
+                        rel_devs, rel_pubs = await self.fetch_developers_publishers('release', release['guid'])
+                        dev_counter.update([x["name"] for x in rel_devs])
+                        pub_counter.update([x["name"] for x in rel_pubs])
+
+                    except RatelimitException:
+                        ratelimited = True
+
                 switch_desc = (
                     f'[**{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}**]'
                     f'({game["site_detail_url"]}releases)'
                 )
-                switch_desc += '\n**Developer(s):** TODO'
-                switch_desc += '\n**Publisher(s):** TODO'
+
+                # Render developers/publisher info
+                if not ratelimited:
+                    devs_common = [n[0] for n in dev_counter.most_common()]
+                    pubs_common = [n[0] for n in pub_counter.most_common()]
+
+                    switch_desc += f'\n**Developer{"" if len(devs_common) == 1 else "s"}:** {", ".join(devs_common)}'
+                    switch_desc += f'\n**Publisher{"" if len(pubs_common) == 1 else "s"}:** {", ".join(pubs_common)}'
+                else:
+                    switch_desc += f'\n**Developers:** *Unavailable*'
+                    switch_desc += f'\n**Publishers:** *Unavailable*'
 
                 # Build release date line
                 date_strs = {}
