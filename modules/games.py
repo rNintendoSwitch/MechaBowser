@@ -12,7 +12,6 @@ import token_bucket
 from dateutil import parser
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
-from pymongo import message
 
 import tools  # type: ignore
 
