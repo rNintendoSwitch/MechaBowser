@@ -314,6 +314,19 @@ class Games(commands.Cog, name='Games'):
         # Has month, day, and year:
         return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime.datetime(year, month, day)
 
+    def get_image_url(self, guid: str, type: str) -> Union[str, None]:
+        game = self.db.find_one({'_type': 'game', 'guid': guid}, projection={'image': 1})
+
+        if not game or 'image' not in game or type not in game['image']:
+            return None
+
+        url = game['image'][type]
+
+        if 'gb_default' in url:
+            return None
+
+        return url
+
     async def fetch_developers_publishers(
         self, type: Literal['games', 'releases'], guid: str
     ) -> Tuple[Optional[list], Optional[list]]:
@@ -361,10 +374,13 @@ class Games(commands.Cog, name='Games'):
             )
             embed.set_author(
                 name='Data via GiantBomb',
-                url='https://www.giantbomb.com/games/',
+                url=f'https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}',
                 icon_url='https://www.giantbomb.com/a/bundles/giantbombsite/images/win8pin.png',
             )
-            embed.set_thumbnail(url=game['image']['small_url'])
+
+            image = self.get_image_url(result['guid'], 'small_url')
+            if image:
+                embed.set_thumbnail(url=image)
 
             # Build footer; if an match was an alias/release name, add it to footer
             has_alias = (result['name'] != name) and (result['name'] != game['name'])
@@ -484,7 +500,8 @@ class Games(commands.Cog, name='Games'):
             title='Game Search Database Status',
             description=(
                 'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api). Please '
-                'contribute corrections of any data inaccuracies to [their wiki](https://www.giantbomb.com/games/).'
+                'contribute corrections of any data inaccuracies to '
+                f'[their wiki](https://www.giantbomb.com/games/?game_filter[platform]={GIANTBOMB_NSW_ID}).'
             ),
         )
 
