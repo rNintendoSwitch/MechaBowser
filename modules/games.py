@@ -261,22 +261,20 @@ class Games(commands.Cog, name='Games'):
         releases_cursor = self.db.find({'_type': 'release', 'game.id': game['id']}, projection={'name': 1})
         release_names = [release['name'] for release in list(releases_cursor)] if releases_cursor else []
 
-        # If all releases share a common root, use the common name of the releases, otherwise use the game name.
-        # This approch might fail for games with completely diffrent names like "Pokemon Sword" and "Pokemon Shield",
-        # so we also ignore games with a slash inn the name.
-        if release_names and not ('/' in game['name']):
-            # Get common starting word for releases name, Adapted from:
-            # https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
-            names = [re.sub('[^0-9a-zA-Z ]+', '', r.lower()) for r in release_names]  # Make lowercase and strip puncts.
-            words = [n.split(' ') for n in names]
-            common_start_words = words[0][: ([min([x[0] == elem for elem in x]) for x in zip(*words)] + [0]).index(0)]
+        if not release_names:
+            return game['name']
 
-            # Access the words in the name of a release to preserve casing and punctuation
-            str = ' '.join(release_names[0].split(' ')[: len(common_start_words)])
-            str = re.sub('[^0-9a-zA-Z ]+$', '', str)  # String end punctuation
-            return str
+        names = [re.sub('[^0-9a-zA-Z ]+', '', r.lower()) for r in release_names]  # Make lowercase and strip puncts.
+        words = [n.split(' ') for n in names]
+        shortest = min(words, key=len)
 
-        return game['name']
+        if any([name[: len(shortest)] != shortest for name in words]):
+            return game['name']
+
+        # Access the words in the name of a release to preserve casing and punctuation
+        str = ' '.join(release_names[0].split(' ')[: len(shortest)])
+        str = re.sub(':$', '', str)  # Remove string end colons
+        return str
 
     def parse_expected_release_date(self, item: dict, string: bool = False) -> Union[str, datetime.datetime, None]:
         if item is None:
