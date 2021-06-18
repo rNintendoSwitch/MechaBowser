@@ -2,6 +2,7 @@ import calendar
 import collections
 import datetime
 import logging
+import re
 from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
@@ -264,7 +265,7 @@ class Games(commands.Cog, name='Games'):
         if release_names:
             # Get common starting word for releases name, Adapted from:
             # https://code.activestate.com/recipes/252177-find-the-common-beginning-in-a-list-of-strings/#c10
-            names = [r.lower() for r in release_names]
+            names = [re.sub('[^0-9a-zA-Z]+', '', r.lower()) for r in release_names]
             words = [n.split(' ') for n in names]
             common_start_words = words[0][: ([min([x[0] == elem for elem in x]) for x in zip(*words)] + [0]).index(0)]
             common_start = ' '.join(common_start_words)
@@ -373,11 +374,11 @@ class Games(commands.Cog, name='Games'):
             # Build developers/publisher info
             try:
                 gme_devs, gme_pubs = await self.fetch_developers_publishers('game', result['guid'])
-                gme_dev_str = ', '.join([x["name"] for x in gme_devs])
-                gme_pub_str = ', '.join([x["name"] for x in gme_pubs])
+                gme_dev_str = ', '.join([x["name"] for x in gme_devs or [{'name': '*Unknown*'}]])
+                gme_pub_str = ', '.join([x["name"] for x in gme_pubs or [{'name': '*Unknown*'}]])
 
-                game_desc = f'**Developer{"" if len(gme_devs) == 1 else "s"}:** {gme_dev_str}'
-                game_desc += f'\n**Publisher{"" if len(gme_pubs) == 1 else "s"}:** {gme_pub_str}'
+                game_desc = f'**Developer{"" if len(gme_devs or []) == 1 else "s"}:** {gme_dev_str}'
+                game_desc += f'\n**Publisher{"" if len(gme_pubs or []) == 1 else "s"}:** {gme_pub_str}'
             except RatelimitException:
                 game_desc = f'**Developers:** *Unavailable*'
                 game_desc += f'\n**Publishers:** *Unavailable*'
@@ -421,8 +422,8 @@ class Games(commands.Cog, name='Games'):
 
                     try:
                         rel_devs, rel_pubs = await self.fetch_developers_publishers('release', release['guid'])
-                        dev_counter.update([x["name"] for x in rel_devs])
-                        pub_counter.update([x["name"] for x in rel_pubs])
+                        dev_counter.update([x["name"] for x in rel_devs or []])
+                        pub_counter.update([x["name"] for x in rel_pubs or []])
 
                     except RatelimitException:
                         ratelimited = True
@@ -434,8 +435,8 @@ class Games(commands.Cog, name='Games'):
 
                 # Render developers/publisher info
                 if not ratelimited:
-                    devs_common = [n[0] for n in dev_counter.most_common()]
-                    pubs_common = [n[0] for n in pub_counter.most_common()]
+                    devs_common = [n[0] for n in dev_counter.most_common()] or ['*Unknown*']
+                    pubs_common = [n[0] for n in pub_counter.most_common()] or ['*Unknown*']
 
                     switch_desc += f'\n**Developer{"" if len(devs_common) == 1 else "s"}:** {", ".join(devs_common)}'
                     switch_desc += f'\n**Publisher{"" if len(pubs_common) == 1 else "s"}:** {", ".join(pubs_common)}'
