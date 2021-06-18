@@ -239,8 +239,10 @@ class Games(commands.Cog, name='Games'):
 
             for name in names:
                 methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
+                rem_punc = re.compile('[^0-9a-zA-Z ]+')
 
-                scores = [method(name.lower(), query.lower()) for method in methods]
+                # Remove punctuation and casing for name and query
+                scores = [method(rem_punc.sub('', name.lower()), rem_punc.sub('', query.lower())) for method in methods]
                 score = sum(scores) / len(methods)
 
                 if not match['score'] or (score > match['score']):
