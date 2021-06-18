@@ -275,6 +275,9 @@ class Games(commands.Cog, name='Games'):
         return game['name']
 
     def parse_expected_release_date(self, item: dict, string: bool = False) -> Union[str, datetime.datetime, None]:
+        if item is None:
+            return None
+
         if 'original_release_date' in item and item['original_release_date']:  # Games
             return None
 
@@ -287,7 +290,7 @@ class Games(commands.Cog, name='Games'):
         day = item['expected_release_day']
 
         if not year:
-            return 'Unknown' if string else datetime.datetime(9999, 12, 31)
+            return None
 
         # Has year...
         if not month:
@@ -315,7 +318,7 @@ class Games(commands.Cog, name='Games'):
         if type not in ['game', 'release']:
             raise ValueError(f'invalid type: {type}')
 
-        db_item = self.db.find_one({'_type': type, 'guid': guid})
+        db_item = self.db.find_one({'_type': type, 'guid': guid}, projection={'_developers': 1, '_publishers': 1})
 
         if not db_item:
             return None, None
@@ -382,8 +385,10 @@ class Games(commands.Cog, name='Games'):
             # Build release date line
             if self.parse_expected_release_date(game):
                 game_desc += f'\n**Expected Release Date:** {self.parse_expected_release_date(game, True)}'
-            else:
+            elif game["original_release_date"]:
                 game_desc += f'\n**Release Date:** {game["original_release_date"].strftime("%b. %d, %Y")}'
+            else:
+                game_desc += f'\n**Release Date:** *Unknown*'
 
             if name != game['name']:  # Our preferred name is not actual name
                 game_desc = f'**Common title:** {game["name"]}\n{game_desc}'
@@ -395,7 +400,7 @@ class Games(commands.Cog, name='Games'):
             if release_count:
                 releases = self.db.find({'_type': 'release', 'game.id': game['id']})
 
-                dates = {'oldest': None, 'newest': releases[0]}
+                dates = {'oldest': None, 'newest': None}
                 ratelimited = False
                 dev_counter = collections.Counter()
                 pub_counter = collections.Counter()
@@ -403,15 +408,16 @@ class Games(commands.Cog, name='Games'):
                 for release in releases:
                     release['_date'] = release['release_date'] or self.parse_expected_release_date(release)
 
-                    if not dates['oldest']:
-                        dates['oldest'] = release
-                        dates['newest'] = release
+                    if release['_date']:
+                        if not dates['oldest']:
+                            dates['oldest'] = release
+                            dates['newest'] = release
 
-                    if release['_date'] < dates['oldest']['_date']:
-                        dates['oldest'] = release
+                        if release['_date'] < dates['oldest']['_date']:
+                            dates['oldest'] = release
 
-                    if release['_date'] > dates['newest']['_date']:
-                        dates['newest'] = release
+                        if release['_date'] > dates['newest']['_date']:
+                            dates['newest'] = release
 
                     try:
                         rel_devs, rel_pubs = await self.fetch_developers_publishers('release', release['guid'])
@@ -440,10 +446,15 @@ class Games(commands.Cog, name='Games'):
                 # Build release date line
                 date_strs = {}
                 for (key, release) in dates.items():
-                    if self.parse_expected_release_date(release):
-                        date_strs[key] = self.parse_expected_release_date(release, True)
+                    if release:
+                        if self.parse_expected_release_date(release):
+                            date_strs[key] = self.parse_expected_release_date(release, True)
+                        elif release["release_date"]:
+                            date_strs[key] = release["release_date"].strftime("%b. %d, %Y")
+                        else:
+                            date_strs[key] = "*Unknown*"
                     else:
-                        date_strs[key] = release["release_date"].strftime("%b. %d, %Y")
+                        date_strs[key] = "*Unknown*"
 
                 if dates['newest'] == dates['oldest']:  # Only 1 date
                     expected_prefix = 'Expected ' if self.parse_expected_release_date(dates['oldest']) else ""
