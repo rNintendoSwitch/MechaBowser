@@ -1,10 +1,10 @@
+import calendar
 import collections
 import datetime
 import logging
 from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
-from pymongo import message
 import config  # type: ignore
 import discord
 import pymongo
@@ -12,7 +12,7 @@ import token_bucket
 from dateutil import parser
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
-import calendar
+from pymongo import message
 
 import tools  # type: ignore
 
