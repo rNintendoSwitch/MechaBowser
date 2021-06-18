@@ -376,20 +376,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Start favorite games
         setGames = dbUser['favgames']
-        if not setGames:
-            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
-
-        else:
+        gameCount = 0
+        if setGames:
             gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
             gameTextLocations = {0: 660, 1: 725, 2: 791}
-            gameCount = 0
             gamesDb = mclient.bowser.games
 
             for game_guid in setGames:
+                gameName = self.Games.get_preferred_name(game_guid)
+
+                if not gameName:
+                    continue
+
                 gameIcon = self._cache_game_img(gamesDb, game_guid)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
-
-                gameName = self.Games.get_preferred_name(game_guid)
 
                 nameW = 120
                 nameWMax = 950
@@ -404,6 +404,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     draw.text((nameW, gameTextLocations[gameCount]), char, (80, 80, 80), font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
+
+        if gameCount == 0:  # No games rendered
+            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
