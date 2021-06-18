@@ -1,9 +1,10 @@
 import collections
 import datetime
 import logging
-from typing import Generator, Literal, Optional, Tuple
+from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
+from pymongo import message
 import config  # type: ignore
 import discord
 import pymongo
@@ -11,6 +12,7 @@ import token_bucket
 from dateutil import parser
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
+import calendar
 
 import tools  # type: ignore
 
@@ -273,6 +275,41 @@ class Games(commands.Cog, name='Games'):
 
         return game['name']
 
+    def parse_expected_release_date(self, item: dict, string: bool = False) -> Union[str, datetime.datetime, None]:
+        if 'original_release_date' in item and item['original_release_date']:  # Games
+            return None
+
+        if 'release_date' in item and item['release_date']:  # Releases
+            return None
+
+        year = item['expected_release_year']
+        month = item['expected_release_month']
+        quarter = item['expected_release_quarter']
+        day = item['expected_release_day']
+
+        if not year:
+            return 'Unknown' if string else datetime.datetime(9999, 12, 31)
+
+        # Has year...
+        if not month:
+            if not quarter:
+                # Year only:
+                return f'{year}' if string else datetime.datetime(year, 12, 31)
+
+            # Year and quarter, but no month:
+            QUARTER_END_DATES = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
+            quarter_end = QUARTER_END_DATES[quarter]
+            return f'Q{quarter} {year}' if string else datetime.datetime(year, quarter_end[0], quarter_end[1])
+
+        # Has month and year...
+        if not day:
+            # Has year and month, but no day:
+            last_day = calendar.monthrange(year, month)[1]
+            return f'{calendar.month_abbr[month]}. {year}' if string else datetime.datetime(year, month, last_day)
+
+        # Has month, day, and year:
+        return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime.datetime(year, month, day)
+
     @commands.group(name='games', aliases=['game'], invoke_without_command=True)
     async def _games(self, ctx):
         '''Search for games or check search database status'''
@@ -310,7 +347,13 @@ class Games(commands.Cog, name='Games'):
             # Build info about overall game release
             game_desc = '**Developer(s):** TODO'
             game_desc += '\n**Publisher(s):** TODO'
-            game_desc += '\n**(Expected) Release Date:** TODO'
+
+            # Build release date line
+            if self.parse_expected_release_date(game):
+                game_desc += f'\n**Expected Release Date:** {self.parse_expected_release_date(game, True)}'
+            else:
+                game_desc += f'\n**Release Date:** {game["original_release_date"].strftime("%b. %d, %Y")}'
+
             if name != game['name']:  # Our preferred name is not actual name
                 game_desc = f'**Common title:** {game["name"]}\n{game_desc}'
 
@@ -319,13 +362,49 @@ class Games(commands.Cog, name='Games'):
             # Build info about switch releases
             release_count = self.db.count({'_type': 'release', 'game.id': game['id']})
             if release_count:
+                releases = self.db.find({'_type': 'release', 'game.id': game['id']})
+
+                dates = {'oldest': None, 'newest': releases[0]}
+
+                for release in releases:
+                    release['_date'] = release['release_date'] or self.parse_expected_release_date(release)
+
+                    if not dates['oldest']:
+                        dates['oldest'] = release
+                        dates['newest'] = release
+
+                    if release['_date'] < dates['oldest']['_date']:
+                        dates['oldest'] = release
+
+                    if release['_date'] > dates['newest']['_date']:
+                        dates['newest'] = release
+
                 switch_desc = (
                     f'[**{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}**]'
                     f'({game["site_detail_url"]}releases)'
                 )
                 switch_desc += '\n**Developer(s):** TODO'
                 switch_desc += '\n**Publisher(s):** TODO'
-                game_desc += '\n**(Expected) Release Dates:** TODO'
+
+                # Build release date line
+                date_strs = {}
+                for (key, release) in dates.items():
+                    if self.parse_expected_release_date(release):
+                        date_strs[key] = self.parse_expected_release_date(release, True)
+                    else:
+                        date_strs[key] = release["release_date"].strftime("%b. %d, %Y")
+
+                if release_count == 1:
+                    expected_prefix = 'Expected ' if self.parse_expected_release_date(dates['oldest']) else ""
+                    switch_desc += f'\n**{expected_prefix}Release Date:** {date_strs["oldest"]}'
+
+                else:
+                    EXPECTED_PREFIXES = {0: '', 1: '(Expected) ', 2: 'Expected '}
+                    expected_count = [bool(self.parse_expected_release_date(x)) for _, x in dates.items()].count(True)
+                    expected_prefix = EXPECTED_PREFIXES[expected_count]
+                    date_str = f'{date_strs["oldest"]} - {date_strs["newest"]}'
+
+                    switch_desc += f'\n**{expected_prefix}Release Dates:** {date_str}'
 
                 embed.add_field(name=f'Nintendo Switch Releases', value=switch_desc, inline=False)
 
