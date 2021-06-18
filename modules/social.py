@@ -32,7 +32,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
-        self.Games = self.bot.get_cog('Games')
 
         # !profile ratelimits
         self.bucket_storage = token_bucket.MemoryStorage()
@@ -213,7 +212,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             do_recache = True
 
         if do_recache:
-            gameImgUrl = self.Games.get_image_url(guid, 'icon_url')
+            Games = self.bot.get_cog('Games')
+
+            if not Games:
+                return self.missingImage
+
+            gameImgUrl = Games.get_image_url(guid, 'icon_url')
 
             if gameImgUrl:
                 gameImg = requests.get(gameImgUrl, stream=True).raw
@@ -377,13 +381,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         # Start favorite games
         setGames = dbUser['favgames']
         gameCount = 0
+        Games = self.bot.get_cog('Games')
         if setGames:
             gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
             gameTextLocations = {0: 660, 1: 725, 2: 791}
             gamesDb = mclient.bowser.games
 
             for game_guid in setGames:
-                gameName = self.Games.get_preferred_name(game_guid)
+                if not Games:
+                    continue
+
+                gameName = Games.get_preferred_name(game_guid)
 
                 if not gameName:
                     continue
@@ -555,6 +563,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         async def _phase4(message):
             failedFetch = False
             userGames = []
+            Games = self.bot.get_cog('Games')
+
+            if not Games:
+                await message.channel.send(
+                    'Err, oops! It looks like we can reach the games system at this time! Skipping that for now...'
+                )
+                return True
 
             while len(userGames) < 3:
                 if failedFetch:
@@ -575,7 +590,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
                     return True
 
-                result = self.Games.search(response.content.strip(), True)
+                result = Games.search(response.content.strip(), True)
 
                 if result:
                     if len(userGames) == 0 and dbUser['favgames']:
@@ -585,7 +600,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         failedFetch = True
                         break
 
-                    name = self.Games.get_preferred_name(result['guid'])
+                    name = Games.get_preferred_name(result['guid'])
                     msg = f'Is **{name}** the game you are looking for? Type __yes__ or __no__'
 
                     while True:
