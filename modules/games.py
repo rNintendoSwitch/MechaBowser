@@ -273,6 +273,7 @@ class Games(commands.Cog, name='Games'):
 
         # Access the words in the name of a release to preserve casing and punctuation
         str = ' '.join(release_names[0].split(' ')[: len(shortest)])
+        str = re.sub(r' \(Digital\)$', '', str)  # Remove end digital
         str = re.sub(':$', '', str)  # Remove string end colons
         return str
 
