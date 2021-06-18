@@ -567,7 +567,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             if not Games:
                 await message.channel.send(
-                    'Err, oops! It looks like we can reach the games system at this time! Skipping that for now...'
+                    'Err, oops! It looks like we can\'t reach the games system at this time! Skipping that for now...'
                 )
                 return True
 
