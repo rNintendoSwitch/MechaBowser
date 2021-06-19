@@ -598,7 +598,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                     if result['guid'] in userGames:
                         failedFetch = True
-                        break
+                        continue
 
                     name = Games.get_preferred_name(result['guid'])
                     msg = f'Is **{name}** the game you are looking for? Type __yes__ or __no__'
