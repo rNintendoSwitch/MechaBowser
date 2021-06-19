@@ -6,6 +6,9 @@ command_prefixes = ['!', ',', '.']
 # Sentry DSN
 DSN = ''
 
+# Api Creds
+giantbomb = 'key'
+
 # Mongo Credentials
 mongoUser = 'user'
 mongoPass = 'password'

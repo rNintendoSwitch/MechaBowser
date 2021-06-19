@@ -23,61 +23,6 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 serverLogs = None
 modLogs = None
 
-# Most NintenDeals code (decommissioned 4/25/2020) was removed on 12/02/2020
-# https://github.com/rNintendoSwitch/MechaBowser/commit/3da2973f3b48548403c24d38c33cdd3a196ac409
-class Games(commands.Cog, name='Game Commands'):
-    gamesReady = False
-
-    def __init__(self, bot):
-        self.bot = bot
-        self.games = {}
-        self.gamesReady = False
-        self.session = aiohttp.ClientSession()
-
-        self.update_game_info.start()  # pylint: disable=no-member
-        logging.info('[Deals] Games task cogs loaded')
-
-    def cog_unload(self):
-        logging.info('[Deals] Attempting to cancel tasks...')
-        self.update_game_info.cancel()  # pylint: disable=no-member
-        logging.info('[Deals] Tasks exited')
-        asyncio.get_event_loop().run_until_complete(self.session.close())
-        logging.info('[Deals] Games task cogs unloaded')
-
-    async def _ready_status(self):
-        return self.gamesReady
-
-    # We still use game info for profiles
-    @tasks.loop(seconds=43200)
-    async def update_game_info(self):
-        logging.info('[Deals] Starting game fetch')
-        gameDB = mclient.bowser.games
-
-        games = gameDB.find({})
-        for game in games:
-            scores = {'metascore': game['scores']['metascore'], 'userscore': game['scores']['userscore']}
-            gameEntry = {
-                '_id': game['_id'],
-                'nsuids': game['nsuids'],
-                'titles': game['titles'],
-                'release_dates': game['release_dates'],
-                'categories': game['categories'],
-                'websites': game['websites'],
-                'scores': scores,
-                'free_to_play': game['free_to_play'],
-            }
-            self.games[game['_id']] = gameEntry
-
-        self.gamesReady = True
-        logging.info('[Deals] Finished game fetch')
-
-    @commands.cooldown(1, 15, type=commands.cooldowns.BucketType.member)
-    @commands.command(name='games', aliases=['game'])
-    async def _games(self, ctx):
-        return await ctx.send(
-            f'{ctx.author.mention} {config.redTick} Game searching and fetching has been temporarily disabled. For more information see https://www.reddit.com/r/NintendoSwitch/comments/g7w97x/'
-        )
-
 
 class ChatControl(commands.Cog, name='Utility Commands'):
     def __init__(self, bot):
@@ -1207,11 +1152,9 @@ def setup(bot):
     modLogs = bot.get_channel(config.modChannel)
 
     bot.add_cog(ChatControl(bot))
-    bot.add_cog(Games(bot))
     logging.info('[Extension] Utility module loaded')
 
 
 def teardown(bot):
     bot.remove_cog('ChatControl')
-    bot.remove_cog('Games')
     logging.info('[Extension] Utility module unloaded')

@@ -6,12 +6,12 @@ import re
 import time
 import typing
 
-import config
+import config  # type: ignore
 import discord
 import pymongo
 from discord.ext import commands, tasks
 
-import tools
+import tools  # type: ignore
 
 
 startTime = int(time.time())
@@ -28,6 +28,7 @@ class MainEvents(commands.Cog):
             self.bot.load_extension('modules.utility')
             self.bot.load_extension('modules.statistics')
             self.bot.load_extension('modules.social')
+            self.bot.load_extension('modules.games')
             try:  # Private submodule extensions
                 self.bot.load_extension('private.automod')
             except commands.errors.ExtensionNotFound:

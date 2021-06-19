@@ -9,7 +9,7 @@ import typing
 from pathlib import Path
 
 import codepoints
-import config
+import config  # type: ignore
 import discord
 import emoji_data
 import gridfs
@@ -22,7 +22,7 @@ from discord.ext import commands
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
 
-import tools
+import tools  # type: ignore
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
@@ -201,33 +201,39 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    def _cache_game_img(self, fs: gridfs.GridFS, id: str) -> Image:
+    def _cache_game_img(self, gamesDb, guid: str) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
-        if id in self.gameImgCache:
-            if time.time() > self.gameImgCache[id][EXPIRY]:  # Expired in cache
+        if guid in self.gameImgCache:
+            if time.time() > self.gameImgCache[guid][EXPIRY]:  # Expired in cache
                 do_recache = True
         else:  # Not in cache
             do_recache = True
 
         if do_recache:
-            if fs.exists(id):
-                gameImg = fs.get(id)
+            Games = self.bot.get_cog('Games')
+
+            if not Games:
+                return self.missingImage
+
+            gameImgUrl = Games.get_image_url(guid, 'icon_url')
+
+            if gameImgUrl:
+                gameImg = requests.get(gameImgUrl, stream=True).raw
                 gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
             else:
                 gameIcon = None
 
-            self.gameImgCache[id] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
+            self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
 
-        if self.gameImgCache[id][IMAGE] is None:
+        if self.gameImgCache[guid][IMAGE] is None:
             return self.missingImage
 
-        return self.gameImgCache[id][IMAGE]
+        return self.gameImgCache[guid][IMAGE]
 
     async def _generate_profile_card(self, member: discord.Member) -> discord.File:
         db = mclient.bowser.users
-        fs = gridfs.GridFS(mclient.bowser)
         dbUser = db.find_one({'_id': member.id})
 
         pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
@@ -374,27 +380,24 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Start favorite games
         setGames = dbUser['favgames']
-        if not setGames:
-            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
-
-        else:
+        gameCount = 0
+        Games = self.bot.get_cog('Games')
+        if setGames:
             gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
             gameTextLocations = {0: 660, 1: 725, 2: 791}
-            gameCount = 0
             gamesDb = mclient.bowser.games
-            for game in setGames:
-                gameDoc = gamesDb.find_one({'_id': game})
-                gameIcon = self._cache_game_img(fs, game)
+
+            for game_guid in setGames:
+                if not Games:
+                    continue
+
+                gameName = Games.get_preferred_name(game_guid)
+
+                if not gameName:
+                    continue
+
+                gameIcon = self._cache_game_img(gamesDb, game_guid)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
-
-                if gameDoc['titles']['NA']:
-                    gameName = gameDoc['titles']['NA']
-
-                elif gameDoc['titles']['EU']:
-                    gameName = gameDoc['titles']['EU']
-
-                else:
-                    gameName = gameDoc['titles']['JP']
 
                 nameW = 120
                 nameWMax = 950
@@ -409,6 +412,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     draw.text((nameW, gameTextLocations[gameCount]), char, (80, 80, 80), font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
+
+        if gameCount == 0:  # No games rendered
+            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
@@ -472,7 +478,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
         phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
         phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
-        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`\n\nNote: Games released after April 2020 may not be selected due to an API issue. A rebuild of our games system is currently in progress to address this limitation.'
+        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
         phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
 
         # Lookup tables of values dependant on if user has setup their profile
@@ -555,71 +561,60 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return False
 
         async def _phase4(message):
-            gameCnt = 0
             failedFetch = False
             userGames = []
-            while gameCnt < 3:
+            Games = self.bot.get_cog('Games')
+
+            if not Games:
+                await message.channel.send(
+                    'Err, oops! It looks like we can\'t reach the games system at this time! Skipping that for now...'
+                )
+                return True
+
+            while len(userGames) < 3:
                 if failedFetch:
                     await message.channel.send(
                         f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n'
-                        + phase4.format(gameCnt)
+                        + phase4.format(len(userGames))
                     )
                 else:
-                    await message.channel.send(phase4.format(gameCnt))
-                failedFetch = False
+                    await message.channel.send(phase4.format(len(userGames)))
+                    failedFetch = False
 
                 response = await self.bot.wait_for('message', timeout=180, check=check)
                 if response.content.lower().strip() == 'skip':
                     break
+
                 if response.content.lower().strip() == 'reset':
                     db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
                     await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
                     return True
 
-                content = response.content.lower().strip()
+                result = Games.search(response.content.strip(), True)
 
-                NintenDeals = self.bot.get_cog('Game Commands')
-                if not NintenDeals.gamesReady:
-                    waitMsg = await message.channel.send(
-                        f'{config.loading} Please wait a few moments, getting info on that game'
-                    )
-                    while not NintenDeals.gamesReady:
-                        await asyncio.sleep(0.5)
-
-                    await waitMsg.delete()
-
-                games = NintenDeals.games
-
-                gameObj = None
-                titleList = {}
-
-                for gameEntry in games.values():
-                    for title in gameEntry['titles'].values():
-                        if not title or title in titleList.keys():
-                            continue
-                        titleList[title] = gameEntry['_id']
-
-                results = process.extract(content, titleList.keys(), limit=2)
-                if results and results[0][1] >= 86:
-                    if gameCnt == 0 and dbUser['favgames']:
+                if result:
+                    if len(userGames) == 0 and dbUser['favgames']:
                         db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
-                    msg = f'Is **{results[0][0]}** the game you are looking for? Type __yes__ or __no__'
+
+                    if result['guid'] in userGames:
+                        failedFetch = True
+                        break
+
+                    name = Games.get_preferred_name(result['guid'])
+                    msg = f'Is **{name}** the game you are looking for? Type __yes__ or __no__'
+
                     while True:
                         await message.channel.send(msg)
+
                         checkResp = await self.bot.wait_for('message', timeout=120, check=check)
                         if checkResp.content.lower().strip() in ['yes', 'y']:
-                            gameObj = games[titleList[results[0][0]]]
-                            if gameObj['_id'] in userGames:
-                                failedFetch = True
-                                break
-
-                            db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': gameObj['_id']}})
-                            gameCnt += 1
-                            userGames.append(gameObj['_id'])
+                            db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': result['guid']}})
+                            userGames.append(result['guid'])
                             break
 
                         elif checkResp.content.lower().strip() in ['no', 'n']:
                             break
+
                         msg = "Your input was not __yes__ or __no__. Please say exactly __yes__ or __no__."
 
                 else:
