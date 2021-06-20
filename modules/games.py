@@ -1,6 +1,7 @@
 import calendar
 import collections
 import datetime
+import io
 import logging
 import re
 from typing import Generator, Literal, Optional, Tuple, Union
@@ -315,7 +316,7 @@ class Games(commands.Cog, name='Games'):
         # Has month, day, and year:
         return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime.datetime(year, month, day)
 
-    def get_image_url(self, guid: str, type: str) -> Union[str, None]:
+    async def get_image(self, guid: str, type: str, as_url: bool = False) -> Union[str, None]:
         game = self.db.find_one({'_type': 'game', 'guid': guid}, projection={'image': 1})
 
         if not game or 'image' not in game or type not in game['image']:
@@ -326,7 +327,14 @@ class Games(commands.Cog, name='Games'):
         if 'gb_default' in url:
             return None
 
-        return url
+        if as_url:
+            return url
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                resp.raise_for_status()
+                data = await resp.read()
+                return io.BytesIO(data)
 
     async def fetch_developers_publishers(
         self, type: Literal['games', 'releases'], guid: str
@@ -383,7 +391,7 @@ class Games(commands.Cog, name='Games'):
                 icon_url='https://www.giantbomb.com/a/bundles/giantbombsite/images/win8pin.png',
             )
 
-            image = self.get_image_url(result['guid'], 'small_url')
+            image = await self.get_image(result['guid'], 'small_url', as_url=True)
             if image:
                 embed.set_thumbnail(url=image)
 

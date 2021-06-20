@@ -201,7 +201,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    def _cache_game_img(self, gamesDb, guid: str) -> Image:
+    async def _cache_game_img(self, gamesDb, guid: str) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
@@ -217,12 +217,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if not Games:
                 return self.missingImage
 
-            gameImgUrl = Games.get_image_url(guid, 'icon_url')
+            try:
+                gameImg = await Games.get_image(guid, 'icon_url')
 
-            if gameImgUrl:
-                gameImg = requests.get(gameImgUrl, stream=True).raw
-                gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
-            else:
+                if gameImg:
+                    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+                else:
+                    gameIcon = None
+
+            except Exception as e:
+                logging.error('Error at %s', 'division', exc_info=e)
                 gameIcon = None
 
             self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
@@ -396,7 +400,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if not gameName:
                     continue
 
-                gameIcon = self._cache_game_img(gamesDb, game_guid)
+                gameIcon = await self._cache_game_img(gamesDb, game_guid)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 120
