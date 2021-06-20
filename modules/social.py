@@ -226,7 +226,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     gameIcon = None
 
             except Exception as e:
-                logging.error('Error at %s', 'division', exc_info=e)
+                logging.error('Error caching game icon', exc_info=e)
                 gameIcon = None
 
             self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
@@ -390,6 +390,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
             gameTextLocations = {0: 660, 1: 725, 2: 791}
             gamesDb = mclient.bowser.games
+
+            setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
+            setGames = setGames[:3]  # Limit to 3 results, just in case
 
             for game_guid in setGames:
                 if not Games:
