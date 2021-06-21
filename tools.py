@@ -631,7 +631,7 @@ async def send_paginated_embed(
         # Check user reaction
         def check(reaction, user):
             if user.id == bot.user.id:
-                False
+                return False
             if owner and user.id != owner.id:
                 return False
 
