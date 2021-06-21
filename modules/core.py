@@ -374,7 +374,7 @@ class MainEvents(commands.Cog):
             return
 
         if message.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
-            logging.debug(f'Discarding bad message {message.channel.type}')
+            logging.debug(f'Discarding non guild message {message.channel.type} {message.id}')
             return
 
         db = mclient.bowser.messages
@@ -396,6 +396,10 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):  # TODO: Work with archives channel attribute to list channels
+        if messages[0].channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+            logging.debug(f'Discarding non guild bulk delete {messages[0].channel.type}  {messages[0].id}')
+            return
+
         await asyncio.sleep(10)  # Give chance for clean command to finish and discord to process delete
         db = mclient.bowser.archive
         checkStamp = int(
@@ -419,8 +423,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
-        if payload.channel_id in [757411216774791189, 769665679593832458, 769665954241970186, 769666021706432532]:
-            return  # temp ignorance of acevent channels
         if payload.cached_message:
             if payload.cached_message.type != discord.MessageType.default or payload.cached_message.author.bot:
                 return  # No system messages
@@ -433,11 +435,12 @@ class MainEvents(commands.Cog):
             content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
 
         else:
+            # Message is not in ram cache, pull from DB or ignore if missing
             db = mclient.bowser.messages
             dbMessage = db.find_one({'_id': payload.message_id, 'channel': payload.channel_id})
             if not dbMessage:
                 logging.warning(
-                    f'[Core] Missing message metadata for deletion of {payload.channel_id}-{payload.message_id}'
+                    f'[Core] Missing message metadata for deletion of {payload.channel_id}/{payload.message_id}'
                 )
                 return
 
@@ -469,6 +472,10 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
+        if before.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+            logging.debug(f'Discarding non guild edit {before.channel.type} {before.id}')
+            return
+
         if before.content == after.content or before.author.bot:
             return
 
