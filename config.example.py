@@ -59,6 +59,7 @@ noReactions: int = reaction_restricted
 noEmbeds: int = attachments_and_embeds_restricted
 noEvents: int = event_restricted
 voiceTextAccess: int = voice_chat
+verified: int = verified_role
 
 # Emoji IDs
 loading = '<a:loading:659107120419045403>'

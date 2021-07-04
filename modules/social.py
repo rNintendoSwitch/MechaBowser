@@ -18,6 +18,7 @@ import pymongo
 import pytz
 import requests
 import token_bucket
+import yaml
 from discord.ext import commands
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
@@ -56,10 +57,30 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 'small': ('Light', 30),
             }
         )
-        self.pfpBackground = Image.open('resources/pfp-background.png').convert('RGBA')
-        self.profileStatic = self._init_profile_static()
-        self.missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-        self.fsImgCache = {}
+
+        with open("resources/profiles/layout/themes.yml", 'r') as stream:
+            self.themes = yaml.safe_load(stream)
+
+        with open("resources/profiles/borders/borders.yml", 'r') as stream:
+            self.borders = yaml.safe_load(stream)
+
+        with open("resources/profiles/backgrounds/backgrounds.yml", 'r') as stream:
+            self.backgrounds = yaml.safe_load(stream)
+
+            for bg_name in self.backgrounds.keys():
+                self.backgrounds[bg_name]["image"] = self._render_background_image(bg_name)
+
+        for theme in self.themes.keys():
+            self.themes[theme]['pfpBackground'] = Image.open(
+                'resources/profiles/layout/{theme}/pfp-background.png'
+            ).convert('RGBA')
+            self.themes[theme]['missingImage'] = (
+                Image.open('resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((45, 45))
+            )
+            self.themes[theme]['profileStatic'] = self._init_profile_static(theme)  # Do this last
+
+        self.trophyImgCache = {}
+        self.borderImgCache = {}
         self.flagImgCache = {}
         self.gameImgCache = {}
 
@@ -141,44 +162,57 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     def _draw_text(self, draw: ImageDraw, xy, text: str, fill, fonts: dict):
         font = fonts[self._determine_cjk_font(text)]
-        return draw.text(xy, text, fill, font)
+        return draw.text(xy, text, tuple(fill), font)
 
-    def _init_profile_static(self) -> Image:
+    def _init_profile_static(self, theme_name: str) -> Image:
         '''Inits static elements above background for profile card precache'''
+        theme = self.themes[theme_name]
+
         fonts = self.profileFonts
         img = Image.new('RGBA', self.pfpBackground.size, (0, 0, 0, 0))
 
-        snoo = Image.open('resources/snoo.png').convert("RGBA")
-        trophyUnderline = Image.open('resources/trophy-case-underline.png').convert("RGBA")
-        gameUnderline = Image.open('resources/favorite-games-underline.png').convert("RGBA")
+        snoo = Image.open('resources/profiles/layout/snoo.png').convert("RGBA")
+        trophyUnderline = Image.open('resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert("RGBA")
+        gameUnderline = Image.open('resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
+            "RGBA"
+        )
 
         img.paste(snoo, (50, 50), snoo)
         img.paste(trophyUnderline, (1150, 100), trophyUnderline)
         img.paste(gameUnderline, (60, 645), gameUnderline)
 
         draw = ImageDraw.Draw(img)
-        self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), fonts['meta'])
-        self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
-        self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (435, 470), 'Messages sent', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (790, 470), 'Local time', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
-        self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
+        self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', theme['branding'], fonts['meta'])
+        self._draw_text(draw, (150, 90), 'User Profile', theme['secondary_heading'], fonts['meta'])
+        self._draw_text(draw, (60, 470), 'Member since', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (435, 470), 'Messages sent', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (790, 470), 'Local time', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (60, 595), 'Favorite games', theme['primary_heading'], fonts['medium'])
+        self._draw_text(draw, (1150, 45), 'Trophy case', theme['primary_heading'], fonts['medium'])
 
         return img
 
-    def _cache_fs_image(self, type: str, name: str) -> Image:
-        if type == 'background':
-            filename = 'resources/profile-{}.png'.format(name)
-        elif type == 'trophy':
-            filename = 'resources/trophies/{}.png'.format(name)
-        else:
-            raise ValueError('Unupported type: ' + type)
+    def _render_background_image(self, name: str) -> Image:
+        bg = self.backgrounds[name]
+        trophy_bg_path = f'resources/profiles/layout/{bg["theme"]}/trophy-bg/{bg["trophy-bg-weight"]}.png'
+        trophy_bg = Image.open(trophy_bg_path).convert("RGBA")
 
-        if not filename in self.fsImgCache:
-            self.fsImgCache[filename] = Image.open(filename).convert("RGBA")
+        img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
+        img.paste(trophy_bg, (0, 0), trophy_bg)
 
-        return self.fsImgCache[filename]
+        return img
+
+    def _cache_trophy_image(self, name: str) -> Image:
+        if not name in self.trophyImgCache:
+            self.trophyImgCache[name] = Image.open('resources/profile/trophies/{}.png'.format(name)).convert("RGBA")
+
+        return self.trophyImgCache[name]
+
+    def _cache_border_image(self, name: str) -> Image:
+        if not name in self.borderImgCache:
+            self.borderImgCache[name] = Image.open('resources/profile/boarders/{}.png'.format(name)).convert("RGBA")
+
+        return self.borderImgCache[name]
 
     def _cache_flag_image(self, name) -> Image:
         SHADOW_OFFSET = 2
@@ -241,13 +275,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
+        background = self.backgrounds
+        theme = self.themes[self.backgrounds["theme"]]
+
         pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
-        background = self._cache_fs_image('background', dbUser['background'])
 
         card = self.pfpBackground.copy()
         card.paste(pfp, (50, 170), pfp)
-        card.paste(background, mask=background)
+        card.paste(background["image"], mask=background["image"])
         card.paste(self.profileStatic, mask=self.profileStatic)
 
         guild = member.guild
@@ -268,7 +304,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             else:
                 if memberName:
                     W, _ = draw.textsize(memberName, font=member_name_font)
-                    draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
+                    draw.text((nameW, 215), memberName, tuple(theme["primary"]), member_name_font)
                     nameW += W
                     memberName = ''
 
@@ -283,9 +319,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW += 46
 
         if memberName:  # Leftovers, text
-            draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
+            draw.text((nameW, 215), memberName, theme["primary"], member_name_font)
 
-        self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
+        self._draw_text(draw, (350, 275), '#' + member.discriminator, theme["secondary"], fonts['subtext'])
 
         if dbUser['regionFlag']:
             regionImg = self._cache_flag_image(dbUser['regionFlag'])
@@ -293,11 +329,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Friend code
         if dbUser['friendcode']:
-            self._draw_text(draw, (350, 330), dbUser['friendcode'], (87, 111, 251), fonts['subtext'])
+            self._draw_text(draw, (350, 330), dbUser['friendcode'], theme["friend_code"], fonts['subtext'])
 
         # Start customized content -- stats
         message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
-        self._draw_text(draw, (435, 505), message_count, (80, 80, 80), fonts['medium'])
+        self._draw_text(draw, (435, 505), message_count, theme["primary"], fonts['medium'])
 
         joins = dbUser['joins']
         joins.sort()
@@ -306,10 +342,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             joinDateF = joinDate.strftime('%b. %-d, %Y')
         except:
             joinDateF = joinDate.strftime('%b. %d, %Y')
-        self._draw_text(draw, (60, 505), joinDateF, (80, 80, 80), fonts['medium'])
+        self._draw_text(draw, (60, 505), joinDateF, theme["primary"], fonts['medium'])
 
         if not dbUser['timezone']:
-            self._draw_text(draw, (790, 505), 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:
             tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
@@ -321,7 +357,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
                 tzOffset = tzOffset[0] + tzOffset[2:]
 
-            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', (80, 80, 80), fonts['medium'])
+            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', theme["primary"], fonts['medium'])
 
         # Start trophies
         trophyLocations = {
@@ -346,6 +382,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for x in dbUser:
                 trophies.append(x)
 
+        if member.bot:
+            trophies.append('bot')
+
         if member.id == guild.owner.id:  # Server owner
             trophies.append('owner')
 
@@ -369,6 +408,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if guild.get_role(config.boostRole) in member.roles:  # Booster role
             trophies.append('booster')
 
+        if guild.get_role(config.verified) in member.roles:  # Verified role
+            trophies.append('verified')
+
         if len(trophies) < 15:  # Check for additional non-prefered trophies
             for x in dbUser['trophies']:
                 if x not in trophies:
@@ -378,10 +420,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             trophies.append('blank')
 
         trophyNum = 0
+        useBorder = self.borders['default']
         for x in trophies:
-            trophyBadge = self._cache_fs_image('trophy', x)
+            if x in self.borders['trophy_borders']:
+                useBorder = x
+
+            trophyBadge = self._cache_trophy_image(x)
             card.paste(trophyBadge, trophyLocations[trophyNum], trophyBadge)
             trophyNum += 1
+
+        # boarder!
+        boarder = self._cache_border_image(useBorder)
+        card.paste(boarder, (0, 0), boarder)
 
         # Start favorite games
         setGames = dbUser['favgames']
@@ -414,15 +464,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 for char in gameName:
                     if nameW >= nameWMax:
-                        draw.text((nameW, gameTextLocations[gameCount]), '...', (80, 80, 80), font=game_name_font)
+                        draw.text((nameW, gameTextLocations[gameCount]), '...', theme["primary"], font=game_name_font)
                         break
 
-                    draw.text((nameW, gameTextLocations[gameCount]), char, (80, 80, 80), font=game_name_font)
+                    draw.text((nameW, gameTextLocations[gameCount]), char, theme["primary"], font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
 
         if gameCount == 0:  # No games rendered
-            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (60, 665), 'Not specified', theme["secondary_heading"], fonts['medium'])
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
