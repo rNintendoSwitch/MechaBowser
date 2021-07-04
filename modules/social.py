@@ -245,7 +245,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    async def _cache_game_img(self, gamesDb, guid: str) -> Image:
+    async def _cache_game_img(self, gamesDb, guid: str, theme) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
@@ -259,7 +259,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             Games = self.bot.get_cog('Games')
 
             if not Games:
-                return self.missingImage
+                return theme['missingImage']
 
             try:
                 gameImg = await Games.get_image(guid, 'icon_url')
@@ -276,7 +276,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
 
         if self.gameImgCache[guid][IMAGE] is None:
-            return self.missingImage
+            return theme['missingImage']
 
         return self.gameImgCache[guid][IMAGE]
 
@@ -477,7 +477,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if not gameName:
                     continue
 
-                gameIcon = await self._cache_game_img(gamesDb, game_guid)
+                gameIcon = await self._cache_game_img(gamesDb, game_guid), theme
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 120
