@@ -58,13 +58,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             }
         )
 
-        with open("resources/profiles/layout/themes.yml", 'r') as stream:
+        with open("resources/profiles/themes.yml", 'r') as stream:
             self.themes = yaml.safe_load(stream)
 
-        with open("resources/profiles/borders/borders.yml", 'r') as stream:
+        with open("resources/profiles/borders.yml", 'r') as stream:
             self.borders = yaml.safe_load(stream)
 
-        with open("resources/profiles/backgrounds/backgrounds.yml", 'r') as stream:
+        with open("resources/profiles/backgrounds.yml", 'r') as stream:
             self.backgrounds = yaml.safe_load(stream)
 
             for bg_name in self.backgrounds.keys():
@@ -72,10 +72,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         for theme in self.themes.keys():
             self.themes[theme]['pfpBackground'] = Image.open(
-                'resources/profiles/layout/{theme}/pfp-background.png'
+                f'resources/profiles/layout/{theme}/pfp-background.png'
             ).convert('RGBA')
             self.themes[theme]['missingImage'] = (
-                Image.open('resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((45, 45))
+                Image.open(f'resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((45, 45))
             )
             self.themes[theme]['profileStatic'] = self._init_profile_static(theme)  # Do this last
 
@@ -169,11 +169,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         theme = self.themes[theme_name]
 
         fonts = self.profileFonts
-        img = Image.new('RGBA', self.pfpBackground.size, (0, 0, 0, 0))
+        img = Image.new('RGBA', theme['pfpBackground'].size, (0, 0, 0, 0))
 
         snoo = Image.open('resources/profiles/layout/snoo.png').convert("RGBA")
-        trophyUnderline = Image.open('resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert("RGBA")
-        gameUnderline = Image.open('resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
+        trophyUnderline = Image.open(f'resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert(
+            "RGBA"
+        )
+        gameUnderline = Image.open(f'resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
             "RGBA"
         )
 
@@ -194,23 +196,30 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     def _render_background_image(self, name: str) -> Image:
         bg = self.backgrounds[name]
+
+        img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
+
         trophy_bg_path = f'resources/profiles/layout/{bg["theme"]}/trophy-bg/{bg["trophy-bg-weight"]}.png'
         trophy_bg = Image.open(trophy_bg_path).convert("RGBA")
 
-        img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
-        img.paste(trophy_bg, (0, 0), trophy_bg)
+        final = Image.alpha_composite(img, trophy_bg.resize(img.size))
+        return final
 
-        return img
+    def _cache_trophy_image(self, name: str, theme_name: str) -> Image:
+        if name is None:
+            name = f'none-{theme_name}'
+            path = f'resources/profiles/layout/{theme_name}/trophy-blank.png'
+        else:
+            path = 'resources/profiles/trophies/{}.png'.format(name)
 
-    def _cache_trophy_image(self, name: str) -> Image:
         if not name in self.trophyImgCache:
-            self.trophyImgCache[name] = Image.open('resources/profile/trophies/{}.png'.format(name)).convert("RGBA")
+            self.trophyImgCache[name] = Image.open(path).convert("RGBA")
 
         return self.trophyImgCache[name]
 
     def _cache_border_image(self, name: str) -> Image:
         if not name in self.borderImgCache:
-            self.borderImgCache[name] = Image.open('resources/profile/boarders/{}.png'.format(name)).convert("RGBA")
+            self.borderImgCache[name] = Image.open('resources/profiles/borders/{}.png'.format(name)).convert("RGBA")
 
         return self.borderImgCache[name]
 
@@ -275,16 +284,28 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
-        background = self.backgrounds
-        theme = self.themes[self.backgrounds["theme"]]
+        # Migrate old backgronds
+        if 'default' in dbUser['backgrounds']:
+            backgrounds = list(dbUser['backgrounds'])
+            backgrounds.remove('default')
+            backgrounds.insert(0, 'default-dark')
+            backgrounds.insert(0, 'default-light')
+
+            db.update_one({'_id': member.id}, {'$set': {'backgrounds': backgrounds}})
+
+        if dbUser['background'] == 'default':
+            db.update_one({'_id': member.id}, {'$set': {'background': 'default-light'}})
+
+        background = self.backgrounds[dbUser['background']]
+        theme = self.themes[background["theme"]]
 
         pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
 
-        card = self.pfpBackground.copy()
+        card = theme['pfpBackground'].copy()
         card.paste(pfp, (50, 170), pfp)
         card.paste(background["image"], mask=background["image"])
-        card.paste(self.profileStatic, mask=self.profileStatic)
+        card.paste(theme['profileStatic'], mask=theme['profileStatic'])
 
         guild = member.guild
         draw = ImageDraw.Draw(card)
@@ -319,7 +340,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW += 46
 
         if memberName:  # Leftovers, text
-            draw.text((nameW, 215), memberName, theme["primary"], member_name_font)
+            draw.text((nameW, 215), memberName, tuple(theme["primary"]), member_name_font)
 
         self._draw_text(draw, (350, 275), '#' + member.discriminator, theme["secondary"], fonts['subtext'])
 
@@ -417,19 +438,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     trophies.append(x)
 
         while len(trophies) < 15:
-            trophies.append('blank')
+            trophies.append(None)
 
         trophyNum = 0
-        useBorder = self.borders['default']
+        useBorder = None
         for x in trophies:
-            if x in self.borders['trophy_borders']:
-                useBorder = x
+            if useBorder is None and x in self.borders['trophy_borders']:
+                useBorder = self.borders['trophy_borders'][x]
 
-            trophyBadge = self._cache_trophy_image(x)
+            trophyBadge = self._cache_trophy_image(x, background["theme"])
             card.paste(trophyBadge, trophyLocations[trophyNum], trophyBadge)
             trophyNum += 1
 
         # boarder!
+        useBorder = useBorder or self.borders['default']
         boarder = self._cache_border_image(useBorder)
         card.paste(boarder, (0, 0), boarder)
 
@@ -464,10 +486,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 for char in gameName:
                     if nameW >= nameWMax:
-                        draw.text((nameW, gameTextLocations[gameCount]), '...', theme["primary"], font=game_name_font)
+                        draw.text(
+                            (nameW, gameTextLocations[gameCount]), '...', tuple(theme["primary"]), font=game_name_font
+                        )
                         break
 
-                    draw.text((nameW, gameTextLocations[gameCount]), char, theme["primary"], font=game_name_font)
+                    draw.text((nameW, gameTextLocations[gameCount]), char, tuple(theme["primary"]), font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
 
@@ -680,37 +704,29 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         async def _phase5(message):
             backgrounds = list(dbUser['backgrounds'])
-            backgrounds.remove('default')
+            await message.channel.send(phase5.format(', '.join(backgrounds)))
+            while True:
+                response = await self.bot.wait_for('message', timeout=120, check=check)
 
-            if not backgrounds:
-                await message.channel.send('Since you don\'t have any background themes unlocked we\'ll skip this step')
-                return True
+                content = response.content.lower().strip()
+                if response.content.lower().strip() == 'reset':
+                    db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default-light'}})
+                    await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
+                    return True
 
-            else:
-                backgrounds = list(dbUser['backgrounds'])
-                await message.channel.send(phase5.format(', '.join(backgrounds)))
-                while True:
-                    response = await self.bot.wait_for('message', timeout=120, check=check)
-
-                    content = response.content.lower().strip()
-                    if response.content.lower().strip() == 'reset':
-                        db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default'}})
-                        await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
-                        return True
-
-                    elif content != 'skip':
-                        if content in backgrounds:
-                            db.update_one({'_id': ctx.author.id}, {'$set': {'background': content}})
-                            break
-
-                        else:
-                            await message.channel.send(
-                                f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n'
-                                + phase5.format(', '.join(backgrounds))
-                            )
+                elif content != 'skip':
+                    if content in backgrounds:
+                        db.update_one({'_id': ctx.author.id}, {'$set': {'background': content}})
+                        break
 
                     else:
-                        break
+                        await message.channel.send(
+                            f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n'
+                            + phase5.format(', '.join(backgrounds))
+                        )
+
+                else:
+                    break
 
         profileSetup = dbUser['profileSetup']
 
