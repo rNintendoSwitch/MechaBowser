@@ -1,0 +1,31 @@
+default-light:
+    theme: light
+    trophy-weight: TODO
+
+animal-crossing: # TODO: MISSING FILE
+    theme: light
+    trophy-weight: TODO
+
+allstars:
+    theme: light
+    trophy-weight: TODO
+
+blossoms:
+    theme: light
+    trophy-weight: TODO
+    
+galaxy:
+    theme: light
+    trophy-weight: TODO
+    
+mario64:
+    theme: light
+    trophy-weight: TODO
+    
+sunshine:
+    theme: light
+    trophy-weight: TODO
+    
+default-dark:
+    theme: dark
+    trophy-weight: TODO

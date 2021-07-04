@@ -1,0 +1,15 @@
+light:
+    branding: [45, 45, 45] # '/r/NintendoSwitch Discord'
+    primary: [80, 80, 80] # Member name, message count, join date, local time, game names
+    secondary: [126, 126, 126] # User discrim, "Not specified"
+    primary_heading: [45, 45, 45] # 'Favorite games', 'Trophy case'
+    secondary_heading: [126, 126, 126] # 'User Profile', 'Member since', 'Messages sent', 'Local time'
+    friend_code: [87, 111, 251]
+   
+dark:
+    branding: [255, 255, 255]
+    primary: [255, 255, 255]
+    secondary: [119, 119, 119]
+    primary_heading: [255, 255, 255]
+    secondary_heading: [119, 119, 119]
+    friend_code: [0, 254, 197]
