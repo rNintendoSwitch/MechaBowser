@@ -284,7 +284,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
-        # Migrate old backgronds
         if 'default' in dbUser['backgrounds']:
             backgrounds = list(dbUser['backgrounds'])
             backgrounds.remove('default')
@@ -293,8 +292,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             db.update_one({'_id': member.id}, {'$set': {'backgrounds': backgrounds}})
 
-        if dbUser['background'] == 'default':
-            db.update_one({'_id': member.id}, {'$set': {'background': 'default-light'}})
+            if dbUser['background'] == 'default':
+                db.update_one({'_id': member.id}, {'$set': {'background': 'default-light'}})
+
+            dbUser = db.find_one({'_id': member.id})
 
         background = self.backgrounds[dbUser['background']]
         theme = self.themes[background["theme"]]
