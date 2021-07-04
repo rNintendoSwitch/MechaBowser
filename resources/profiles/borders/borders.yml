@@ -1,0 +1,14 @@
+# When rendering trophies a user, if a trophy name matches a name in this list, they will also a boarder
+trophy_borders:
+  # trophy:  boarder
+  bot: bot
+  booster: nitrobooster
+  chat-mod: chatmod
+  developer: botdev
+  extra-life-2020: extralife-green
+  helpful-user: helpful-user
+  owner: serverowner
+  sub-mod: submod
+  verified: verified
+
+default: mint

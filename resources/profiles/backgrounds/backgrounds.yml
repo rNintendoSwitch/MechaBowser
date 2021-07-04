@@ -1,31 +1,31 @@
 default-light:
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
 
 animal-crossing: # TODO: MISSING FILE
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
 
 allstars:
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
 
 blossoms:
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
     
 galaxy:
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
     
 mario64:
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
     
 sunshine:
     theme: light
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
     
 default-dark:
     theme: dark
-    trophy-weight: TODO
+    trophy-bg-weight: 50 # TODO: Replace with correct value?
