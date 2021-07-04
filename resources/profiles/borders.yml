@@ -1,4 +1,4 @@
-# When rendering trophies a user, if a trophy name matches a name in this list, they will also a boarder
+# When rendering trophies for a user, if a trophy name matches a name in this list, they will also be given a border
 trophy_borders:
   # trophy:  boarder
   bot: bot
