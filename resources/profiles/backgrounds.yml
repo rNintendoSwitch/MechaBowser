@@ -1,10 +1,10 @@
 default-light:
     theme: light
-    trophy-bg-weight: 100 # TODO: Replace with correct value?
+    trophy-bg-weight: 10 # TODO: Replace with correct value?
 
-animal-crossing: # TODO: MISSING FILE
+animal-crossing:
     theme: light
-    trophy-bg-weight: 100 # TODO: Replace with correct value?
+    trophy-bg-weight: 10 # TODO: Replace with correct value?
 
 allstars:
     theme: light
