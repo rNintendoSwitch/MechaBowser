@@ -183,7 +183,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.group(name='infraction', aliases=['inf'], invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _infraction(self, ctx):
-        return
+        return await ctx.send_help(self._infraction)
 
     @_infraction.command(name='reason')
     @commands.has_any_role(config.moderator, config.eh)
@@ -358,7 +358,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
             try:
-                await user.send(tools.format_pundm('ban', reason, ctx.author))
+                await user.send(tools.format_pundm('ban', reason, ctx.author, auto=ctx.author.id == self.bot.user.id))
 
             except (discord.Forbidden, AttributeError):
                 pass
@@ -391,14 +391,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        if len(users) == 1:
-            await ctx.send(f'{config.greenTick} {users[0]} has been successfully banned')
+        if ctx.author.id != self.bot.user.id:  # Non-command invoke, such as automod
+            if len(users) == 1:
+                await ctx.send(f'{config.greenTick} {users[0]} has been successfully banned')
 
-        else:
-            resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
-            if failedBans:
-                resp += f'. Failed to ban **{failedBans}** from the provided list'
-            return await ctx.send(resp)
+            else:
+                resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
+                if failedBans:
+                    resp += f'. Failed to ban **{failedBans}** from the provided list'
+                return await ctx.send(resp)
 
     @commands.command(name='unban')
     @commands.has_any_role(config.moderator, config.eh)
@@ -583,7 +584,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
 
-    @commands.group(name='warn', invoke_without_command=True)
+    @commands.command(name='warn', invoke_without_command=True)
     @commands.has_any_role(config.moderator, config.eh)
     async def _warning(self, ctx):
         await ctx.send(':warning: Warns are depreciated. Please use the strike system instead (`!help strike`)')
