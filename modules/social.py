@@ -692,20 +692,22 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     failedFetch = True
 
         async def _phase5(message):
-            if 'default' in dbUser['backgrounds']:
-                backgrounds = list(dbUser['backgrounds'])
+            dbUser_phase5 = db.find_one({'_id': ctx.author.id})
+
+            if 'default' in dbUser_phase5['backgrounds']:
+                backgrounds = list(dbUser_phase5['backgrounds'])
                 backgrounds.remove('default')
                 backgrounds.insert(0, 'default-dark')
                 backgrounds.insert(0, 'default-light')
 
                 db.update_one({'_id': ctx.author.id}, {'$set': {'backgrounds': backgrounds}})
 
-                if dbUser['background'] == 'default':
+                if dbUser_phase5['background'] == 'default':
                     db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default-light'}})
 
-                dbUser = db.find_one({'_id': ctx.author.id})
+                dbUser_phase5 = db.find_one({'_id': ctx.author.id})
 
-            backgrounds = list(dbUser['backgrounds'])
+            backgrounds = list(dbUser_phase5['backgrounds'])
             await message.channel.send(phase5.format(', '.join(backgrounds)))
             while True:
                 response = await self.bot.wait_for('message', timeout=120, check=check)
