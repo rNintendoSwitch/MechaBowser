@@ -95,6 +95,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             ),
         }
 
+        self.special_trophies = {
+            'bot': lambda member, guild: member.bot,
+            'owner': lambda member, guild: member.id == guild.owner.id,
+            'developer': lambda member, guild: member.id in self.bot_contributors,
+            'chat-mod': lambda member, guild: guild.get_role(config.chatmod) in member.roles,
+            'sub-mod': lambda member, guild: guild.get_role(config.submod) in member.roles,
+            'mod-emeritus': lambda member, guild: guild.get_role(config.modemeritus) in member.roles
+            or guild.get_role(config.submodemeritus) in member.roles,
+            'helpful-user': lambda member, guild: guild.get_role(config.helpfulUser) in member.roles,
+            'booster': lambda member, guild: guild.get_role(config.boostRole) in member.roles,
+            'verified': lambda member, guild: guild.get_role(config.verified) in member.roles,
+        }
+
     @commands.group(name='profile', invoke_without_command=True)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member:
@@ -404,34 +417,22 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for x in dbUser:
                 trophies.append(x)
 
-        if member.bot:
-            trophies.append('bot')
+        # When editing this list, also edit protected_trophies in _profile_grant()
+        PROTECTED_TROPHIES = [
+            'bot',
+            'owner',
+            'developer',
+            'chat-mod',
+            'sub-mod',
+            'mod-emeritus',
+            'helpful-user',
+            'booster',
+            'verified',
+        ]
 
-        if member.id == guild.owner.id:  # Server owner
-            trophies.append('owner')
-
-        if member.id in self.bot_contributors:  # Developer
-            trophies.append('developer')
-
-        if guild.get_role(config.chatmod) in member.roles:  # Chat-mod role
-            trophies.append('chat-mod')
-
-        if guild.get_role(config.submod) in member.roles:  # Sub-mod role
-            trophies.append('sub-mod')
-
-        if (
-            guild.get_role(config.modemeritus) in member.roles or guild.get_role(config.submodemeritus) in member.roles
-        ):  # Mod emeritus
-            trophies.append('mod-emeritus')
-
-        if guild.get_role(config.helpfulUser) in member.roles:  # Helpful user
-            trophies.append('helpful-user')
-
-        if guild.get_role(config.boostRole) in member.roles:  # Booster role
-            trophies.append('booster')
-
-        if guild.get_role(config.verified) in member.roles:  # Verified role
-            trophies.append('verified')
+        for trophy, lambda_function in self.special_trophies.items():
+            if lambda_function(member, guild):
+                trophies.append(trophy)
 
         if len(trophies) < 15:  # Check for additional non-prefered trophies
             for x in dbUser['trophies']:
@@ -477,7 +478,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if not gameName:
                     continue
 
-                gameIcon = await self._cache_game_img(gamesDb, game_guid), theme
+                gameIcon = await self._cache_game_img(gamesDb, game_guid, theme)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 120
@@ -824,6 +825,57 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again'
             )
 
+    @_profile.command(name='grant')
+    async def _profile_grant(self, ctx, item: str, member: discord.Member, name: str):
+        '''Grants specified item, background or trophy, from a member'''
+        item = item.lower()
+        name = name.lower()
+
+        if item not in ['background', 'trophy']:
+            return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
+
+        if item == 'background' and name not in self.backgrounds:
+            return await ctx.send(f'{config.redTick} Invalid background: {name}')
+
+        if item == 'trophy':
+            if not os.path.isfile(f'resources/profiles/trophies/{name}.png'):
+                return await ctx.send(f'{config.redTick} Invalid trophy: {name}')
+
+            if name in self.special_trophies:
+                return await ctx.send(f'{config.redTick} Trophy cannot be granted via command: {name}')
+
+        db = mclient.bowser.users
+        dbUser = db.find_one({'_id': member.id})
+        key = {'background': 'backgrounds', 'trophy': 'trophies'}[item]
+
+        if name in dbUser[key]:
+            return await ctx.send(f'{config.redTick} {member} already has {item} {name}')
+
+        db.update_one({'_id': member.id}, {'$push': {key: name}})
+        return await ctx.send(f'{config.redTick} {item.title()} `{name}` granted to {member}')
+
+    @_profile.command(name='revoke')
+    async def _profile_revoke(self, ctx, item: str, member: discord.Member, name: str):
+        '''Revokes specified item, background or trophy, from a member'''
+        item = item.lower()
+        name = name.lower()
+
+        if item not in ['background', 'trophy']:
+            return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
+
+        if item == 'trophy' and name in self.special_trophies:
+            return await ctx.send(f'{config.redTick} Trophy cannot be revoked via command: {name}')
+
+        db = mclient.bowser.users
+        dbUser = db.find_one({'_id': member.id})
+        key = {'background': 'backgrounds', 'trophy': 'trophies'}[item]
+
+        if name not in dbUser[key]:
+            return await ctx.send(f'{config.redTick} {member} does not have {item} {name}')
+
+        db.update_one({'_id': member.id}, {'$pull': {key: name}})
+        return await ctx.send(f'{config.redTick} {item.title()} `{name}` revoked from {member}')
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.channel.type != discord.ChannelType.text or message.author.bot:
@@ -839,14 +891,32 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
 
-    async def cog_command_error(self, ctx, error):
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+    async def cog_command_error(self, ctx, error: commands.CommandError):
+        if not ctx.command:
+            return
 
-        await ctx.send(
-            f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-            delete_after=15,
-        )
-        raise error
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(
+                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
+
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(
+                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
+
+        elif isinstance(error, commands.CheckFailure):
+            return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
+
+        else:
+            await ctx.send(
+                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+                delete_after=15,
+            )
+            raise error
 
 
 def setup(bot):
