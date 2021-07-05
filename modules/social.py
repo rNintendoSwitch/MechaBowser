@@ -840,7 +840,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await ctx.send(f'{config.redTick} {member} already has {item} {name}')
 
         db.update_one({'_id': member.id}, {'$push': {key: name}})
-        return await ctx.send(f'{config.redTick} {item.title()} `{name}` granted to {member}')
+        return await ctx.send(f'{config.greenTick} {item.title()} `{name}` granted to {member}')
 
     @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='revoke')
@@ -863,7 +863,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await ctx.send(f'{config.redTick} {member} does not have {item} {name}')
 
         db.update_one({'_id': member.id}, {'$pull': {key: name}})
-        return await ctx.send(f'{config.redTick} {item.title()} `{name}` revoked from {member}')
+        return await ctx.send(f'{config.greenTick} {item.title()} `{name}` revoked from {member}')
 
     @commands.Cog.listener()
     async def on_message(self, message):
