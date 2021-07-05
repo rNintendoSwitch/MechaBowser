@@ -199,7 +199,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
 
-        trophy_bg_path = f'resources/profiles/layout/{bg["theme"]}/trophy-bg/{bg["trophy-bg-weight"]}.png'
+        trophy_bg_path = f'resources/profiles/layout/{bg["theme"]}/trophy-bg/{bg["trophy-bg-opacity"]}.png'
         trophy_bg = Image.open(trophy_bg_path).convert("RGBA")
 
         final = Image.alpha_composite(img, trophy_bg.resize(img.size))
