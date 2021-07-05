@@ -18,6 +18,7 @@ import pymongo
 import pytz
 import requests
 import token_bucket
+import yaml
 from discord.ext import commands
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
@@ -43,6 +44,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             125233822760566784,  # MattBSG
             123879073972748290,  # Lyrus
             108429628560924672,  # Alex from Alaska
+            115840403458097161,  # FlapSnapple
         ]
 
         # Profile generation - precaching
@@ -55,10 +57,30 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 'small': ('Light', 30),
             }
         )
-        self.pfpBackground = Image.open('resources/pfp-background.png').convert('RGBA')
-        self.profileStatic = self._init_profile_static()
-        self.missingImage = Image.open('resources/missing-game.png').convert("RGBA").resize((45, 45))
-        self.fsImgCache = {}
+
+        with open("resources/profiles/themes.yml", 'r') as stream:
+            self.themes = yaml.safe_load(stream)
+
+        with open("resources/profiles/borders.yml", 'r') as stream:
+            self.borders = yaml.safe_load(stream)
+
+        with open("resources/profiles/backgrounds.yml", 'r') as stream:
+            self.backgrounds = yaml.safe_load(stream)
+
+            for bg_name in self.backgrounds.keys():
+                self.backgrounds[bg_name]["image"] = self._render_background_image(bg_name)
+
+        for theme in self.themes.keys():
+            self.themes[theme]['pfpBackground'] = Image.open(
+                f'resources/profiles/layout/{theme}/pfp-background.png'
+            ).convert('RGBA')
+            self.themes[theme]['missingImage'] = (
+                Image.open(f'resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((45, 45))
+            )
+            self.themes[theme]['profileStatic'] = self._init_profile_static(theme)  # Do this last
+
+        self.trophyImgCache = {}
+        self.borderImgCache = {}
         self.flagImgCache = {}
         self.gameImgCache = {}
 
@@ -71,6 +93,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             "chatFilter": re.compile(
                 r'(sw|m[^ao]|d[^a]|[^MD]\w|^\w|^)[ \-\u2014_]?\d{4}[ \-\u2014_]\d{4}[ \-\u2014_]\d{4}', re.I + re.M
             ),
+        }
+
+        self.special_trophies = {
+            'bot': lambda member, guild: member.bot,
+            'owner': lambda member, guild: member.id == guild.owner.id,
+            'developer': lambda member, guild: member.id in self.bot_contributors,
+            'chat-mod': lambda member, guild: guild.get_role(config.chatmod) in member.roles,
+            'sub-mod': lambda member, guild: guild.get_role(config.submod) in member.roles,
+            'mod-emeritus': lambda member, guild: guild.get_role(config.modemeritus) in member.roles
+            or guild.get_role(config.submodemeritus) in member.roles,
+            'helpful-user': lambda member, guild: guild.get_role(config.helpfulUser) in member.roles,
+            'booster': lambda member, guild: guild.get_role(config.boostRole) in member.roles,
+            'verified': lambda member, guild: guild.get_role(config.verified) in member.roles,
         }
 
     @commands.group(name='profile', invoke_without_command=True)
@@ -140,44 +175,66 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     def _draw_text(self, draw: ImageDraw, xy, text: str, fill, fonts: dict):
         font = fonts[self._determine_cjk_font(text)]
-        return draw.text(xy, text, fill, font)
+        return draw.text(xy, text, tuple(fill), font)
 
-    def _init_profile_static(self) -> Image:
+    def _init_profile_static(self, theme_name: str) -> Image:
         '''Inits static elements above background for profile card precache'''
-        fonts = self.profileFonts
-        img = Image.new('RGBA', self.pfpBackground.size, (0, 0, 0, 0))
+        theme = self.themes[theme_name]
 
-        snoo = Image.open('resources/snoo.png').convert("RGBA")
-        trophyUnderline = Image.open('resources/trophy-case-underline.png').convert("RGBA")
-        gameUnderline = Image.open('resources/favorite-games-underline.png').convert("RGBA")
+        fonts = self.profileFonts
+        img = Image.new('RGBA', theme['pfpBackground'].size, (0, 0, 0, 0))
+
+        snoo = Image.open('resources/profiles/layout/snoo.png').convert("RGBA")
+        trophyUnderline = Image.open(f'resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert(
+            "RGBA"
+        )
+        gameUnderline = Image.open(f'resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
+            "RGBA"
+        )
 
         img.paste(snoo, (50, 50), snoo)
         img.paste(trophyUnderline, (1150, 100), trophyUnderline)
         img.paste(gameUnderline, (60, 645), gameUnderline)
 
         draw = ImageDraw.Draw(img)
-        self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', (45, 45, 45), fonts['meta'])
-        self._draw_text(draw, (150, 90), 'User Profile', (126, 126, 126), fonts['meta'])
-        self._draw_text(draw, (60, 470), 'Member since', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (435, 470), 'Messages sent', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (790, 470), 'Local time', (126, 126, 126), fonts['small'])
-        self._draw_text(draw, (60, 595), 'Favorite games', (45, 45, 45), fonts['medium'])
-        self._draw_text(draw, (1150, 45), 'Trophy case', (45, 45, 45), fonts['medium'])
+        self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', theme['branding'], fonts['meta'])
+        self._draw_text(draw, (150, 90), 'User Profile', theme['secondary_heading'], fonts['meta'])
+        self._draw_text(draw, (60, 470), 'Member since', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (435, 470), 'Messages sent', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (790, 470), 'Local time', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (60, 595), 'Favorite games', theme['primary_heading'], fonts['medium'])
+        self._draw_text(draw, (1150, 45), 'Trophy case', theme['primary_heading'], fonts['medium'])
 
         return img
 
-    def _cache_fs_image(self, type: str, name: str) -> Image:
-        if type == 'background':
-            filename = 'resources/profile-{}.png'.format(name)
-        elif type == 'trophy':
-            filename = 'resources/trophies/{}.png'.format(name)
+    def _render_background_image(self, name: str) -> Image:
+        bg = self.backgrounds[name]
+
+        img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
+
+        trophy_bg_path = f'resources/profiles/layout/{bg["theme"]}/trophy-bg/{bg["trophy-bg-opacity"]}.png'
+        trophy_bg = Image.open(trophy_bg_path).convert("RGBA")
+
+        final = Image.alpha_composite(img, trophy_bg.resize(img.size))
+        return final
+
+    def _cache_trophy_image(self, name: str, theme_name: str) -> Image:
+        if name is None:
+            name = f'none-{theme_name}'
+            path = f'resources/profiles/layout/{theme_name}/trophy-blank.png'
         else:
-            raise ValueError('Unupported type: ' + type)
+            path = 'resources/profiles/trophies/{}.png'.format(name)
 
-        if not filename in self.fsImgCache:
-            self.fsImgCache[filename] = Image.open(filename).convert("RGBA")
+        if not name in self.trophyImgCache:
+            self.trophyImgCache[name] = Image.open(path).convert("RGBA")
 
-        return self.fsImgCache[filename]
+        return self.trophyImgCache[name]
+
+    def _cache_border_image(self, name: str) -> Image:
+        if not name in self.borderImgCache:
+            self.borderImgCache[name] = Image.open('resources/profiles/borders/{}.png'.format(name)).convert("RGBA")
+
+        return self.borderImgCache[name]
 
     def _cache_flag_image(self, name) -> Image:
         SHADOW_OFFSET = 2
@@ -201,7 +258,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    async def _cache_game_img(self, gamesDb, guid: str) -> Image:
+    async def _cache_game_img(self, gamesDb, guid: str, theme) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
@@ -215,7 +272,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             Games = self.bot.get_cog('Games')
 
             if not Games:
-                return self.missingImage
+                return theme['missingImage']
 
             try:
                 gameImg = await Games.get_image(guid, 'icon_url')
@@ -232,7 +289,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
 
         if self.gameImgCache[guid][IMAGE] is None:
-            return self.missingImage
+            return theme['missingImage']
 
         return self.gameImgCache[guid][IMAGE]
 
@@ -240,14 +297,29 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
+        if 'default' in dbUser['backgrounds']:
+            backgrounds = list(dbUser['backgrounds'])
+            backgrounds.remove('default')
+            backgrounds.insert(0, 'default-dark')
+            backgrounds.insert(0, 'default-light')
+
+            db.update_one({'_id': member.id}, {'$set': {'backgrounds': backgrounds}})
+
+            if dbUser['background'] == 'default':
+                db.update_one({'_id': member.id}, {'$set': {'background': 'default-light'}})
+
+            dbUser = db.find_one({'_id': member.id})
+
+        background = self.backgrounds[dbUser['background']]
+        theme = self.themes[background["theme"]]
+
         pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
-        background = self._cache_fs_image('background', dbUser['background'])
 
-        card = self.pfpBackground.copy()
+        card = theme['pfpBackground'].copy()
         card.paste(pfp, (50, 170), pfp)
-        card.paste(background, mask=background)
-        card.paste(self.profileStatic, mask=self.profileStatic)
+        card.paste(background["image"], mask=background["image"])
+        card.paste(theme['profileStatic'], mask=theme['profileStatic'])
 
         guild = member.guild
         draw = ImageDraw.Draw(card)
@@ -267,7 +339,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             else:
                 if memberName:
                     W, _ = draw.textsize(memberName, font=member_name_font)
-                    draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
+                    draw.text((nameW, 215), memberName, tuple(theme["primary"]), member_name_font)
                     nameW += W
                     memberName = ''
 
@@ -282,9 +354,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 nameW += 46
 
         if memberName:  # Leftovers, text
-            draw.text((nameW, 215), memberName, (80, 80, 80), member_name_font)
+            draw.text((nameW, 215), memberName, tuple(theme["primary"]), member_name_font)
 
-        self._draw_text(draw, (350, 275), '#' + member.discriminator, (126, 126, 126), fonts['subtext'])
+        self._draw_text(draw, (350, 275), '#' + member.discriminator, theme["secondary"], fonts['subtext'])
 
         if dbUser['regionFlag']:
             regionImg = self._cache_flag_image(dbUser['regionFlag'])
@@ -292,11 +364,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # Friend code
         if dbUser['friendcode']:
-            self._draw_text(draw, (350, 330), dbUser['friendcode'], (87, 111, 251), fonts['subtext'])
+            self._draw_text(draw, (350, 330), dbUser['friendcode'], theme["friend_code"], fonts['subtext'])
 
         # Start customized content -- stats
         message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
-        self._draw_text(draw, (435, 505), message_count, (80, 80, 80), fonts['medium'])
+        self._draw_text(draw, (435, 505), message_count, theme["primary"], fonts['medium'])
 
         joins = dbUser['joins']
         joins.sort()
@@ -305,10 +377,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             joinDateF = joinDate.strftime('%b. %-d, %Y')
         except:
             joinDateF = joinDate.strftime('%b. %d, %Y')
-        self._draw_text(draw, (60, 505), joinDateF, (80, 80, 80), fonts['medium'])
+        self._draw_text(draw, (60, 505), joinDateF, theme["primary"], fonts['medium'])
 
         if not dbUser['timezone']:
-            self._draw_text(draw, (790, 505), 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:
             tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
@@ -320,7 +392,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
                 tzOffset = tzOffset[0] + tzOffset[2:]
 
-            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', (80, 80, 80), fonts['medium'])
+            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', theme["primary"], fonts['medium'])
 
         # Start trophies
         trophyLocations = {
@@ -345,28 +417,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for x in dbUser:
                 trophies.append(x)
 
-        if member.id == guild.owner.id:  # Server owner
-            trophies.append('owner')
-
-        if member.id in self.bot_contributors:  # Developer
-            trophies.append('developer')
-
-        if guild.get_role(config.chatmod) in member.roles:  # Chat-mod role
-            trophies.append('chat-mod')
-
-        if guild.get_role(config.submod) in member.roles:  # Sub-mod role
-            trophies.append('sub-mod')
-
-        if (
-            guild.get_role(config.modemeritus) in member.roles or guild.get_role(config.submodemeritus) in member.roles
-        ):  # Mod emeritus
-            trophies.append('mod-emeritus')
-
-        if guild.get_role(config.helpfulUser) in member.roles:  # Helpful user
-            trophies.append('helpful-user')
-
-        if guild.get_role(config.boostRole) in member.roles:  # Booster role
-            trophies.append('booster')
+        for trophy, lambda_function in self.special_trophies.items():
+            if lambda_function(member, guild):
+                trophies.append(trophy)
 
         if len(trophies) < 15:  # Check for additional non-prefered trophies
             for x in dbUser['trophies']:
@@ -374,13 +427,22 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     trophies.append(x)
 
         while len(trophies) < 15:
-            trophies.append('blank')
+            trophies.append(None)
 
         trophyNum = 0
+        useBorder = None
         for x in trophies:
-            trophyBadge = self._cache_fs_image('trophy', x)
+            if useBorder is None and x in self.borders['trophy_borders']:
+                useBorder = self.borders['trophy_borders'][x]
+
+            trophyBadge = self._cache_trophy_image(x, background["theme"])
             card.paste(trophyBadge, trophyLocations[trophyNum], trophyBadge)
             trophyNum += 1
+
+        # border!
+        useBorder = useBorder or self.borders['default']
+        border = self._cache_border_image(useBorder)
+        card.paste(border, (0, 0), border)
 
         # Start favorite games
         setGames = dbUser['favgames']
@@ -403,7 +465,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if not gameName:
                     continue
 
-                gameIcon = await self._cache_game_img(gamesDb, game_guid)
+                gameIcon = await self._cache_game_img(gamesDb, game_guid, theme)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 120
@@ -413,15 +475,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 for char in gameName:
                     if nameW >= nameWMax:
-                        draw.text((nameW, gameTextLocations[gameCount]), '...', (80, 80, 80), font=game_name_font)
+                        draw.text(
+                            (nameW, gameTextLocations[gameCount]), '...', tuple(theme["primary"]), font=game_name_font
+                        )
                         break
 
-                    draw.text((nameW, gameTextLocations[gameCount]), char, (80, 80, 80), font=game_name_font)
+                    draw.text((nameW, gameTextLocations[gameCount]), char, tuple(theme["primary"]), font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
 
         if gameCount == 0:  # No games rendered
-            self._draw_text(draw, (60, 665), 'Not specified', (126, 126, 126), fonts['medium'])
+            self._draw_text(draw, (60, 665), 'Not specified', theme["secondary_heading"], fonts['medium'])
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
@@ -629,37 +693,29 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         async def _phase5(message):
             backgrounds = list(dbUser['backgrounds'])
-            backgrounds.remove('default')
+            await message.channel.send(phase5.format(', '.join(backgrounds)))
+            while True:
+                response = await self.bot.wait_for('message', timeout=120, check=check)
 
-            if not backgrounds:
-                await message.channel.send('Since you don\'t have any background themes unlocked we\'ll skip this step')
-                return True
+                content = response.content.lower().strip()
+                if response.content.lower().strip() == 'reset':
+                    db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default-light'}})
+                    await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
+                    return True
 
-            else:
-                backgrounds = list(dbUser['backgrounds'])
-                await message.channel.send(phase5.format(', '.join(backgrounds)))
-                while True:
-                    response = await self.bot.wait_for('message', timeout=120, check=check)
-
-                    content = response.content.lower().strip()
-                    if response.content.lower().strip() == 'reset':
-                        db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default'}})
-                        await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
-                        return True
-
-                    elif content != 'skip':
-                        if content in backgrounds:
-                            db.update_one({'_id': ctx.author.id}, {'$set': {'background': content}})
-                            break
-
-                        else:
-                            await message.channel.send(
-                                f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n'
-                                + phase5.format(', '.join(backgrounds))
-                            )
+                elif content != 'skip':
+                    if content in backgrounds:
+                        db.update_one({'_id': ctx.author.id}, {'$set': {'background': content}})
+                        break
 
                     else:
-                        break
+                        await message.channel.send(
+                            f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n'
+                            + phase5.format(', '.join(backgrounds))
+                        )
+
+                else:
+                    break
 
         profileSetup = dbUser['profileSetup']
 
@@ -756,6 +812,59 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again'
             )
 
+    @commands.has_any_role(config.moderator, config.eh)
+    @_profile.command(name='grant')
+    async def _profile_grant(self, ctx, item: str, member: discord.Member, name: str):
+        '''Grants specified item, background or trophy, to a member'''
+        item = item.lower()
+        name = name.lower()
+
+        if item not in ['background', 'trophy']:
+            return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
+
+        if item == 'background' and name not in self.backgrounds:
+            return await ctx.send(f'{config.redTick} Invalid background: {name}')
+
+        if item == 'trophy':
+            if not os.path.isfile(f'resources/profiles/trophies/{name}.png'):
+                return await ctx.send(f'{config.redTick} Invalid trophy: {name}')
+
+            if name in self.special_trophies:
+                return await ctx.send(f'{config.redTick} Trophy cannot be granted via command: {name}')
+
+        db = mclient.bowser.users
+        dbUser = db.find_one({'_id': member.id})
+        key = {'background': 'backgrounds', 'trophy': 'trophies'}[item]
+
+        if name in dbUser[key]:
+            return await ctx.send(f'{config.redTick} {member} already has {item} {name}')
+
+        db.update_one({'_id': member.id}, {'$push': {key: name}})
+        return await ctx.send(f'{config.redTick} {item.title()} `{name}` granted to {member}')
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @_profile.command(name='revoke')
+    async def _profile_revoke(self, ctx, item: str, member: discord.Member, name: str):
+        '''Revokes specified item, background or trophy, from a member'''
+        item = item.lower()
+        name = name.lower()
+
+        if item not in ['background', 'trophy']:
+            return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
+
+        if item == 'trophy' and name in self.special_trophies:
+            return await ctx.send(f'{config.redTick} Trophy cannot be revoked via command: {name}')
+
+        db = mclient.bowser.users
+        dbUser = db.find_one({'_id': member.id})
+        key = {'background': 'backgrounds', 'trophy': 'trophies'}[item]
+
+        if name not in dbUser[key]:
+            return await ctx.send(f'{config.redTick} {member} does not have {item} {name}')
+
+        db.update_one({'_id': member.id}, {'$pull': {key: name}})
+        return await ctx.send(f'{config.redTick} {item.title()} `{name}` revoked from {member}')
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.channel.type != discord.ChannelType.text or message.author.bot:
@@ -771,14 +880,32 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
 
-    async def cog_command_error(self, ctx, error):
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+    async def cog_command_error(self, ctx, error: commands.CommandError):
+        if not ctx.command:
+            return
 
-        await ctx.send(
-            f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-            delete_after=15,
-        )
-        raise error
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+        if isinstance(error, commands.MissingRequiredArgument):
+            return await ctx.send(
+                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
+
+        elif isinstance(error, commands.BadArgument):
+            return await ctx.send(
+                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
+                delete_after=15,
+            )
+
+        elif isinstance(error, commands.CheckFailure):
+            return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
+
+        else:
+            await ctx.send(
+                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
+                delete_after=15,
+            )
+            raise error
 
 
 def setup(bot):

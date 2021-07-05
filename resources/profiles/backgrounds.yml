@@ -1,0 +1,35 @@
+default-light:
+    theme: light
+    trophy-bg-opacity: 100
+
+animal-crossing:
+    theme: light
+    trophy-bg-opacity: 70
+
+allstars:
+    theme: light
+    trophy-bg-opacity: 80
+
+blossoms:
+    theme: light
+    trophy-bg-opacity: 60
+    
+galaxy:
+    theme: light
+    trophy-bg-opacity: 90
+    
+mario64:
+    theme: light
+    trophy-bg-opacity: 90
+    
+sunshine:
+    theme: light
+    trophy-bg-opacity: 90
+    
+gamebuildergarage:
+    theme: light
+    trophy-bg-opacity: 70
+    
+default-dark:
+    theme: dark
+    trophy-bg-opacity: 100

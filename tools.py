@@ -176,8 +176,8 @@ async def store_user(member, messages=0):
         'favgames': [],
         'regionFlag': None,
         'profileSetup': False,
-        'background': 'default',
-        'backgrounds': ['default'],
+        'background': 'default-light',
+        'backgrounds': ['default-light', 'default-dark'],
     }
     db.insert_one(userData)
 

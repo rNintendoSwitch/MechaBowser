@@ -1,0 +1,14 @@
+# When rendering trophies for a user, if a trophy name matches a name in this list, they will also be given a border
+trophy_borders:
+  # trophy:  border
+  bot: bot
+  booster: nitrobooster
+  chat-mod: chatmod
+  developer: botdev
+  extra-life-2020: extralife-green
+  helpful-user: helpfuluser
+  owner: serverowner
+  sub-mod: submod
+  verified: verified
+
+default: mint

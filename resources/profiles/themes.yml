@@ -1,0 +1,24 @@
+# Category          Used for
+# ------------------------------------------------------------------------------
+# branding          '/r/NintendoSwitch Discord'
+# primary           Member name, message count, game names, etc.
+# secondary         User discriminator, 'Not specified'
+# primary_heading   'Favorite games', 'Trophy case'
+# secondary_heading 'User Profile', 'Member since', etc
+# friend_code       Friend code
+
+light:
+    branding: [45, 45, 45]
+    primary: [80, 80, 80]
+    secondary: [126, 126, 126]
+    primary_heading: [45, 45, 45]
+    secondary_heading: [126, 126, 126]
+    friend_code: [87, 111, 251]
+   
+dark:
+    branding: [255, 255, 255]
+    primary: [255, 255, 255]
+    secondary: [119, 119, 119]
+    primary_heading: [255, 255, 255]
+    secondary_heading: [119, 119, 119]
+    friend_code: [0, 254, 197]
