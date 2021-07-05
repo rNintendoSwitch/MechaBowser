@@ -812,6 +812,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again'
             )
 
+    @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='grant')
     async def _profile_grant(self, ctx, item: str, member: discord.Member, name: str):
         '''Grants specified item, background or trophy, to a member'''
@@ -841,6 +842,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db.update_one({'_id': member.id}, {'$push': {key: name}})
         return await ctx.send(f'{config.redTick} {item.title()} `{name}` granted to {member}')
 
+    @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='revoke')
     async def _profile_revoke(self, ctx, item: str, member: discord.Member, name: str):
         '''Revokes specified item, background or trophy, from a member'''
