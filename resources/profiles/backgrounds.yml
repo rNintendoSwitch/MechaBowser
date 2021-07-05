@@ -2,7 +2,7 @@ default-light:
     theme: light
     trophy-bg-opacity: 100
 
-animal-crossing:
+animalcrossing:
     theme: light
     trophy-bg-opacity: 70
 
