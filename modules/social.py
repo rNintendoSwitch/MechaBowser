@@ -451,10 +451,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             card.paste(trophyBadge, trophyLocations[trophyNum], trophyBadge)
             trophyNum += 1
 
-        # boarder!
+        # border!
         useBorder = useBorder or self.borders['default']
-        boarder = self._cache_border_image(useBorder)
-        card.paste(boarder, (0, 0), boarder)
+        border = self._cache_border_image(useBorder)
+        card.paste(border, (0, 0), border)
 
         # Start favorite games
         setGames = dbUser['favgames']
