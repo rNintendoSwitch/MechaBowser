@@ -814,7 +814,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @_profile.command(name='grant')
     async def _profile_grant(self, ctx, item: str, member: discord.Member, name: str):
-        '''Grants specified item, background or trophy, from a member'''
+        '''Grants specified item, background or trophy, to a member'''
         item = item.lower()
         name = name.lower()
 
