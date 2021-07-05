@@ -417,19 +417,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for x in dbUser:
                 trophies.append(x)
 
-        # When editing this list, also edit protected_trophies in _profile_grant()
-        PROTECTED_TROPHIES = [
-            'bot',
-            'owner',
-            'developer',
-            'chat-mod',
-            'sub-mod',
-            'mod-emeritus',
-            'helpful-user',
-            'booster',
-            'verified',
-        ]
-
         for trophy, lambda_function in self.special_trophies.items():
             if lambda_function(member, guild):
                 trophies.append(trophy)
