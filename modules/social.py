@@ -2,11 +2,11 @@ import asyncio
 import datetime
 import io
 import logging
+import math
 import os
 import re
 import time
 import typing
-import math
 from pathlib import Path
 
 import codepoints
@@ -739,7 +739,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 dbUser_phase5 = db.find_one({'_id': ctx.author.id})
 
             loading_message = await message.channel.send('Just a moment...')
-            
+
             backgrounds = list(dbUser_phase5['backgrounds'])
             preview = self._generate_background_preview(backgrounds)
 
