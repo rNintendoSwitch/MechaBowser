@@ -6,6 +6,7 @@ import os
 import re
 import time
 import typing
+import math
 from pathlib import Path
 
 import codepoints
@@ -292,6 +293,36 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return theme['missingImage']
 
         return self.gameImgCache[guid][IMAGE]
+
+    def _generate_background_preview(self, backgrounds) -> discord.File:
+        # square_length: Gets smallest square dimensions that will fit length of backgrounds, ie len 17 -> 25
+        square_length = math.ceil(math.sqrt(len(backgrounds)))
+
+        # rows_required is used to chop the bottom off, i.e. 2 bgs have a 2x2 w/ square_length but we only need 2x1
+        rows_required = math.ceil(len(backgrounds) / square_length)
+
+        canvas = Image.new('RGBA', (1600 * square_length, 900 * rows_required), (0, 0, 0, 0))
+
+        for i, name in enumerate(backgrounds):
+            background = self.backgrounds[name]
+            theme = self.themes[background["theme"]]
+
+            image = theme['pfpBackground'].copy()
+            draw = ImageDraw.Draw(image)
+
+            image.paste(background["image"], mask=background["image"])
+            image.paste(theme['profileStatic'], mask=theme['profileStatic'])
+            self._draw_text(draw, (350, 215), name, theme["primary"], self.profileFonts['user'])
+
+            paste_at = (i % square_length * 1600, i // square_length * 900)
+            canvas.paste(image, paste_at, image)
+
+        new_height = round((rows_required / square_length) * 900)
+        canvas = canvas.resize((1600, new_height))
+
+        bytesFile = io.BytesIO()
+        canvas.save(bytesFile, format='PNG')
+        return discord.File(io.BytesIO(bytesFile.getvalue()), filename='preview.png')
 
     async def _generate_profile_card(self, member: discord.Member) -> discord.File:
         db = mclient.bowser.users
@@ -707,8 +738,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 dbUser_phase5 = db.find_one({'_id': ctx.author.id})
 
+            loading_message = await message.channel.send('Just a moment...')
+            
             backgrounds = list(dbUser_phase5['backgrounds'])
-            await message.channel.send(phase5.format(', '.join(backgrounds)))
+            preview = self._generate_background_preview(backgrounds)
+
+            await message.channel.send(phase5.format(', '.join(backgrounds)), file=preview)
+            await loading_message.delete()
+
             while True:
                 response = await self.bot.wait_for('message', timeout=120, check=check)
 
@@ -817,8 +854,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await _phase5(botMsg)
 
             del self.inprogressEdits[ctx.author.id]
+
+            loading_message = await mainMsg.channel.send('Just a moment...')
             card = await self._generate_profile_card(ctx.author)
-            return await mainMsg.channel.send('You are all set! Your profile has been edited:', file=card)
+
+            await mainMsg.channel.send('You are all set! Your profile has been edited:', file=card)
+            await loading_message.delete()
+            return
 
         except asyncio.TimeoutError:
             await mainMsg.delete()
