@@ -339,11 +339,28 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         failedBans = 0
         for user in users:
             userid = user if (type(user) is int) else user.id
-
             username = userid if (type(user) is int) else f'{str(user)}'
-            user = (
-                discord.Object(id=userid) if (type(user) is int) else user
-            )  # If not a user, manually contruct a user object
+
+            # If not a user, manually contruct a user object
+            user = discord.Object(id=userid) if (type(user) is int) else user
+
+            mod_role_pos = ctx.author.top_role.position
+            bot_member = await ctx.guild.fetch_member(self.bot.user.id)
+            bot_role_pos = bot_member.top_role.position
+
+            try:
+                member = await ctx.guild.fetch_member(userid)
+                usr_role_pos = member.top_role.position
+            except:
+                usr_role_pos = -1
+
+            if (usr_role_pos >= bot_role_pos) or (usr_role_pos >= mod_role_pos):
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} Insufficent permissions to ban {username}')
+                else:
+                    failedBans += 1
+                    continue
+
             try:
                 await ctx.guild.fetch_ban(user)
                 if len(users) == 1:
@@ -476,6 +493,18 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     failedKicks += 1
                     continue
 
+            mod_role_pos = ctx.author.top_role.position
+            bot_member = await ctx.guild.fetch_member(self.bot.user.id)
+            bot_role_pos = bot_member.top_role.position
+            usr_role_pos = member.top_role.position
+
+            if (usr_role_pos >= bot_role_pos) or (usr_role_pos >= mod_role_pos):
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} Insufficent permissions to kick {username}')
+                else:
+                    failedKicks += 1
+                    continue
+
             try:
                 await user.send(tools.format_pundm('kick', reason, ctx.author))
             except (discord.Forbidden, AttributeError):
@@ -488,11 +517,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 failedKicks += 1
                 continue
 
-        docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
-        await tools.send_modlog(
-            self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
-        )
-        kickCount += 1
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+            await tools.send_modlog(
+                self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
+            )
+            kickCount += 1
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
