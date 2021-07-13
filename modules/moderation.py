@@ -337,6 +337,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await ctx.send(f'{config.redTick} An invalid user was provided')
         banCount = 0
         failedBans = 0
+
         for user in users:
             userid = user if (type(user) is int) else user.id
             username = userid if (type(user) is int) else f'{str(user)}'
@@ -344,17 +345,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             # If not a user, manually contruct a user object
             user = discord.Object(id=userid) if (type(user) is int) else user
 
-            mod_role_pos = ctx.author.top_role.position
-            bot_member = await ctx.guild.fetch_member(self.bot.user.id)
-            bot_role_pos = bot_member.top_role.position
-
             try:
                 member = await ctx.guild.fetch_member(userid)
                 usr_role_pos = member.top_role.position
             except:
                 usr_role_pos = -1
 
-            if (usr_role_pos >= bot_role_pos) or (usr_role_pos >= mod_role_pos):
+            if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
                 if len(users) == 1:
                     return await ctx.send(f'{config.redTick} Insufficent permissions to ban {username}')
                 else:
@@ -493,12 +490,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     failedKicks += 1
                     continue
 
-            mod_role_pos = ctx.author.top_role.position
-            bot_member = await ctx.guild.fetch_member(self.bot.user.id)
-            bot_role_pos = bot_member.top_role.position
             usr_role_pos = member.top_role.position
 
-            if (usr_role_pos >= bot_role_pos) or (usr_role_pos >= mod_role_pos):
+            if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
                 if len(users) == 1:
                     return await ctx.send(f'{config.redTick} Insufficent permissions to kick {username}')
                 else:
