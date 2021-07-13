@@ -410,7 +410,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         if ctx.author.id != self.bot.user.id:  # Non-command invoke, such as automod
             if len(users) == 1:
-                resp = f'{config.greenTick} {users[0]} has been successfully banned')
+                resp = f'{config.greenTick} {users[0]} has been successfully banned'
                 if couldNotDM:
                     resp += '. I was not able to DM them about this action'
 
@@ -418,7 +418,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
                 if failedBans:
                     resp += f'. Failed to ban **{failedBans}** from the provided list'
-            
+
             return await ctx.send(resp)
 
     @commands.command(name='unban')
