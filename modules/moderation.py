@@ -661,7 +661,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
-    async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
+    async def _strike(self, ctx, user: ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
         if count == 0:
             return await ctx.send(
                 f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `{ctx.prefix}strike set`'
@@ -675,7 +675,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         userDB = mclient.bowser.users
 
         activeStrikes = 0
-        for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
+        for pun in punDB.find({'user': user.id, 'type': 'strike', 'active': True}):
             activeStrikes += pun['active_strike_count']
 
         activeStrikes += count
@@ -684,8 +684,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead'
             )
 
-        docID = await tools.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
-        userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
+        docID = await tools.issue_pun(user.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
+        userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
 
         self.taskHandles.append(
             self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
@@ -696,17 +696,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             'strike',
             docID,
             reason,
-            user=member,
+            user=user,
             moderator=ctx.author,
             extra_author=count,
             public=True,
         )
         content = (
-            f'{config.greenTick} {member} ({member.id}) has been successfully struck, '
+            f'{config.greenTick} {user} ({user.id}) has been successfully struck, '
             f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count})'
         )
         try:
-            await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
+            await user.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
         except discord.Forbidden:
             if not tools.mod_cmd_invoke_delete(ctx.channel):
