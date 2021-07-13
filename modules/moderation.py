@@ -337,13 +337,27 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await ctx.send(f'{config.redTick} An invalid user was provided')
         banCount = 0
         failedBans = 0
+
         for user in users:
             userid = user if (type(user) is int) else user.id
-
             username = userid if (type(user) is int) else f'{str(user)}'
-            user = (
-                discord.Object(id=userid) if (type(user) is int) else user
-            )  # If not a user, manually contruct a user object
+
+            # If not a user, manually contruct a user object
+            user = discord.Object(id=userid) if (type(user) is int) else user
+
+            try:
+                member = await ctx.guild.fetch_member(userid)
+                usr_role_pos = member.top_role.position
+            except:
+                usr_role_pos = -1
+
+            if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} Insufficent permissions to ban {username}')
+                else:
+                    failedBans += 1
+                    continue
+
             try:
                 await ctx.guild.fetch_ban(user)
                 if len(users) == 1:
@@ -445,29 +459,79 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.command(name='kick')
     @commands.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _kicking(self, ctx, member: discord.Member, *, reason='-No reason specified-'):
+    async def _kicking(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
         if len(reason) > 990:
             return await ctx.send(
                 f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters'
             )
-        docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
-        await tools.send_modlog(
-            self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
-        )
-        additional = ""
-        try:
-            await member.send(tools.format_pundm('kick', reason, ctx.author))
+        if not users:
+            return await ctx.send(f'{config.redTick} An invalid user was provided')
 
-        except (discord.Forbidden, AttributeError):
-            if not tools.mod_cmd_invoke_delete(ctx.channel):
-                additional = ' I was not able to DM them about this action'
+        kickCount = 0
+        failedKicks = 0
+        couldNotDM = False
 
-        await member.kick(reason='Kick action performed by moderator')
+        for user in users:
+            userid = user if (type(user) is int) else user.id
+            username = userid if (type(user) is int) else f'{str(user)}'
+
+            user = (
+                discord.Object(id=userid) if (type(user) is int) else user
+            )  # If not a user, manually contruct a user object
+
+            try:
+                member = await ctx.guild.fetch_member(userid)
+            except discord.HTTPException:  # Member not in guild
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} {username} is not the server!')
+
+                else:
+                    # If a many-user kick, don't exit if a user is already gone
+                    failedKicks += 1
+                    continue
+
+            usr_role_pos = member.top_role.position
+
+            if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
+                if len(users) == 1:
+                    return await ctx.send(f'{config.redTick} Insufficent permissions to kick {username}')
+                else:
+                    failedKicks += 1
+                    continue
+
+            try:
+                await user.send(tools.format_pundm('kick', reason, ctx.author))
+            except (discord.Forbidden, AttributeError):
+                couldNotDM = True
+                pass
+
+            try:
+                await member.kick(reason='Kick action performed by moderator')
+            except (discord.Forbidden):
+                failedKicks += 1
+                continue
+
+            docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+            await tools.send_modlog(
+                self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
+            )
+            kickCount += 1
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully kicked{additional}')
+        if ctx.author.id != self.bot.user.id:  # Non-command invoke, such as automod
+            if len(users) == 1:
+                resp = f'{config.greenTick} {users[0]} has been successfully kicked'
+                if couldNotDM:
+                    resp += '. I was not able to DM them about this action'
+
+            else:
+                resp = f'{config.greenTick} **{kickCount}** users have been successfully kicked'
+                if failedKicks:
+                    resp += f'. Failed to kick **{failedKicks}** from the provided list'
+
+            return await ctx.send(resp)
 
     @commands.command(name='mute')
     @commands.has_any_role(config.moderator, config.eh)
@@ -591,7 +655,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
-    async def _strike(self, ctx, member: discord.Member, count: typing.Optional[StrikeRange] = 1, *, reason):
+    async def _strike(self, ctx, user: ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
         if count == 0:
             return await ctx.send(
                 f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `{ctx.prefix}strike set`'
@@ -605,7 +669,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         userDB = mclient.bowser.users
 
         activeStrikes = 0
-        for pun in punDB.find({'user': member.id, 'type': 'strike', 'active': True}):
+        for pun in punDB.find({'user': user.id, 'type': 'strike', 'active': True}):
             activeStrikes += pun['active_strike_count']
 
         activeStrikes += count
@@ -614,8 +678,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead'
             )
 
-        docID = await tools.issue_pun(member.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
-        userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
+        docID = await tools.issue_pun(user.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
+        userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
 
         self.taskHandles.append(
             self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
@@ -626,17 +690,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             'strike',
             docID,
             reason,
-            user=member,
+            user=user,
             moderator=ctx.author,
             extra_author=count,
             public=True,
         )
         content = (
-            f'{config.greenTick} {member} ({member.id}) has been successfully struck, '
+            f'{config.greenTick} {user} ({user.id}) has been successfully struck, '
             f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count})'
         )
         try:
-            await member.send(tools.format_pundm('strike', reason, ctx.author, details=count))
+            await user.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
         except discord.Forbidden:
             if not tools.mod_cmd_invoke_delete(ctx.channel):
