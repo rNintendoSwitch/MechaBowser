@@ -62,32 +62,6 @@ class MainEvents(commands.Cog):
 
         logging.info('[Core] Finished sanitzation of old EUD')
 
-    @tasks.loop(seconds=15)
-    async def fetch_invites(self):
-        for guild in self.bot.guilds:
-            for invite in await guild.invites():
-                inviteDict = {
-                    'max_age': invite.max_age,
-                    'guild': guild.id,
-                    'created_at': invite.created_at,
-                    'temporary': invite.temporary,
-                    'max_uses': invite.max_uses,
-                    'uses': invite.uses,
-                    'inviter': invite.inviter.id,
-                    'channel': invite.channel.id,
-                }
-
-                if invite.id not in self.invites.keys() or inviteDict != self.invites[invite.id]:
-                    self.invites[invite.id] = inviteDict
-        print(self.invites)
-
-    async def check_invite_use(self, guild):
-        for key, value in self.invites.items():
-            if value['guild'] != guild:
-                continue  # Not an applicable guild to this check
-            invite = await self.bot.fetch_invite(url=key)
-            # if
-
     @commands.command(name='ping')
     async def _ping(self, ctx):
         initiated = ctx.message.created_at
