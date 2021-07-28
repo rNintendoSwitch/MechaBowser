@@ -728,10 +728,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @_strike.command(name='set')
-    async def _strike_set(self, ctx, member: discord.Member, count: StrikeRange, *, reason):
+    async def _strike_set(self, ctx, user: ResolveUser, count: StrikeRange, *, reason):
         punDB = mclient.bowser.puns
         activeStrikes = 0
-        puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True})
+        puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True})
         for pun in puns:
             activeStrikes += pun['active_strike_count']
 
@@ -741,12 +741,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         elif (
             count > activeStrikes
         ):  # This is going to be a positive diff, lets just do the math and defer work to _strike()
-            return await self._strike(ctx, member, count - activeStrikes, reason=reason)
+            return await self._strike(ctx, user, count - activeStrikes, reason=reason)
 
         else:  # Negative diff, we will need to reduce our strikes
             diff = activeStrikes - count
 
-            puns = punDB.find({'user': member.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
+            puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
             for pun in puns:
                 if pun['active_strike_count'] - diff >= 0:
                     userDB = mclient.bowser.users
@@ -759,7 +759,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                             }
                         },
                     )
-                    userDB.update_one({'_id': member.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})
+                    userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})
                     self.taskHandles.append(
                         self.bot.loop.call_later(
                             60 * 60 * 12, asyncio.create_task, self.expire_actions(pun['_id'], ctx.guild.id)
@@ -783,7 +783,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 raise ValueError('Diff != 0 after full iteration')
 
             docID = await tools.issue_pun(
-                member.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count
+                user.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count
             )
             await tools.send_modlog(
                 self.bot,
@@ -791,14 +791,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 'destrike',
                 docID,
                 reason,
-                user=member,
+                user=user,
                 moderator=ctx.author,
                 extra_author=(activeStrikes - count),
                 public=True,
             )
             error = ""
             try:
-                await member.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
+                await user.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
             except discord.Forbidden:
                 error = 'I was not able to DM them about this action'
 
@@ -806,7 +806,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{member} ({member.id}) has had {diff} strikes removed, '
+                f'{user} ({user.id}) has had {diff} strikes removed, '
                 f'they now have {count} strike{"s" if count > 1 else ""} '
                 f'({activeStrikes} - {count}) {error}'
             )
