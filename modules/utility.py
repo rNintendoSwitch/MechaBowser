@@ -757,6 +757,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if not (
                     ctx.guild.get_role(config.moderator) in ctx.author.roles
                     or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles
+                    or ctx.guild.get_role(config.trialHelpfulUser) in ctx.author.roles
                 ):
                     return await ctx.send(
                         f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}',
@@ -818,7 +819,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             )
 
     @_tag.command(name='edit')
-    @commands.has_any_role(config.moderator, config.helpfulUser)
+    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_create(self, ctx, name, *, content):
         db = mclient.bowser.tags
         name = name.lower()
@@ -844,7 +845,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.greenTick} The **{name}** tag has been created', delete_after=10)
 
     @_tag.command(name='delete')
-    @commands.has_any_role(config.moderator, config.helpfulUser)
+    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_delete(self, ctx, *, name):
         db = mclient.bowser.tags
         name = name.lower()
@@ -877,7 +878,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
     @_tag.command(name='setdesc')
-    @commands.has_any_role(config.moderator, config.helpfulUser)
+    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_setdesc(self, ctx, name, *, content: typing.Optional[str] = ''):
         db = mclient.bowser.tags
         name = name.lower()
@@ -898,7 +899,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
     @_tag.command(name='setimg')
-    @commands.has_any_role(config.moderator, config.helpfulUser)
+    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_setimg(self, ctx, name, img_type_arg, *, url: typing.Optional[str] = ''):
         db = mclient.bowser.tags
         name = name.lower()
@@ -936,7 +937,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
 
     @_tag.command(name='source')
-    @commands.has_any_role(config.moderator, config.helpfulUser)
+    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_source(self, ctx, *, name):
         db = mclient.bowser.tags
         name = name.lower()

@@ -52,6 +52,7 @@ modemeritus: int = moderator_emeritus
 submodemeritus: int = sub_moderator_emeritus
 eh: int = test_server_mod
 helpfulUser: int = helpful_user
+trialHelpfulUser: int = trial_helpful_user
 mute: int = timeout
 noSpoilers: int = spoiler_restricted
 noSuggestions: int = suggestion_restricted
