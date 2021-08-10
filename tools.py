@@ -307,8 +307,8 @@ async def send_modlog(
     bot,
     channel,
     _type,
-    footer,
-    reason,
+    footer=None,
+    reason=None,
     user=None,
     username=None,
     userid=None,
@@ -319,28 +319,29 @@ async def send_modlog(
     public=False,
     delay=300,
     updated=None,
+    description=None,
 ):
     if user:
         # Keep compatibility with sources without reliable user objects (i.e. ban), without forcing a long function every time
         username = str(user)
         userid = user.id
 
+    # Certain types require special formatting, all others are generic
     if _type in ['duration-update', 'reason-update']:
         author = config.punStrs[_type] + f' ({extra_author}) '
 
+    elif _type == 'strike':
+        author = f'{extra_author} ' + config.punStrs[_type]
+        author += 's ' if extra_author > 1 else ' '
+
+    elif _type == 'destrike':
+        author = f'Removed {extra_author} ' + config.punStrs['strike']
+        author += 's ' if extra_author > 1 else ' '
+
     else:
-        if _type == 'strike':
-            author = f'{extra_author} ' + config.punStrs[_type]
-            author += 's ' if extra_author > 1 else ' '
-
-        elif _type == 'destrike':
-            author = f'Removed {extra_author} ' + config.punStrs['strike']
-            author += 's ' if extra_author > 1 else ' '
-
-        else:
-            author = f'{config.punStrs[_type]} '
-            if extra_author:
-                author += f'({extra_author}) '
+        author = f'{config.punStrs[_type]} '
+        if extra_author:
+            author += f'({extra_author}) '
 
     author += f'| {username} ({userid})'
 
@@ -349,8 +350,14 @@ async def send_modlog(
 
     embed = discord.Embed(color=config.punColors[_type], timestamp=timestamp)
     embed.set_author(name=author)
-    embed.set_footer(text=footer)
     embed.add_field(name='User', value=f'<@!{userid}>', inline=True)
+
+    if description:
+        embed.description = description
+
+    if footer:
+        embed.set_footer(text=footer)
+
     if moderator:
         if not isinstance(moderator, str):  # Convert to str
             moderator = moderator.mention
@@ -360,7 +367,9 @@ async def send_modlog(
     if expires:
         embed.add_field(name='Expires' if _type != 'duration-update' else 'Now expires', value=expires)
 
-    embed.add_field(name='Reason' if _type != 'reason-update' else 'New reason', value=reason)
+    if reason:
+        embed.add_field(name='Reason' if _type != 'reason-update' else 'New reason', value=reason)
+
     if _type == 'reason-update':
         embed.add_field(name='Old reason', value=updated)
 

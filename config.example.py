@@ -111,6 +111,8 @@ punStrs = {
     'appealdeny': 'Denied ban appeal',
     'duration-update': 'Duration updated',
     'reason-update': 'Reason updated',
+    'action-approve': 'Automod Resolved',
+    'action-reject': 'Automod Dismissed',
 }
 
 punColors = {
@@ -126,4 +128,6 @@ punColors = {
     'unmute': 0x39C05D,
     'duration-update': 0x58B9FF,
     'reason-update': 0x58B9FF,
+    'action-approve': 0x895EC8,
+    'action-reject': 0xC553C0,
 }
