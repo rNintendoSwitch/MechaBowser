@@ -95,7 +95,7 @@ punDM = (
 
 punStrs = {
     'strike': 'Strike',
-    'destrike': 'Removed Strike',
+    'destrike': 'Removed strike',
     'tier1': 'Tier 1 Warning',
     'tier2': 'Tier 2 Warning',
     'tier3': 'Tier 3 Warning',
@@ -111,8 +111,8 @@ punStrs = {
     'appealdeny': 'Denied ban appeal',
     'duration-update': 'Duration updated',
     'reason-update': 'Reason updated',
-    'action-approve': 'Automod Resolved',
-    'action-reject': 'Automod Dismissed',
+    'action-approve': 'Automod alert resolved',
+    'action-reject': 'Automod alert dismissed',
 }
 
 punColors = {
