@@ -45,6 +45,20 @@ class MainEvents(commands.Cog):
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.invites = {}
 
+        # Automod is hard coded to this guild, so to reduce confusion, we only init configured guild.
+        guild_db = mclient.bowser.guilds
+        guild = guild_db.find_one({'_id': config.nintendoswitch})
+
+        if not guild:
+            guild_db.insert(
+                {
+                    "_id": config.nintendoswitch,
+                    "inviteWhitelist": [config.nintendoswitch],
+                    "whitelist": [],
+                    "blacklist": [],
+                }
+            )
+
     def cog_unload(self):
         self.sanitize_eud.cancel()  # pylint: disable=no-member
 
