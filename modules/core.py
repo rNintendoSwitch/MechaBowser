@@ -128,7 +128,7 @@ class MainEvents(commands.Cog):
         # log = f':inbox_tray: {new} User **{str(member)}** ({member.id}) joined'
 
         embed = discord.Embed(color=0x417505, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
         created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
         created_at += '' if not new else '\n' + tools.humanize_duration(member.created_at)
         embed.add_field(name='Created at', value=created_at)
@@ -179,7 +179,7 @@ class MainEvents(commands.Cog):
                         restoredPuns.append(punTypes[x['type']])
 
             embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+            embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
             embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList))
             if restoredPuns:
                 embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
@@ -297,7 +297,7 @@ class MainEvents(commands.Cog):
         else:
             embed = discord.Embed(color=0x8B572A, timestamp=datetime.datetime.utcnow())
 
-        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
         await self.serverLogs.send(':outbox_tray: User left', embed=embed)
 
@@ -325,7 +325,7 @@ class MainEvents(commands.Cog):
                 )
 
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
+        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
         await self.serverLogs.send(':rotating_light: User banned', embed=embed)
@@ -359,7 +359,7 @@ class MainEvents(commands.Cog):
                 )
 
         embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
+        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
         await self.serverLogs.send(':triangular_flag_on_post: User unbanned', embed=embed)
@@ -449,7 +449,7 @@ class MainEvents(commands.Cog):
             color=0xF8E71C,
             timestamp=datetime.datetime.utcnow(),
         )
-        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar_url)
+        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
         if payload.cached_message and len(payload.cached_message.attachments) == 1:
             embed.set_image(url=payload.cached_message.attachments[0].proxy_url)
@@ -502,7 +502,7 @@ class MainEvents(commands.Cog):
                 timestamp=datetime.datetime.utcnow(),
             )
 
-        embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar_url)
+        embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar.url)
         embed.add_field(name='Mention', value=f'<@{before.author.id}>')
 
         await self.serverLogs.send(f':pencil: Message edited in <#{before.channel.id}>', embed=embed)
@@ -524,7 +524,7 @@ class MainEvents(commands.Cog):
                 after_name = discord.utils.escape_markdown(after.nick)
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
+            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -553,7 +553,7 @@ class MainEvents(commands.Cog):
 
             if rolesRemoved or rolesAdded:  # nop if no change, e.g. role moves in list
                 embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
+                embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar.url)
 
                 if rolesRemoved:
                     embed.add_field(
@@ -579,7 +579,7 @@ class MainEvents(commands.Cog):
         after_name = discord.utils.escape_markdown(after.name)
         if before.name != after.name:
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
             embed.add_field(name='Before', value=str(before), inline=False)
             embed.add_field(name='After', value=str(after), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -590,7 +590,7 @@ class MainEvents(commands.Cog):
             # Really only case this would be called, and not username (i.e. discrim reroll after name change)
             # is when nitro runs out with a custom discriminator set
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')

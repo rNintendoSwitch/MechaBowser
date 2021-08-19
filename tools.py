@@ -50,7 +50,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                     'id': 0,
                     'name': archive[0].author.name,
                     'discriminator': archive[0].author.discriminator,
-                    'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
+                    'avatar_url': archive[0].author.avatar.with_format('png').with_size(1024).url,
                     'mod': False,
                 },
                 'creator': {
@@ -71,7 +71,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                             'id': str(archive[0].author.id),
                             'name': archive[0].author.name,
                             'discriminator': archive[0].author.discriminator,
-                            'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
+                            'avatar_url': archive[0].author.avatar.with_format('png').with_size(1024).url,
                             'mod': False,
                         },
                         'attachments': [x.url for x in archive[0].attachments],
@@ -85,7 +85,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                             'id': str(archive[1].author.id),
                             'name': archive[1].author.name,
                             'discriminator': archive[1].author.discriminator,
-                            'avatar_url': str(archive[1].author.avatar_url_as(static_format='png', size=1024)),
+                            'avatar_url': archive[1].author.avatar.with_format('png').with_size(1024).url,
                             'mod': False,
                         },
                         'attachments': [x.url for x in archive[1].attachments],
@@ -107,7 +107,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                         'id': str(msg.author.id),
                         'name': msg.author.name,
                         'discriminator': msg.author.discriminator,
-                        'avatar_url': str(msg.author.avatar_url_as(static_format='png', size=1024)),
+                        'avatar_url': msg.author.avatar.with_format('png').with_size(1024).url,
                         'mod': False,
                     },
                     'channel': {'id': str(msg.channel.id), 'name': msg.channel.name},
@@ -597,7 +597,7 @@ async def send_paginated_embed(
     embed = discord.Embed(description=None if not description else description, colour=color)
     if author:
         embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
-    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
+    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar.url)
 
     # Main loop
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
