@@ -456,7 +456,7 @@ def format_pundm(_type, reason, moderator=None, details=None, auto=False):
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on',
-        'duration-update': f'The **duration** for your {details_tup[0]} has been updated and **will now expire on {details_tup[0]}** on',
+        'duration-update': f'The **duration** for your {details_tup[0]} has been updated and **will now expire on {details_tup[1]}** on',
         'reason-update': f'The **reasoning** for your {details_tup[0]} issued on {details_tup[1]} has been updated on',
     }
 
