@@ -147,7 +147,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             f'{netMemberStr}:hammer: **{puns}** punishment actions were handed down\n\n:bar_chart: The most active channels by message count were {activeChannels}',
             color=0xD267BA,
         )
-        embed.set_thumbnail(url=ctx.guild.icon_url)
+        embed.set_thumbnail(url=ctx.guild.icon.url)
         embed.add_field(
             name='Guild features',
             value=f'**Guild flags:** {", ".join(ctx.guild.features)}\n'
