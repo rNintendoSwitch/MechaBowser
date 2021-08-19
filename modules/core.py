@@ -361,27 +361,44 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':triangular_flag_on_post: User unbanned', embed=embed)
 
     @commands.Cog.listener()
+    async def on_thread_join(self, thread):
+        # on_thread_join is called when a thread is created as well as joined
+        if not thread.me:
+            # We only want to send an API call if we aren't already in it
+            await thread.join()
+
+    @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or message.webhook_id:
             return
 
-        if message.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+        if message.type != discord.MessageType.default:
+            return
+
+        if message.channel.type not in [
+            discord.ChannelType.text,
+            discord.ChannelType.news,
+            discord.ChannelType.public_thread,
+            discord.ChannelType.private_thread,
+        ]:
             logging.debug(f'Discarding non guild message {message.channel.type} {message.id}')
             return
 
         db = mclient.bowser.messages
         timestamp = int(time.time())
-        db.insert_one(
-            {
-                '_id': message.id,
-                'author': message.author.id,
-                'guild': message.guild.id,
-                'channel': message.channel.id,
-                'content': message.content,
-                'timestamp': timestamp,
-                'sanitized': False,
-            }
-        )
+        obj = {
+            '_id': message.id,
+            'author': message.author.id,
+            'guild': message.guild.id,
+            'channel': message.channel.id,
+            'content': message.content,
+            'timestamp': timestamp,
+            'sanitized': False,
+        }
+        if message.channel.type in [discord.ChannelType.public_thread, discord.ChannelType.private_thread]:
+            obj['parent_channel'] = message.channel.parent_id
+
+        db.insert_one(obj)
 
         await self.bot.process_commands(message)  # Allow commands to fire
         return
