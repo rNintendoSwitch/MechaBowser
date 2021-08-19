@@ -1131,22 +1131,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             raise error
 
 
-class AntiRaid(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.adminChannel = self.bot.get_channel(config.adminChannel)
-        self.muteRole = self.bot.get_guild(config.nintendoswitch).get_role(config.mute)
-        self.messages = {}
-
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        self.messages[message.channel.id].append(
-            {'user': message.author.id, 'content': message.content, 'id': message.id}
-        )
-
-        # Individual user spam analysis
-
-
 def setup(bot):
     global serverLogs
     global modLogs
