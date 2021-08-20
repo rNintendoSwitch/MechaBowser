@@ -114,7 +114,7 @@ class MainEvents(commands.Cog):
         else:
             db.update_one(
                 {'_id': member.id},
-                {'$push': {'joins': (datetime.now(tz=timezone.utc) - datetime.utcfromtimestamp(0)).total_seconds()}},
+                {'$push': {'joins': int(datetime.now(tz=timezone.utc).timestamp())}},
             )
 
         new = (
