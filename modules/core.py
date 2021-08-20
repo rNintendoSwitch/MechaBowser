@@ -391,6 +391,7 @@ class MainEvents(commands.Cog):
             'author': message.author.id,
             'guild': message.guild.id,
             'channel': message.channel.id,
+            'parent_channel': None,
             'content': message.content,
             'timestamp': timestamp,
             'sanitized': False,
