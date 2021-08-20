@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 import typing
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import config
 import discord
@@ -39,7 +39,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             )
             searchDate = searchDate.replace(hour=0, minute=0, second=0)
             endDate = (
-                searchDate + datetime.timedelta(days=30)
+                searchDate + timedelta(days=30)
                 if not end_date
                 else datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
             )

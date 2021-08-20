@@ -3,7 +3,7 @@ import collections
 import io
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
@@ -73,7 +73,7 @@ class GiantBomb:
                 # Futhermore, confusingly, both the /games and /releases have a platforms key, however their filter
                 # subkey is either 'platform' or 'platforms', respectfully.
                 if after:
-                    after = after + datetime.timedelta(0, 1)  # Add 1 sec
+                    after = after + timedelta(0, 1)  # Add 1 sec
                     start = after.isoformat(" ", timespec="seconds")
                     end = "2100-01-01 00:00:00"
                     platform_s = 'platform' if path == 'releases' else 'platforms'
@@ -133,7 +133,7 @@ class Games(commands.Cog, name='Games'):
     @tasks.loop(hours=1)
     async def sync_db(self, force_full: bool = False) -> Tuple[int, str]:
         # If last full sync was more then a day ago (or on restart/forced), preform a new full sync
-        day_ago = datetime.now(tz=timezone.utc) - datetime.timedelta(days=1)
+        day_ago = datetime.now(tz=timezone.utc) - timedelta(days=1)
         full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
 
         if not full:

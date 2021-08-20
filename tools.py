@@ -4,7 +4,7 @@ import re
 import time
 import typing
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import config
 import discord
@@ -245,10 +245,10 @@ def resolve_duration(data, include_seconds=False):
         digits = ''
 
     if include_seconds:
-        return datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=value + 1), value
+        return datetime.now(tz=timezone.utc) + timedelta(seconds=value + 1), value
 
     else:
-        return datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=value + 1)
+        return datetime.now(tz=timezone.utc) + timedelta(seconds=value + 1)
 
 
 def humanize_duration(duration):
@@ -260,11 +260,11 @@ def humanize_duration(duration):
     duration: datetime
     """
     now = datetime.now(tz=timezone.utc)
-    if isinstance(duration, datetime.timedelta):
+    if isinstance(duration, timedelta):
         if duration.total_seconds() > 0:
             duration = datetime.today() + duration
         else:
-            duration = datetime.now(tz=timezone.utc) - datetime.timedelta(seconds=duration.total_seconds())
+            duration = datetime.now(tz=timezone.utc) - timedelta(seconds=duration.total_seconds())
     diff_delta = duration - now
     diff = int(diff_delta.total_seconds())
 
