@@ -16,11 +16,11 @@ QTEs
 
 --change back run_ghost in item 4, and pick by floor again"""
 import asyncio
-import datetime
 import logging
 import math
 import random
 import typing
+from datetime import datetime, timezone
 
 import config
 import pymongo
@@ -171,7 +171,7 @@ class Mansion(commands.Cog):
     @tasks.loop(seconds=1)
     async def _expire_effects(self):
         for item in self.activeItems[:]:
-            if item['expires'] and item['expires'] <= datetime.datetime.utcnow():
+            if item['expires'] and item['expires'] <= datetime.now(tz=timezone.utc):
                 if item['id'] == 'gooigi':
                     self.multiplier -= 1
 
@@ -524,7 +524,7 @@ class Mansion(commands.Cog):
         await self.ghost.add_reaction(self.poltergustEmote)
         editDelay = 1
         qteTimer = 30
-        while self.hp > 0 and (expires - datetime.datetime.now()).total_seconds() > 0:
+        while self.hp > 0 and (expires - datetime.now()).total_seconds() > 0:
             #            if boss:
             #                #if random.choices([True, False], weights=[2, 98]):#[0]:
             #                if not self.activeQte:

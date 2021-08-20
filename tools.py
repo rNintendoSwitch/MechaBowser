@@ -1,10 +1,10 @@
 import asyncio
-import datetime
 import logging
 import re
 import time
 import typing
 import uuid
+from datetime import datetime, timezone
 
 import config
 import discord
@@ -164,7 +164,7 @@ async def store_user(member, messages=0):
     userData = {
         '_id': member.id,
         'roles': roleList,
-        'joins': [(datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()],
+        'joins': [(datetime.now(tz=timezone.utc) - datetime.utcfromtimestamp(0)).total_seconds()],
         'leaves': [],
         'lockdown': False,
         'jailed': False,
@@ -245,10 +245,10 @@ def resolve_duration(data, include_seconds=False):
         digits = ''
 
     if include_seconds:
-        return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1), value
+        return datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=value + 1), value
 
     else:
-        return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
+        return datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=value + 1)
 
 
 def humanize_duration(duration):
@@ -257,14 +257,14 @@ def humanize_duration(duration):
     weeks, days, hours, minutes, seconds string output
     Credit https://github.com/ThaTiemsz/jetski via MIT license
 
-    duration: datetime.datetime
+    duration: datetime
     """
-    now = datetime.datetime.utcnow()
+    now = datetime.now(tz=timezone.utc)
     if isinstance(duration, datetime.timedelta):
         if duration.total_seconds() > 0:
-            duration = datetime.datetime.today() + duration
+            duration = datetime.today() + duration
         else:
-            duration = datetime.datetime.utcnow() - datetime.timedelta(seconds=duration.total_seconds())
+            duration = datetime.now(tz=timezone.utc) - datetime.timedelta(seconds=duration.total_seconds())
     diff_delta = duration - now
     diff = int(diff_delta.total_seconds())
 
@@ -346,7 +346,7 @@ async def send_modlog(
     author += f'| {username} ({userid})'
 
     if not timestamp:
-        timestamp = datetime.datetime.utcnow()
+        timestamp = datetime.now(tz=timezone.utc)
 
     embed = discord.Embed(color=config.punColors[_type], timestamp=timestamp)
     embed.set_author(name=author)
@@ -408,14 +408,12 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
     author += f'| {user} ({user.id})'
 
-    embed = discord.Embed(
-        color=config.punColors[doc['type']], timestamp=datetime.datetime.utcfromtimestamp(doc['timestamp'])
-    )
+    embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.utcfromtimestamp(doc['timestamp']))
     embed.set_author(name=author)
     embed.set_footer(text=id)
     embed.add_field(name='User', value=user.mention, inline=True)
     if doc['expiry']:
-        expires = datetime.datetime.utcfromtimestamp(doc['expiry'])
+        expires = datetime.utcfromtimestamp(doc['expiry'])
         embed.add_field(
             name='Expires', value=f'{expires.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanize_duration(expires)})'
         )

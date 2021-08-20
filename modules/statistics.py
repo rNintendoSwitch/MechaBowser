@@ -1,8 +1,8 @@
 import asyncio
-import datetime
 import logging
 import time
 import typing
+from datetime import datetime, timezone
 
 import config
 import discord
@@ -33,15 +33,15 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
 
         try:
             searchDate = (
-                datetime.datetime.utcnow()
+                datetime.now(tz=timezone.utc)
                 if not start_date
-                else datetime.datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+                else datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
             )
             searchDate = searchDate.replace(hour=0, minute=0, second=0)
             endDate = (
                 searchDate + datetime.timedelta(days=30)
                 if not end_date
-                else datetime.datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
+                else datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=pytz.UTC)
             )
             endDate = endDate.replace(hour=23, minute=59, second=59)
 

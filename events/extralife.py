@@ -1,5 +1,5 @@
-import datetime
 import logging
+from datetime import datetime
 
 import discord
 import requests
@@ -76,7 +76,7 @@ class ExtraLife(commands.Cog):
                 break
 
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
-            donation_time = datetime.datetime.strptime(
+            donation_time = datetime.strptime(
                 donation['createdDateUTC'], '%Y-%m-%dT%H:%M:%S.%f%z'
             )  # eg 2020-11-07T06:00:07.327+0000
 

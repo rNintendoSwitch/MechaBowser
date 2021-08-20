@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import io
 import logging
 import math
@@ -7,6 +6,7 @@ import os
 import re
 import time
 import typing
+from datetime import datetime
 from pathlib import Path
 
 import codepoints
@@ -403,7 +403,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         joins = dbUser['joins']
         joins.sort()
-        joinDate = datetime.datetime.utcfromtimestamp(joins[0])
+        joinDate = datetime.utcfromtimestamp(joins[0])
         try:  # -d doesn't work on all platforms, such as Windows
             joinDateF = joinDate.strftime('%b. %-d, %Y')
         except:
@@ -414,7 +414,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:
-            tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
+            tznow = datetime.now(pytz.timezone(dbUser['timezone']))
             localtime = tznow.strftime('%H:%M')
             tzOffset = tznow.strftime('%z')
 

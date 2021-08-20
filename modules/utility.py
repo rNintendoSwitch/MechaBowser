@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import io
 import logging
 import pathlib
@@ -7,6 +6,7 @@ import re
 import time
 import typing
 import urllib
+from datetime import datetime
 
 import aiohttp
 import config
@@ -431,9 +431,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         lastMsg = (
             'N/a'
             if msgCount == 0
-            else datetime.datetime.utcfromtimestamp(
-                messages.sort('timestamp', pymongo.DESCENDING)[0]['timestamp']
-            ).strftime('%B %d, %Y %H:%M:%S UTC')
+            else datetime.utcfromtimestamp(messages.sort('timestamp', pymongo.DESCENDING)[0]['timestamp']).strftime(
+                '%B %d, %Y %H:%M:%S UTC'
+            )
         )
         embed.add_field(name='Last message', value=lastMsg, inline=True)
         embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
@@ -444,7 +444,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             noteCnt = noteDocs.count()
             noteList = []
             for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
-                stamp = datetime.datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
+                stamp = datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
                 noteContent = f'{stamp}: {x["reason"]}'
 
                 fieldLength = 0
@@ -479,7 +479,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     continue
 
                 puns += 1
-                stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
+                stamp = datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
                 punType = config.punStrs[pun['type']]
                 if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist', 'destrike']:
                     if pun['type'] == 'destrike':
@@ -594,7 +594,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             activeStrikes = 0
             totalStrikes = 0
             for pun in puns.sort('timestamp', pymongo.DESCENDING):
-                datestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
+                datestamp = datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
                 moderator = ctx.guild.get_member(pun['moderator'])
                 if not moderator:
                     moderator = await self.bot.fetch_user(pun['moderator'])
@@ -612,9 +612,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     inf = punNames[pun['type']].format(pun['context'])
 
                 elif pun['type'] == 'appealdeny':
-                    inf = punNames[pun['type']].format(
-                        datetime.datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y')
-                    )
+                    inf = punNames[pun['type']].format(datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
 
                 else:
                     inf = punNames[pun['type']]
