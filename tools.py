@@ -164,7 +164,7 @@ async def store_user(member, messages=0):
     userData = {
         '_id': member.id,
         'roles': roleList,
-        'joins': [(datetime.now(tz=timezone.utc) - datetime.utcfromtimestamp(0)).total_seconds()],
+        'joins': [int(datetime.now(tz=timezone.utc).timestamp())],
         'leaves': [],
         'lockdown': False,
         'jailed': False,

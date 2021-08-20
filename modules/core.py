@@ -270,7 +270,7 @@ class MainEvents(commands.Cog):
 
         mclient.bowser.users.update_one(
             {'_id': member.id},
-            {'$push': {'leaves': (datetime.now(tz=timezone.utc) - datetime.utcfromtimestamp(0)).total_seconds()}},
+            {'$push': {'leaves': int(datetime.now(tz=timezone.utc).timestamp())}},
         )
         if puns.count():
             embed = discord.Embed(
