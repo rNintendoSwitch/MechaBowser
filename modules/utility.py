@@ -12,7 +12,7 @@ import aiohttp
 import config
 import discord
 import pymongo
-from discord import AsyncWebhookAdapter, Webhook
+from discord import Webhook, WebhookType
 from discord.ext import commands, tasks
 
 import tools
@@ -159,22 +159,24 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     content = content.replace(link[0], url)
 
             if contentModified:
-                hooks = await message.channel.webhooks()
+                useHook = None
+                for h in await message.channel.webhooks():
+                    if h.type == WebhookType.incoming and h.token:
+                        useHook = h
 
-                if hooks:
-                    useHook = hooks[0]
-                else:
+                if not useHook:
+                    # An incoming webhook does not exist
                     useHook = await message.channel.create_webhook(
                         name=f'mab_{message.channel.id}',
                         reason='No webhooks existed; 1 or more is required for affiliate filtering',
                     )
 
                 async with aiohttp.ClientSession() as session:
-                    webhook = Webhook.from_url(useHook.url, adapter=AsyncWebhookAdapter(session))
+                    webhook = Webhook.from_url(useHook.url, session=session)
                     webhook_message = await webhook.send(
                         content=content,
                         username=message.author.display_name,
-                        avatar_url=message.author.avatar_url,
+                        avatar_url=message.author.avatar.url,
                         wait=True,
                     )
 
@@ -188,7 +190,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     )
 
                     # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
-                    icon_url = f'{message.author.avatar_url}#mab_remover_{message.author.id}_{webhook_message.id}'
+                    icon_url = f'{message.author.avatar.url}#mab_remover_{message.author.id}_{webhook_message.id}'
                     embed.set_footer(text=f'Author: {str(message.author)} ({message.author.id})', icon_url=icon_url)
 
                     # A seperate message is sent so that the original message has embeds
@@ -368,8 +370,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `{ctx.prefix}history {user.id}` to view'
 
                 embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
-                embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-                embed.set_thumbnail(url=user.avatar_url)
+                embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar.url)
+                embed.set_thumbnail(url=user.avatar.url)
                 embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
 
                 return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
@@ -392,8 +394,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         )
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
-        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-        embed.set_thumbnail(url=user.avatar_url)
+        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar.url)
+        embed.set_thumbnail(url=user.avatar.url)
         embed.add_field(name='Messages', value=str(msgCount), inline=True)
         if inServer:
             embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
@@ -655,7 +657,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 )
                 await ctx.message.add_reaction('📬')
 
-            author = {'name': f'{user} | {user.id}', 'icon_url': user.avatar_url}
+            author = {'name': f'{user} | {user.id}', 'icon_url': user.avatar.url}
             await tools.send_paginated_embed(
                 self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author
             )
@@ -712,7 +714,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await ctx.message.delete()
 
             embed = discord.Embed(title=tag['_id'], description=tag['content'])
-            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.avatar_url)
+            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.avatar.url)
 
             if 'img_main' in tag and tag['img_main']:
                 embed.set_image(url=tag['img_main'])
@@ -1127,22 +1129,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 delete_after=15,
             )
             raise error
-
-
-class AntiRaid(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.adminChannel = self.bot.get_channel(config.adminChannel)
-        self.muteRole = self.bot.get_guild(config.nintendoswitch).get_role(config.mute)
-        self.messages = {}
-
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        self.messages[message.channel.id].append(
-            {'user': message.author.id, 'content': message.content, 'id': message.id}
-        )
-
-        # Individual user spam analysis
 
 
 def setup(bot):

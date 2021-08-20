@@ -344,7 +344,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         background = self.backgrounds[dbUser['background']]
         theme = self.themes[background["theme"]]
 
-        pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
+        pfpBytes = io.BytesIO(await member.avatar.with_format('png').with_size(256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
 
         card = theme['pfpBackground'].copy()
@@ -778,7 +778,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile'
             '\n\nWhen prompted, simply reply with what you would like to set the field as.',
         )
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
 
         try:
             mainMsg = await ctx.author.send(embed=embed)

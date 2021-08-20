@@ -1,10 +1,10 @@
 import asyncio
 import collections
-import datetime
 import logging
 import re
 import time
 import typing
+from datetime import datetime, timezone
 
 import config  # type: ignore
 import discord
@@ -114,21 +114,17 @@ class MainEvents(commands.Cog):
         else:
             db.update_one(
                 {'_id': member.id},
-                {
-                    '$push': {
-                        'joins': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()
-                    }
-                },
+                {'$push': {'joins': (datetime.utcnow() - datetime.utcfromtimestamp(0)).total_seconds()}},
             )
 
         new = (
-            ':new: ' if (datetime.datetime.utcnow() - member.created_at).total_seconds() <= 60 * 60 * 24 * 14 else ''
+            ':new: ' if (datetime.now(tz=timezone.utc) - member.created_at).total_seconds() <= 60 * 60 * 24 * 14 else ''
         )  # Two weeks
 
         # log = f':inbox_tray: {new} User **{str(member)}** ({member.id}) joined'
 
-        embed = discord.Embed(color=0x417505, timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+        embed = discord.Embed(color=0x417505, timestamp=datetime.utcnow())
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
         created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
         created_at += '' if not new else '\n' + tools.humanize_duration(member.created_at)
         embed.add_field(name='Created at', value=created_at)
@@ -178,8 +174,8 @@ class MainEvents(commands.Cog):
                     else:
                         restoredPuns.append(punTypes[x['type']])
 
-            embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+            embed = discord.Embed(color=0x4A90E2, timestamp=datetime.utcnow())
+            embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
             embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList))
             if restoredPuns:
                 embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
@@ -246,7 +242,7 @@ class MainEvents(commands.Cog):
                 ).format(
                     str(member),  # Username
                     pun['type'][-1:],  # Tier type
-                    datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y'),  # Date of warn
+                    datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y'),  # Date of warn
                     strikeCount,  # How many strikes will replace tier,
                     config.commandsChannel,  # Commands channel can only be used for the command
                     config.parakarry,  # Parakarry mention for DM
@@ -274,13 +270,13 @@ class MainEvents(commands.Cog):
 
         mclient.bowser.users.update_one(
             {'_id': member.id},
-            {'$push': {'leaves': (datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()}},
+            {'$push': {'leaves': (datetime.utcnow() - datetime.utcfromtimestamp(0)).total_seconds()}},
         )
         if puns.count():
             embed = discord.Embed(
                 description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:',
                 color=0xD62E44,
-                timestamp=datetime.datetime.utcnow(),
+                timestamp=datetime.utcnow(),
             )
             punishments = []
             for x in puns:
@@ -295,9 +291,9 @@ class MainEvents(commands.Cog):
             )
 
         else:
-            embed = discord.Embed(color=0x8B572A, timestamp=datetime.datetime.utcnow())
+            embed = discord.Embed(color=0x8B572A, timestamp=datetime.utcnow())
 
-        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
         await self.serverLogs.send(':outbox_tray: User left', embed=embed)
 
@@ -324,8 +320,8 @@ class MainEvents(commands.Cog):
                     self.bot, self.modLogs, 'ban', docID, reason, user=user, moderator=audited.user, public=True
                 )
 
-        embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
+        embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.utcnow())
+        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
         await self.serverLogs.send(':rotating_light: User banned', embed=embed)
@@ -358,34 +354,52 @@ class MainEvents(commands.Cog):
                     self.bot, self.modLogs, 'unban', docID, reason, user=user, moderator=audited.user, public=True
                 )
 
-        embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.datetime.utcnow())
-        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar_url)
+        embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.utcnow())
+        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
         await self.serverLogs.send(':triangular_flag_on_post: User unbanned', embed=embed)
+
+    @commands.Cog.listener()
+    async def on_thread_join(self, thread):
+        # on_thread_join is called when a thread is created as well as joined
+        if not thread.me:
+            # We only want to send an API call if we aren't already in it
+            await thread.join()
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or message.webhook_id:
             return
 
-        if message.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+        if message.type != discord.MessageType.default:
+            return
+
+        if message.channel.type not in [
+            discord.ChannelType.text,
+            discord.ChannelType.news,
+            discord.ChannelType.public_thread,
+            discord.ChannelType.private_thread,
+        ]:
             logging.debug(f'Discarding non guild message {message.channel.type} {message.id}')
             return
 
         db = mclient.bowser.messages
         timestamp = int(time.time())
-        db.insert_one(
-            {
-                '_id': message.id,
-                'author': message.author.id,
-                'guild': message.guild.id,
-                'channel': message.channel.id,
-                'content': message.content,
-                'timestamp': timestamp,
-                'sanitized': False,
-            }
-        )
+        obj = {
+            '_id': message.id,
+            'author': message.author.id,
+            'guild': message.guild.id,
+            'channel': message.channel.id,
+            'parent_channel': None,
+            'content': message.content,
+            'timestamp': timestamp,
+            'sanitized': False,
+        }
+        if message.channel.type in [discord.ChannelType.public_thread, discord.ChannelType.private_thread]:
+            obj['parent_channel'] = message.channel.parent_id
+
+        db.insert_one(obj)
 
         await self.bot.process_commands(message)  # Allow commands to fire
         return
@@ -413,7 +427,7 @@ class MainEvents(commands.Cog):
         embed = discord.Embed(
             description=f'Archive URL: {config.baseUrl}/logs/{archiveID}',
             color=0xF5A623,
-            timestamp=datetime.datetime.utcnow(),
+            timestamp=datetime.utcnow(),
         )
         return await self.serverLogs.send(':printer: New message archive generated', embed=embed)
 
@@ -447,9 +461,9 @@ class MainEvents(commands.Cog):
         embed = discord.Embed(
             description=f'[Jump to message]({jump_url})\n{content}',
             color=0xF8E71C,
-            timestamp=datetime.datetime.utcnow(),
+            timestamp=datetime.utcnow(),
         )
-        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar_url)
+        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
         if payload.cached_message and len(payload.cached_message.attachments) == 1:
             embed.set_image(url=payload.cached_message.attachments[0].proxy_url)
@@ -490,7 +504,7 @@ class MainEvents(commands.Cog):
             embed = discord.Embed(
                 description=f'[Jump to message]({before.jump_url})',
                 color=0xF8E71C,
-                timestamp=datetime.datetime.utcnow(),
+                timestamp=datetime.utcnow(),
             )
             embed.add_field(name='Before', value=before.content, inline=False)
             embed.add_field(name='After', value=after.content, inline=False)
@@ -499,10 +513,10 @@ class MainEvents(commands.Cog):
             embed = discord.Embed(
                 description=f'[Jump to message]({before.jump_url})\nMessage diff exceeds character limit, view at {config.baseUrl}/logs/{await tools.message_archive([before, after], True)}',
                 color=0xF8E71C,
-                timestamp=datetime.datetime.utcnow(),
+                timestamp=datetime.utcnow(),
             )
 
-        embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar_url)
+        embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar.url)
         embed.add_field(name='Mention', value=f'<@{before.author.id}>')
 
         await self.serverLogs.send(f':pencil: Message edited in <#{before.channel.id}>', embed=embed)
@@ -523,8 +537,8 @@ class MainEvents(commands.Cog):
             else:
                 after_name = discord.utils.escape_markdown(after.nick)
 
-            embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
+            embed = discord.Embed(color=0x9535EC, timestamp=datetime.utcnow())
+            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -552,8 +566,8 @@ class MainEvents(commands.Cog):
             roleStr = ['*No roles*'] if not roleStr else roleStr
 
             if rolesRemoved or rolesAdded:  # nop if no change, e.g. role moves in list
-                embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar_url)
+                embed = discord.Embed(color=0x9535EC, timestamp=datetime.utcnow())
+                embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar.url)
 
                 if rolesRemoved:
                     embed.add_field(
@@ -578,8 +592,8 @@ class MainEvents(commands.Cog):
         before_name = discord.utils.escape_markdown(before.name)
         after_name = discord.utils.escape_markdown(after.name)
         if before.name != after.name:
-            embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
+            embed = discord.Embed(color=0x9535EC, timestamp=datetime.utcnow())
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
             embed.add_field(name='Before', value=str(before), inline=False)
             embed.add_field(name='After', value=str(after), inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -589,8 +603,8 @@ class MainEvents(commands.Cog):
         elif before.discriminator != after.discriminator:
             # Really only case this would be called, and not username (i.e. discrim reroll after name change)
             # is when nitro runs out with a custom discriminator set
-            embed = discord.Embed(color=0x9535EC, timestamp=datetime.datetime.utcnow())
-            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar_url)
+            embed = discord.Embed(color=0x9535EC, timestamp=datetime.utcnow())
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -660,7 +674,7 @@ class MainEvents(commands.Cog):
     async def _pundb(
         self, ctx, _type, user, moderator, strTime, active: typing.Optional[bool], *, reason='-No reason specified-'
     ):
-        date = datetime.datetime.strptime(strTime, '%m/%d/%y')
+        date = datetime.strptime(strTime, '%m/%d/%y')
         expiry = None if not active else int(date.timestamp() + (60 * 60 * 24 * 30))
         await tools.issue_pun(int(user), int(moderator), _type, reason, expiry, active, 'old', date.timestamp())
         await ctx.send(f'{config.greenTick} Done')
