@@ -3,7 +3,7 @@ import collections
 import io
 import logging
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
