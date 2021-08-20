@@ -584,7 +584,7 @@ async def send_paginated_embed(
     message = None
 
     single_page = len(pages) == 1
-    dm_channel = not isinstance(channel, discord.TextChannel)
+    dm_channel = not isinstance(channel, discord.TextChannel) and not isinstance(channel, discord.Thread)
 
     if not (single_page or dm_channel):
         # Setup messages, we wait to update the embed later so users don't click reactions before we're setup
