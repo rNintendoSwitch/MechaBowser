@@ -524,6 +524,19 @@ class MainEvents(commands.Cog):
     async def on_member_update(self, before, after):
         userCol = mclient.bowser.users
         if before.nick != after.nick:
+            userCol.update_one(
+                {'_id': before.id},
+                {
+                    '$push': {
+                        'nameHist': {
+                            'str': after.nick,  # Not escaped. Can be None if nickname removed
+                            'type': 'nick',
+                            'discriminator': after.discriminator,
+                            'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+                        }
+                    }
+                },
+            )
             if not before.nick:
                 before_name = before.name
 
@@ -588,20 +601,26 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_user_update(self, before, after):
-        before_name = discord.utils.escape_markdown(before.name)
-        after_name = discord.utils.escape_markdown(after.name)
-        if before.name != after.name:
-            embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
-            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
-            embed.add_field(name='Before', value=str(before), inline=False)
-            embed.add_field(name='After', value=str(after), inline=False)
-            embed.add_field(name='Mention', value=f'<@{before.id}>')
-
-            await self.serverLogs.send(':label: User\'s name updated', embed=embed)
-
-        elif before.discriminator != after.discriminator:
-            # Really only case this would be called, and not username (i.e. discrim reroll after name change)
+        if before.name != after.name or before.discriminator != after.discriminator:
+            # Only time discrim would be called, and not username (i.e. discrim reroll after name change)
             # is when nitro runs out with a custom discriminator set
+            before_name = discord.utils.escape_markdown(str(before))
+            after_name = discord.utils.escape_markdown(str(after))
+            userCol = mclient.bowser.users
+
+            userCol.update_one(
+                {'_id': before.id},
+                {
+                    '$push': {
+                        'nameHist': {
+                            'str': after.name,  # We want to keep the integrity without escape characters
+                            'type': 'name',
+                            'discriminator': after.discriminator,
+                            'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+                        }
+                    }
+                },
+            )
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
             embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)

@@ -166,6 +166,14 @@ async def store_user(member, messages=0):
         'roles': roleList,
         'joins': [int(datetime.now(tz=timezone.utc).timestamp())],
         'leaves': [],
+        'nameHist': [
+            {
+                'str': member.name,
+                'type': 'name',
+                'discriminator': member.discriminator,
+                'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+            }
+        ],
         'lockdown': False,
         'jailed': False,
         'friendcode': None,
