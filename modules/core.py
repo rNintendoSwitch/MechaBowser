@@ -342,11 +342,10 @@ class MainEvents(commands.Cog):
                     break
 
             if audited:
-                reason = (
-                    "Ban appeal accepted"
-                    if audited.user.id == config.parakarry
-                    else audited.reason or '-No reason specified-'
-                )
+                if audited.user.id == config.parakarry:
+                    return  # Parakarry generates it's own pun records, exit
+
+                reason = audited.reason or '-No reason specified-'
                 docID = await tools.issue_pun(audited.target.id, audited.user.id, 'unban', reason, active=False)
                 db.update_one({'user': audited.target.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
 
