@@ -262,7 +262,7 @@ def humanize_duration(duration):
     now = datetime.now(tz=timezone.utc)
     if isinstance(duration, timedelta):
         if duration.total_seconds() > 0:
-            duration = datetime.today() + duration
+            duration = datetime.now(tz=timezone.utc) + duration
         else:
             duration = datetime.now(tz=timezone.utc) - timedelta(seconds=duration.total_seconds())
     diff_delta = duration - now
