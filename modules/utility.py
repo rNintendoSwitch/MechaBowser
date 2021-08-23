@@ -419,7 +419,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 tempList = []
                 for x in reversed(roleList):
                     y = ctx.guild.get_role(x)
-                    name = '*deleted role*' if not y else y.name
+                    name = '*deleted role*' if not y else y.mention
                     tempList.append(name)
 
                 roleList = tempList
