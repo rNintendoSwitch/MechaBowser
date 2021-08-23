@@ -405,7 +405,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 if role.id == user.guild.id:
                     continue
 
-                roleList.append(role.name)
+                roleList.append(role.mention)
 
         else:
             roleList = dbUser['roles']
