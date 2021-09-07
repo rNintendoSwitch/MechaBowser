@@ -371,7 +371,8 @@ class MainEvents(commands.Cog):
         if message.author.bot or message.webhook_id:
             return
 
-        if message.type != discord.MessageType.default:
+        if message.type not in [discord.MessageType.default, discord.MessageType.reply]:
+            logging.debug(f'on_message discarding non-normal-message: {message.type=}, {message.id=}')
             return
 
         if message.channel.type not in [
