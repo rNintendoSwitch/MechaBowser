@@ -420,7 +420,14 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
         if payload.cached_message:
-            if payload.cached_message.type != discord.MessageType.default or payload.cached_message.author.bot:
+            if (
+                payload.cached_message.type not in [discord.MessageType.default, discord.MessageType.reply]
+                or payload.cached_message.author.bot
+            ):
+                logging.debug(
+                    'on_raw_message_delete discarding non guild message '
+                    f'{payload.cached_message.channel.type} {payload.cached_message.id}'
+                )
                 return  # No system messages
 
             if not payload.cached_message.content and not payload.cached_message.attachments:
@@ -475,7 +482,8 @@ class MainEvents(commands.Cog):
         if before.content == after.content or before.author.bot:
             return
 
-        if before.type != discord.MessageType.default:
+        if before.type not in [discord.MessageType.default, discord.MessageType.reply]:
+            logging.debug(f'on_message_edit discarding non-normal-message: {before.type=}, {before.id=}')
             return  # No system messages
 
         if not after.content or not before.content:

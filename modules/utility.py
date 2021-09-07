@@ -72,7 +72,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await self.adminChannel.send(message.system_content)
             await self.boostChannel.send(message.system_content)
 
-        if message.author.bot or message.type != discord.MessageType.default:
+        if message.author.bot or message.type not in [discord.MessageType.default, discord.MessageType.reply]:
+            logging.debug(f'on_automod_finished discarding non-normal-message: {message.type=}, {message.id=}')
             return
 
         # Filter invite links
