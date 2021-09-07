@@ -1,5 +1,5 @@
 git+git://github.com/falconry/token-bucket
-discord.py
+git+https://github.com/Rapptz/discord.py.git@d4c683738d48e0ba4a5012405d2068b3ae18c385
 pymongo
 jishaku
 pylint
@@ -13,6 +13,7 @@ discord-sentry-reporting
 aiohttp
 python-dateutil
 pyyaml
+pendulum
 
 # Workaround for numpy issue on windows. https://stackoverflow.com/a/64661876
 numpy==1.19.3; platform_system == "Windows"

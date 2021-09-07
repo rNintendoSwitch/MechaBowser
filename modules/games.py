@@ -1,9 +1,9 @@
 import calendar
 import collections
-import datetime
 import io
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Generator, Literal, Optional, Tuple, Union
 
 import aiohttp
@@ -47,7 +47,7 @@ class GiantBomb:
             raise RatelimitException()
 
     async def fetch_items(
-        self, path: Literal['games', 'releases'], after: datetime.datetime = None
+        self, path: Literal['games', 'releases'], after: datetime = None
     ) -> Generator[dict, None, None]:
         if path not in ['games', 'releases']:
             raise ValueError(f'invalid path: {path}')
@@ -73,7 +73,7 @@ class GiantBomb:
                 # Futhermore, confusingly, both the /games and /releases have a platforms key, however their filter
                 # subkey is either 'platform' or 'platforms', respectfully.
                 if after:
-                    after = after + datetime.timedelta(0, 1)  # Add 1 sec
+                    after = after + timedelta(0, 1)  # Add 1 sec
                     start = after.isoformat(" ", timespec="seconds")
                     end = "2100-01-01 00:00:00"
                     platform_s = 'platform' if path == 'releases' else 'platforms'
@@ -133,7 +133,7 @@ class Games(commands.Cog, name='Games'):
     @tasks.loop(hours=1)
     async def sync_db(self, force_full: bool = False) -> Tuple[int, str]:
         # If last full sync was more then a day ago (or on restart/forced), preform a new full sync
-        day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        day_ago = datetime.now(tz=timezone.utc) - timedelta(days=1)
         full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
 
         if not full:
@@ -166,7 +166,7 @@ class Games(commands.Cog, name='Games'):
 
         logging.info(f'[Games] Finished syncing {count["games"]} games and {count["releases"]} releases {detail_str}')
         self.last_sync['full' if full else 'part'] = {
-            'at': datetime.datetime.utcnow(),
+            'at': datetime.now(tz=timezone.utc),
             'count': count,
             'running': False,
         }
@@ -278,7 +278,7 @@ class Games(commands.Cog, name='Games'):
         str = re.sub(':$', '', str)  # Remove string end colons
         return str
 
-    def parse_expected_release_date(self, item: dict, string: bool = False) -> Union[str, datetime.datetime, None]:
+    def parse_expected_release_date(self, item: dict, string: bool = False) -> Union[str, datetime, None]:
         if item is None:
             return None
 
@@ -300,21 +300,21 @@ class Games(commands.Cog, name='Games'):
         if not month:
             if not quarter:
                 # Year only:
-                return f'{year}' if string else datetime.datetime(year, 12, 31)
+                return f'{year}' if string else datetime(year, 12, 31)
 
             # Year and quarter, but no month:
             QUARTER_END_DATES = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
             quarter_end = QUARTER_END_DATES[quarter]
-            return f'Q{quarter} {year}' if string else datetime.datetime(year, quarter_end[0], quarter_end[1])
+            return f'Q{quarter} {year}' if string else datetime(year, quarter_end[0], quarter_end[1])
 
         # Has month and year...
         if not day:
             # Has year and month, but no day:
             last_day = calendar.monthrange(year, month)[1]
-            return f'{calendar.month_abbr[month]}. {year}' if string else datetime.datetime(year, month, last_day)
+            return f'{calendar.month_abbr[month]}. {year}' if string else datetime(year, month, last_day)
 
         # Has month, day, and year:
-        return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime.datetime(year, month, day)
+        return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime(year, month, day)
 
     async def get_image(self, guid: str, type: str, as_url: bool = False) -> Union[str, None]:
         game = self.db.find_one({'_type': 'game', 'guid': guid}, projection={'image': 1})

@@ -1,10 +1,10 @@
 import asyncio
-import datetime
 import logging
 import re
 import time
 import typing
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import config
 import discord
@@ -50,7 +50,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                     'id': 0,
                     'name': archive[0].author.name,
                     'discriminator': archive[0].author.discriminator,
-                    'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
+                    'avatar_url': archive[0].author.avatar.with_format('png').with_size(1024).url,
                     'mod': False,
                 },
                 'creator': {
@@ -71,7 +71,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                             'id': str(archive[0].author.id),
                             'name': archive[0].author.name,
                             'discriminator': archive[0].author.discriminator,
-                            'avatar_url': str(archive[0].author.avatar_url_as(static_format='png', size=1024)),
+                            'avatar_url': archive[0].author.avatar.with_format('png').with_size(1024).url,
                             'mod': False,
                         },
                         'attachments': [x.url for x in archive[0].attachments],
@@ -85,7 +85,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                             'id': str(archive[1].author.id),
                             'name': archive[1].author.name,
                             'discriminator': archive[1].author.discriminator,
-                            'avatar_url': str(archive[1].author.avatar_url_as(static_format='png', size=1024)),
+                            'avatar_url': archive[1].author.avatar.with_format('png').with_size(1024).url,
                             'mod': False,
                         },
                         'attachments': [x.url for x in archive[1].attachments],
@@ -107,7 +107,7 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
                         'id': str(msg.author.id),
                         'name': msg.author.name,
                         'discriminator': msg.author.discriminator,
-                        'avatar_url': str(msg.author.avatar_url_as(static_format='png', size=1024)),
+                        'avatar_url': msg.author.avatar.with_format('png').with_size(1024).url,
                         'mod': False,
                     },
                     'channel': {'id': str(msg.channel.id), 'name': msg.channel.name},
@@ -164,8 +164,16 @@ async def store_user(member, messages=0):
     userData = {
         '_id': member.id,
         'roles': roleList,
-        'joins': [(datetime.datetime.utcnow() - datetime.datetime.utcfromtimestamp(0)).total_seconds()],
+        'joins': [int(datetime.now(tz=timezone.utc).timestamp())],
         'leaves': [],
+        'nameHist': [
+            {
+                'str': member.name,
+                'type': 'name',
+                'discriminator': member.discriminator,
+                'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+            }
+        ],
         'lockdown': False,
         'jailed': False,
         'friendcode': None,
@@ -245,10 +253,10 @@ def resolve_duration(data, include_seconds=False):
         digits = ''
 
     if include_seconds:
-        return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1), value
+        return datetime.now(tz=timezone.utc) + timedelta(seconds=value + 1), value
 
     else:
-        return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
+        return datetime.now(tz=timezone.utc) + timedelta(seconds=value + 1)
 
 
 def humanize_duration(duration):
@@ -257,14 +265,14 @@ def humanize_duration(duration):
     weeks, days, hours, minutes, seconds string output
     Credit https://github.com/ThaTiemsz/jetski via MIT license
 
-    duration: datetime.datetime
+    duration: datetime
     """
-    now = datetime.datetime.utcnow()
-    if isinstance(duration, datetime.timedelta):
+    now = datetime.now(tz=timezone.utc)
+    if isinstance(duration, timedelta):
         if duration.total_seconds() > 0:
-            duration = datetime.datetime.today() + duration
+            duration = datetime.now(tz=timezone.utc) + duration
         else:
-            duration = datetime.datetime.utcnow() - datetime.timedelta(seconds=duration.total_seconds())
+            duration = datetime.now(tz=timezone.utc) - timedelta(seconds=duration.total_seconds())
     diff_delta = duration - now
     diff = int(diff_delta.total_seconds())
 
@@ -346,7 +354,7 @@ async def send_modlog(
     author += f'| {username} ({userid})'
 
     if not timestamp:
-        timestamp = datetime.datetime.utcnow()
+        timestamp = datetime.now(tz=timezone.utc)
 
     embed = discord.Embed(color=config.punColors[_type], timestamp=timestamp)
     embed.set_author(name=author)
@@ -408,14 +416,12 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
     author += f'| {user} ({user.id})'
 
-    embed = discord.Embed(
-        color=config.punColors[doc['type']], timestamp=datetime.datetime.utcfromtimestamp(doc['timestamp'])
-    )
+    embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.utcfromtimestamp(doc['timestamp']))
     embed.set_author(name=author)
     embed.set_footer(text=id)
     embed.add_field(name='User', value=user.mention, inline=True)
     if doc['expiry']:
-        expires = datetime.datetime.utcfromtimestamp(doc['expiry'])
+        expires = datetime.utcfromtimestamp(doc['expiry'])
         embed.add_field(
             name='Expires', value=f'{expires.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanize_duration(expires)})'
         )
@@ -456,7 +462,7 @@ def format_pundm(_type, reason, moderator=None, details=None, auto=False):
         'kick': 'You have been **kicked** from',
         'ban': 'You have been **banned** from',
         'automod-word': 'You have violated the word filter on',
-        'duration-update': f'The **duration** for your {details_tup[0]} has been updated and **will now expire on {details_tup[0]}** on',
+        'duration-update': f'The **duration** for your {details_tup[0]} has been updated and **will now expire on {details_tup[1]}** on',
         'reason-update': f'The **reasoning** for your {details_tup[0]} issued on {details_tup[1]} has been updated on',
     }
 
@@ -584,7 +590,7 @@ async def send_paginated_embed(
     message = None
 
     single_page = len(pages) == 1
-    dm_channel = not isinstance(channel, discord.TextChannel)
+    dm_channel = not isinstance(channel, discord.TextChannel) and not isinstance(channel, discord.Thread)
 
     if not (single_page or dm_channel):
         # Setup messages, we wait to update the embed later so users don't click reactions before we're setup
@@ -597,7 +603,7 @@ async def send_paginated_embed(
     embed = discord.Embed(description=None if not description else description, colour=color)
     if author:
         embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
-    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar_url)
+    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar.url)
 
     # Main loop
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)

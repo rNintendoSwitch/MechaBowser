@@ -1,10 +1,10 @@
 import asyncio
 import copy
-import datetime
 import logging
 import re
 import time
 import typing
+from datetime import datetime
 
 import config
 import discord
@@ -303,7 +303,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         reason,
                         details=(
                             doc['type'],
-                            datetime.datetime.utcfromtimestamp(doc['timestamp']).strftime("%B %d, %Y %H:%M:%S UTC"),
+                            datetime.utcfromtimestamp(doc['timestamp']).strftime("%B %d, %Y %H:%M:%S UTC"),
                         ),
                     )
                 )

@@ -1,5 +1,5 @@
-import datetime
 import logging
+from datetime import datetime
 
 import discord
 import requests
@@ -16,12 +16,12 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://extra-life.org/api/participants/409108/donations'
+        self.DONATIONS_URL = 'https://extra-life.org/api/participants/455769/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 772481541657985045
+        self.CHAT_ROLE = 777723175274020924
         ################################################################################################################################
 
         self.bot = bot
@@ -76,7 +76,7 @@ class ExtraLife(commands.Cog):
                 break
 
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
-            donation_time = datetime.datetime.strptime(
+            donation_time = datetime.strptime(
                 donation['createdDateUTC'], '%Y-%m-%dT%H:%M:%S.%f%z'
             )  # eg 2020-11-07T06:00:07.327+0000
 

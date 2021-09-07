@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import io
 import logging
 import math
@@ -7,6 +6,7 @@ import os
 import re
 import time
 import typing
+from datetime import datetime
 from pathlib import Path
 
 import codepoints
@@ -344,7 +344,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         background = self.backgrounds[dbUser['background']]
         theme = self.themes[background["theme"]]
 
-        pfpBytes = io.BytesIO(await member.avatar_url_as(format='png', size=256).read())
+        pfpBytes = io.BytesIO(await member.avatar.with_format('png').with_size(256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
 
         card = theme['pfpBackground'].copy()
@@ -403,7 +403,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         joins = dbUser['joins']
         joins.sort()
-        joinDate = datetime.datetime.utcfromtimestamp(joins[0])
+        joinDate = datetime.utcfromtimestamp(joins[0])
         try:  # -d doesn't work on all platforms, such as Windows
             joinDateF = joinDate.strftime('%b. %-d, %Y')
         except:
@@ -414,7 +414,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:
-            tznow = datetime.datetime.now(pytz.timezone(dbUser['timezone']))
+            tznow = datetime.now(pytz.timezone(dbUser['timezone']))
             localtime = tznow.strftime('%H:%M')
             tzOffset = tznow.strftime('%z')
 
@@ -778,7 +778,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile'
             '\n\nWhen prompted, simply reply with what you would like to set the field as.',
         )
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
 
         try:
             mainMsg = await ctx.author.send(embed=embed)

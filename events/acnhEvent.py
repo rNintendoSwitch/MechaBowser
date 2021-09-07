@@ -750,7 +750,7 @@ class AnimalGame(commands.Cog):
                 title="[COMPLETE] Town Hall" if len(user["diy"]) >= 5 else "Town Hall",
                 color=0xFF69B4,
             )
-            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
             embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Zipper-01.png")
             description = "Hippity ho, whaddaya know! Look who it is! I'm just a hop, skip, and a jump away from finishing my egg furniture collection. Before I bounce after Bunny Day, do ya think you can help this hare out? I'm still missing a few items...\n\nIf ya can lend a paw (or four!) could you bring by some crafting items I need? If you have the items for a DIY recipe, just come back here to the town hall and use the `!townhall` item command, replacing \"item\" with the name of the recipe you want to help me out with!"
             embed.description = description
@@ -928,7 +928,7 @@ class AnimalGame(commands.Cog):
 
         if user["townhall"] == 2 and not saniItem:
             embed = discord.Embed(title="Island Museum", color=0x194499)
-            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
             embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/Blathers-01.png")
             description = 'Heyo, hoot hoot! Thanks for swinging by, here is our collection and a list of creatures we still need! You can donate an item by using `!donate item` replacing "item" with the name of the creature!\n\n__Fish__\n'
             missingItem = 0
@@ -1294,7 +1294,7 @@ class AnimalGame(commands.Cog):
                     + '\n\nTo talk to one of your fellow residents, simply run `!quest Name` command, replacing "Name" with who you would like to speak to or give items'
                 )
             embed = discord.Embed(title="Quests", description=description)
-            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
             embed.set_thumbnail(url=self.items["bells"]["image"])
 
             return await ctx.send(ctx.author.mention, embed=embed)
@@ -1316,7 +1316,7 @@ class AnimalGame(commands.Cog):
             cat = questInfo["catID"]
             description = questInfo["text"]
             embed = discord.Embed(title="Quests - " + realName)
-            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+            embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
             embed.set_thumbnail(url=self.animals[realName]["image"])
 
             itemCost = int(questInfo["itemCost"])
@@ -1441,7 +1441,7 @@ class AnimalGame(commands.Cog):
             description="One swing at a time...",
         )
         embed.set_thumbnail(url="https://cdn.mattbsg.xyz/rns/stone-axe.png")
-        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
         message = await ctx.send(ctx.author.mention, embed=embed)
 
         await asyncio.sleep(4)
@@ -1502,7 +1502,7 @@ class AnimalGame(commands.Cog):
             title="You put your fishing line in the water...",
             description="And you patiently wait for a bite...",
         )
-        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
         message = await ctx.send(ctx.author.mention, embed=embed)
 
         await asyncio.sleep(16)
@@ -1592,7 +1592,7 @@ class AnimalGame(commands.Cog):
             title="You used your shovel to dig up some sand...",
             description="And you found...",
         )
-        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
         message = await ctx.send(ctx.author.mention, embed=embed)
 
         await asyncio.sleep(11)
@@ -1703,7 +1703,7 @@ class AnimalGame(commands.Cog):
             title=f"You harvest one of your {'plants' if fruit == 'turnip' else 'trees'}...",
             description=f"You reach towards to the **{fruit}** {'plant' if fruit == 'turnip' else 'tree'}...",
         )
-        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
         message = await ctx.send(ctx.author.mention, embed=embed)
 
         quantity = -3
@@ -1761,7 +1761,7 @@ class AnimalGame(commands.Cog):
             title="You begin to plant a fruit...",
             description=f"You put a **{fruit}** in the ground...",
         )
-        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
         message = await ctx.send(ctx.author.mention, embed=embed)
         db.update_one(
             {"_id": ctx.author.id},
@@ -1876,7 +1876,7 @@ class AnimalGame(commands.Cog):
         )
 
         embed.description = description
-        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar.url)
         embed.set_thumbnail(url=self.fruits[user["homeFruit"]])
         treeDesc = ""
         treeCnt = 0
