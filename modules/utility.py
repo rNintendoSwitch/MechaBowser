@@ -5,7 +5,7 @@ import pathlib
 import re
 import time
 import typing
-import urllib
+import urllib.parse
 from datetime import datetime
 
 import aiohttp
