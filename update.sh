@@ -2,6 +2,7 @@
 # Script that updates all submodules, using a GitHub PAT to update private modules if defined
 
 echo 'Updating root...'
+git checkout master
 git pull
 
 echo 'Updating twemoji...'
