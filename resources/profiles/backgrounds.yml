@@ -33,3 +33,11 @@ gamebuildergarage:
 default-dark:
     theme: dark
     trophy-bg-opacity: 100
+
+trivia-mario:
+    theme: dark
+    trophy-bg-opacity: 40
+
+trivia-metroid:
+    theme: light
+    troph-bg-opacity: 100
