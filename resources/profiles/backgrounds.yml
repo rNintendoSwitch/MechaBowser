@@ -40,4 +40,5 @@ trivia-mario:
 
 trivia-metroid:
     theme: light
-    troph-bg-opacity: 100
+    trophy-bg-opacity: 100
+    
