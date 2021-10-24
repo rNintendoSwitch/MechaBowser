@@ -363,7 +363,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             try:
                 await ctx.guild.fetch_ban(user)
                 if len(users) == 1:
-                    return await ctx.send(f'{config.redTick} {username} is already banned')
+                    if ctx.author.id == self.bot.user.id:  # Non-command invoke, such as automod
+                        # We could do custom exception types, but the whole "automod context" is already a hack anyway.
+                        raise ValueError
+                    else:
+                        return await ctx.send(f'{config.redTick} {username} is already banned')
 
                 else:
                     # If a many-user ban, don't exit if a user is already banned
@@ -408,7 +412,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        if ctx.author.id != self.bot.user.id:  # Non-command invoke, such as automod
+        if ctx.author.id != self.bot.user.id:  # Command invoke, i.e. anything not automod
             if len(users) == 1:
                 resp = f'{config.greenTick} {users[0]} has been successfully banned'
                 if couldNotDM:
