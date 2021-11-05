@@ -14,6 +14,7 @@ aiohttp
 python-dateutil
 pyyaml
 pendulum
+unidecode
 
 # Workaround for numpy issue on windows. https://stackoverflow.com/a/64661876
 numpy==1.19.3; platform_system == "Windows"
