@@ -48,7 +48,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
         }
         self.inviteRe = re.compile(
-            r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/[\da-z-]+)', re.I
+            r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/+[\da-z-]+)', re.I
         )
 
     @commands.Cog.listener()
