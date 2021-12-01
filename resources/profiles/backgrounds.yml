@@ -46,3 +46,6 @@ the-game-awards:
     theme: dark
     trophy-bg-opacity: 30
     
+trivia-persona:
+    theme: dark
+    trophy-bg-opacity: 50
