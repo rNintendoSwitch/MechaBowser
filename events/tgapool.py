@@ -36,7 +36,6 @@ class TGAPool(commands.Cog):
                     dbUser = self.db.find_one(int(user['id']))
 
                     if not user['earnedTrophy'] or not dbUser:
-                        logging.info('no trophy for u ' + user["id"])
                         continue
 
                     trophy_name = f'{self.TROPHIES_PREFIX}{user["earnedTrophy"]}'
