@@ -1,10 +1,12 @@
 import logging
 from datetime import datetime
 
-import discord, aiohttp, pymongo
+import aiohttp
+import config
+import discord
+import pymongo
 from discord.ext import commands, tasks
 
-import config
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
