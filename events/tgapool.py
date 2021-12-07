@@ -14,7 +14,7 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 class TGAPool(commands.Cog):
     def __init__(self, bot):
         self.GUILD = 238080556708003851
-        self.EVENT_CHANNEL = 654018662860193830
+        self.EVENT_CHANNEL = 672550040979636244
         self.ENDPOINT = 'https://switchcord.net/rewards'
         self.BACKGROUND = 'the-game-awards'
         self.TROPHIES_PREFIX = 'tga-'
