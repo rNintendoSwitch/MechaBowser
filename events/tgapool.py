@@ -52,7 +52,7 @@ class TGAPool(commands.Cog):
                         msg = f':information_source: Assigned TGA trophy `{trophy_name}` to <@{user["id"]}>'
                         await ctx.reply(msg, allowed_mentions=discord.AllowedMentions.none())
 
-                        if ctx.channel.id != self.bot.event_channel.id:
+                        if ctx.channel.id != self.event_channel.id:
                             await self.event_channel.send(msg, allowed_mentions=discord.AllowedMentions.none())
 
     @tasks.loop(seconds=30)
