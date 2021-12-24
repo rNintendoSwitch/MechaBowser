@@ -66,10 +66,11 @@ class ChatRoleRandomEvent(commands.Cog):
             return
 
         member_role_ids = [role.id for role in message.author.roles]
-        if not any([(role in member_role_ids) for role in self.roles]):
+        if not any([(role_id in member_role_ids) for role_id in self.roles]):
 
-            await message.author.add_roles(random.choice(self.roles))
-            return await message.react('🏷️')
+            role = message.guild.get_role(random.choice(self.roles))
+            await message.author.add_roles(role)
+            return await message.add_reaction('🏷️')
 
 
 def setup(bot):
