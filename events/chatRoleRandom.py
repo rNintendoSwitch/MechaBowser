@@ -1,12 +1,12 @@
 import asyncio
 import logging
+import random
 import re
+import typing
 from typing import Union
 
 import config
-import random
 import discord
-import typing
 from discord.ext import commands
 
 
