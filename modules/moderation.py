@@ -813,7 +813,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             await ctx.send(
                 f'{user} ({user.id}) has had {removedStrikes} strikes removed, '
                 f'they now have {count} strike{"s" if count > 1 else ""} '
-                f'({activeStrikes} - {count}) {error}'
+                f'({activeStrikes} - {removedStrikes}) {error}'
             )
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
