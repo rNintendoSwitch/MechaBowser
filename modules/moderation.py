@@ -749,7 +749,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         else:  # Negative diff, we will need to reduce our strikes
             removedStrikes = activeStrikes - count
-            diff = activeStrikes - count
+            diff = removedStrikes  # accumlator
 
             puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
             for pun in puns:
