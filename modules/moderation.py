@@ -748,6 +748,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await self._strike(ctx, user, count - activeStrikes, reason=reason)
 
         else:  # Negative diff, we will need to reduce our strikes
+            removedStrikes = activeStrikes - count
             diff = activeStrikes - count
 
             puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
@@ -787,7 +788,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 raise ValueError('Diff != 0 after full iteration')
 
             docID = await tools.issue_pun(
-                user.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=activeStrikes - count
+                user.id, ctx.author.id, 'destrike', reason=reason, active=False, strike_count=removedStrikes
             )
             await tools.send_modlog(
                 self.bot,
@@ -797,12 +798,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 reason,
                 user=user,
                 moderator=ctx.author,
-                extra_author=(activeStrikes - count),
+                extra_author=(removedStrikes),
                 public=True,
             )
             error = ""
             try:
-                await user.send(tools.format_pundm('destrike', reason, ctx.author, details=activeStrikes - count))
+                await user.send(tools.format_pundm('destrike', reason, ctx.author, details=removedStrikes))
             except discord.Forbidden:
                 error = 'I was not able to DM them about this action'
 
@@ -810,7 +811,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return await ctx.message.delete()
 
             await ctx.send(
-                f'{user} ({user.id}) has had {diff} strikes removed, '
+                f'{user} ({user.id}) has had {removedStrikes} strikes removed, '
                 f'they now have {count} strike{"s" if count > 1 else ""} '
                 f'({activeStrikes} - {count}) {error}'
             )
