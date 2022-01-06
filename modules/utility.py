@@ -91,11 +91,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                             pass
 
                         else:
-                            if invite.guild.id in guildWhitelist:
+                            feature_whitelist = ['VERIFIED', 'PARTNERED', 'DISCOVERABLE']
+
+                            if (invite.guild.id in guildWhitelist):
                                 continue
-                            if 'VERIFIED' in invite.guild.features:
-                                continue
-                            if 'PARTNERED' in invite.guild.features:
+                            if any([(f in feature_whitelist) for f in invite.guild.features]):
                                 continue
 
                         inviteInfos.append(invite)
