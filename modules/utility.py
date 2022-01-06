@@ -93,7 +93,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         else:
                             feature_whitelist = ['VERIFIED', 'PARTNERED', 'DISCOVERABLE']
 
-                            if (invite.guild.id in guildWhitelist):
+                            if invite.guild.id in guildWhitelist:
                                 continue
                             if any([(f in feature_whitelist) for f in invite.guild.features]):
                                 continue
