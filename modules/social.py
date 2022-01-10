@@ -17,6 +17,7 @@ import gridfs
 import numpy as np
 import pymongo
 import pytz
+import random
 import requests
 import token_bucket
 import yaml
@@ -108,6 +109,25 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'booster': lambda member, guild: guild.get_role(config.boostRole) in member.roles,
             'verified': lambda member, guild: guild.get_role(config.verified) in member.roles,
         }
+
+        self.easter_egg_games = {
+            # Super Mario 3D All-Stars (Sunshine)
+            self.bot.user.id: ["3030-80463"],
+            # Paper Mario: The Origami King (closest we have to Paper Mario 1 as of Jan 2022)
+            config.parakarry: ["3030-78447"],
+        }
+
+        self.easter_egg_text = [  # Message text for bot easter egg, keep under 12 chars
+            'A lot',
+            'Enough',
+            'Over 9000!',
+            'idk',
+            'Tree Fiddy',
+            'Around 4',
+            'Infinity',
+            'Yes',
+            'Not specified',
+        ]
 
     @commands.group(name='profile', invoke_without_command=True)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
@@ -398,8 +418,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self._draw_text(draw, (350, 330), dbUser['friendcode'], theme["friend_code"], fonts['subtext'])
 
         # Start customized content -- stats
-        message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
-        self._draw_text(draw, (435, 505), message_count, theme["primary"], fonts['medium'])
+        if member.id in self.easter_egg_games:
+            dbUser['favgames'] = self.easter_egg_games[member.id]
+            self._draw_text(draw, (435, 505), random.choice(self.easter_egg_text), theme["secondary"], fonts['medium'])
+
+        else:
+            message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
+            self._draw_text(draw, (435, 505), message_count, theme["primary"], fonts['medium'])
 
         joins = dbUser['joins']
         joins.sort()
@@ -411,6 +436,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 505), joinDateF, theme["primary"], fonts['medium'])
 
         if not dbUser['timezone']:
+
             self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:
