@@ -126,6 +126,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'Around 4',
             'Infinity',
             'Yes',
+            'No',
             'Not specified',
         ]
 
