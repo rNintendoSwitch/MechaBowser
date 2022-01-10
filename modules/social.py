@@ -3,6 +3,7 @@ import io
 import logging
 import math
 import os
+import random
 import re
 import time
 import typing
@@ -17,7 +18,6 @@ import gridfs
 import numpy as np
 import pymongo
 import pytz
-import random
 import requests
 import token_bucket
 import yaml
