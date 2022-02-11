@@ -49,3 +49,19 @@ the-game-awards:
 trivia-persona:
     theme: dark
     trophy-bg-opacity: 50
+
+trivia-pokemon:
+    theme: light
+    trophy-bg-opacity: 30
+
+trivia-winter:
+    theme: light
+    trophy-bg-opacity: 70
+
+trivia-kingdomhearts:
+    theme: dark
+    trophy-bg-opacity: 40
+
+trivia-kirby:
+    theme: light
+    trophy-bg-opacity: 40
