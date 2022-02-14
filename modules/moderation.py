@@ -17,30 +17,6 @@ import tools
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 
-class ResolveUser(commands.Converter):
-    async def convert(self, ctx, argument):
-        if not argument:
-            raise commands.BadArgument
-
-        try:
-            userid = int(argument)
-
-        except ValueError:
-            mention = re.search(r'<@!?(\d+)>', argument)
-            if not mention:
-                raise commands.BadArgument
-
-            userid = int(mention.group(1))
-
-        try:
-            member = ctx.guild.get_member(userid)
-            user = await ctx.bot.fetch_user(argument) if not member else member
-            return user
-
-        except discord.NotFound:
-            raise commands.BadArgument
-
-
 class StrikeRange(commands.Converter):
     async def convert(self, ctx, argument):
         if not argument:
@@ -328,7 +304,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.command(name='ban', aliases=['banid', 'forceban'])
     @commands.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _banning(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
+    async def _banning(self, ctx, users: commands.Greedy[tools.ResolveUser], *, reason='-No reason specified-'):
         if len(reason) > 990:
             return await ctx.send(
                 f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters'
@@ -469,7 +445,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @commands.command(name='kick')
     @commands.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _kicking(self, ctx, users: commands.Greedy[ResolveUser], *, reason='-No reason specified-'):
+    async def _kicking(self, ctx, users: commands.Greedy[tools.ResolveUser], *, reason='-No reason specified-'):
         if len(reason) > 990:
             return await ctx.send(
                 f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters'
@@ -644,7 +620,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.command(name='note')
-    async def _note(self, ctx, user: ResolveUser, *, content):
+    async def _note(self, ctx, user: tools.ResolveUser, *, content):
         userid = user if (type(user) is int) else user.id
 
         if len(content) > 900:
@@ -665,7 +641,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
-    async def _strike(self, ctx, user: ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
+    async def _strike(self, ctx, user: tools.ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
         if count == 0:
             return await ctx.send(
                 f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `{ctx.prefix}strike set`'
@@ -732,7 +708,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @_strike.command(name='set')
-    async def _strike_set(self, ctx, user: ResolveUser, count: StrikeRange, *, reason):
+    async def _strike_set(self, ctx, user: tools.ResolveUser, count: StrikeRange, *, reason):
         punDB = mclient.bowser.puns
         activeStrikes = 0
         puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True})

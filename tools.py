@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 import time
 import typing
@@ -309,6 +310,56 @@ def humanize_duration(duration):
 
 def mod_cmd_invoke_delete(channel):
     return not (channel.id in config.showModCTX or channel.category_id in config.showModCTX)
+
+
+async def commit_profile_change(bot, user: discord.User, element: str, item: str, revoke=False):
+    '''Given a user, update the owned status of a particular element (trophy, background, etc.), "item"'''
+    # Calling functions should be verifying availability of item
+    db = mclient.bowser.users
+    dbUser = db.find_one({'_id': user.id})
+    key = {'background': 'backgrounds', 'trophy': 'trophies'}[element]
+
+    if item in dbUser[key] and not revoke:
+        raise ValueError('Item is already granted to user')
+
+    if item not in dbUser[key] and revoke:
+        raise ValueError('Item is not granted to user')
+
+    socialCog = bot.get_cog('Social Commands')
+
+    if not revoke:
+        db.update({'_id': user.id}, {'$push': {key: item}})
+        dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)}!\nYou have received a new item for your profile on the r/NintendoSwitch Discord server!\n\nThe **{item.replace("-", " ")}** {element} is now yours, enjoy! '
+        if element == 'background':
+            dmMsg += 'If you wish to use this background, use the `!profile edit` command in the #commands-central channel. Here\'s what your profile could look like:'
+            generated_background = socialCog._generate_background_preview([item])
+
+        else:
+            dmMsg += "Here's what your profile looks like with it:"
+            generated_background = await socialCog._generate_profile_card(user)
+
+        try:
+            await user.send(dmMsg, file=generated_background)
+
+        except (discord.NotFound, discord.Forbidden):
+            raise
+
+    else:
+        db.update({'_id': user.id}, {'$pull': {key: item}})
+        # Reset background to default if the one being revoked is currently equiped
+        if dbUser['background'] == item and element == 'background':
+            db.update({'_id': user.id}, {'$set': {'background': 'default-light'}})
+
+        dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)},\nA profile item has been revoked from you on the r/NintendoSwitch Discord server.\n\nThe **{item.replace("-", " ")}** {element} was revoked from you. '
+        if element == 'background':
+            'If you were using this as your current background then your background has been reset to default. Use the `!profile edit` command in the #commands-central channel if you\'d like to change it.'
+        dmMsg += f'If you have questions about this action, please feel free to reach out to us via modmail by DMing <@{config.parakarry}>.'
+
+        try:
+            await user.send(dmMsg)
+
+        except (discord.NotFound, discord.Forbidden):
+            pass
 
 
 async def send_modlog(
@@ -709,6 +760,30 @@ def convert_list_to_fields(lines: str, codeblock: bool = True) -> typing.List[ty
         fields.append({'name': '\uFEFF', 'value': value, 'inline': False})  # \uFEFF = ZERO WIDTH NO-BREAK SPACE
 
     return fields
+
+
+class ResolveUser(discord.ext.commands.Converter):
+    async def convert(self, ctx, argument):
+        if not argument:
+            raise discord.ext.commands.BadArgument
+
+        try:
+            userid = int(argument)
+
+        except ValueError:
+            mention = re.search(r'<@!?(\d+)>', argument)
+            if not mention:
+                raise discord.ext.commands.BadArgument
+
+            userid = int(mention.group(1))
+
+        try:
+            member = ctx.guild.get_member(userid)
+            user = await ctx.bot.fetch_user(argument) if not member else member
+            return user
+
+        except discord.NotFound:
+            raise discord.ext.commands.BadArgument
 
 
 def setup(bot):
