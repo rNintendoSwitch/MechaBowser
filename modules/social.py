@@ -916,6 +916,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if name in self.special_trophies:
                 return await ctx.send(f'{config.redTick} Trophy cannot be granted via command: {name}')
 
+        msg = await ctx.send(f'{config.loading} Granting {item.title()} `{name}` to {len(members)} member(s)...')
         failCount = 0
         for m in members:
             try:
@@ -926,14 +927,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if not failCount:
             # 0 Failures
-            return await ctx.send(f'{config.greenTick} {item.title()} `{name}` granted to {len(members)} member(s)')
+            return await msg.edit(
+                content=f'{config.greenTick} {item.title()} `{name}` granted to {len(members)} member(s)'
+            )
 
         elif failCount == len(members):
-            return await ctx.send(f'{config.redTick} {item.title()} `{name}` granted to 0 members')
+            return await msg.edit(content=f'{config.redTick} {item.title()} `{name}` granted to 0 members')
 
         else:
-            return await ctx.send(
-                f'{config.greenTick} {item.title()} `{name}` granted to {len(members) - failCount}/{len(members)} member(s).'
+            return await msg.edit(
+                content=f'{config.greenTick} {item.title()} `{name}` granted to {len(members) - failCount}/{len(members)} member(s).'
             )
 
     @commands.has_any_role(config.moderator, config.eh)
@@ -949,6 +952,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if item == 'trophy' and name in self.special_trophies:
             return await ctx.send(f'{config.redTick} Trophy cannot be revoked via command: {name}')
 
+        msg = await ctx.send(f'{config.loading} Revoking {item.title()} `{name}` from {len(members)} member(s)...')
         failCount = 0
         for m in members:
             try:
@@ -959,14 +963,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if not failCount:
             # 0 Failures
-            return await ctx.send(f'{config.greenTick} {item.title()} `{name}` revoked from {len(members)} member(s)')
+            return await msg.edit(
+                content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(members)} member(s)'
+            )
 
         elif failCount == len(members):
-            return await ctx.send(f'{config.redTick} {item.title()} `{name}` revoked from 0 members')
+            return await msg.edit(content=f'{config.redTick} {item.title()} `{name}` revoked from 0 members')
 
         else:
-            return await ctx.send(
-                f'{config.greenTick} {item.title()} `{name}` revoked from {len(members) - failCount}/{len(members)} member(s).'
+            return await msg.edit(
+                content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(members) - failCount}/{len(members)} member(s).'
             )
 
     @commands.Cog.listener()
