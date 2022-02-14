@@ -345,7 +345,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         canvas.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='preview.png')
 
-    async def _generate_profile_card(self, member: discord.Member, background_override=None) -> discord.File:
+    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -362,7 +362,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             dbUser = db.find_one({'_id': member.id})
 
-        background = self.backgrounds[background_override or dbUser['background']]
+        background = self.backgrounds[dbUser['background']]
         theme = self.themes[background["theme"]]
 
         pfpBytes = io.BytesIO(await member.avatar.with_format('png').with_size(256).read())
