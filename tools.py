@@ -3,11 +3,14 @@ import logging
 import re
 import time
 import typing
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import config
 import discord
+from exceptions import *
+
 import pymongo
 
 
@@ -309,6 +312,51 @@ def humanize_duration(duration):
 
 def mod_cmd_invoke_delete(channel):
     return not (channel.id in config.showModCTX or channel.category_id in config.showModCTX)
+
+
+async def commit_profile_change(bot, user: discord.User, element: str, item: str, revoke=False):
+    '''Given a user, update the owned status of a particular element (trophy, background, etc.), "item"'''
+    # Calling functions should be verifying availability of item
+    db = mclient.bowser.users
+    dbUser = db.find_one({'_id': user.id})
+    key = {'background': 'backgrounds', 'trophy': 'trophies'}[element]
+
+    if item in dbUser[key] and not revoke:
+        raise ValueError('Item is already granted to user')
+
+    if item not in dbUser[key] and revoke:
+        raise ValueError('Item is not granted to user')
+
+    socialCog = bot.get_cog('Social Commands')
+
+    if not revoke:
+        db.update({'_id': user.id}, {'$push': {key: item}})
+        dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)}!\nYou have received a new item for your profile on the r/NintendoSwitch Discord server!\n\nThe **{item.replace("-", " ")}** {element} is now yours, enjoy! '
+        if element == 'background':
+            dmMsg += (
+                'If you wish to use this background, use the `!profile edit` command in the #commands-central channel. '
+            )
+        dmMsg += "Here's what your profile looks like with it:"
+
+        try:
+            generated_background = await socialCog._generate_profile_card(
+                user, item if element == 'background' else None
+            )
+            await user.send(dmMsg, File=generated_background)
+
+        except (discord.NotFound, discord.Forbidden):
+            pass
+
+    else:
+        db.update({'_id': user.id}, {'$pull': {key: item}})
+        # Reset background to default if the one being revoked is currently equiped
+        if dbUser['background'] == item and element == 'background':
+            db.update({'_id': user.id}, {'$set': {'background': 'default-light'}})
+
+        dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)},\nA profile item has been revoked from you on the r/NintendoSwitch Discord server.\n\nThe **{item.replace("-", " ")}** {element} was revoked from you. '
+        if element == 'background':
+            'If you were using this as your current background then your background has been reset to default. Use the `!profile edit` command in the #commands-central channel if you\'d like to change it.'
+        element += f'If you have questions about this action, please feel free to reach out to us via modmail by DMing <@{config.parakarry}>.'
 
 
 async def send_modlog(

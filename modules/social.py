@@ -345,7 +345,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         canvas.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='preview.png')
 
-    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
+    async def _generate_profile_card(self, member: discord.Member, background_override=None) -> discord.File:
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -362,7 +362,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             dbUser = db.find_one({'_id': member.id})
 
-        background = self.backgrounds[dbUser['background']]
+        background = background_override or self.backgrounds[dbUser['background']]
         theme = self.themes[background["theme"]]
 
         pfpBytes = io.BytesIO(await member.avatar.with_format('png').with_size(256).read())
@@ -916,14 +916,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if name in self.special_trophies:
                 return await ctx.send(f'{config.redTick} Trophy cannot be granted via command: {name}')
 
-        db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
-        key = {'background': 'backgrounds', 'trophy': 'trophies'}[item]
+        try:
+            await tools.commit_profile_change(self.bot, member, item, name)
 
-        if name in dbUser[key]:
+        except ValueError:
             return await ctx.send(f'{config.redTick} {member} already has {item} {name}')
 
-        db.update_one({'_id': member.id}, {'$push': {key: name}})
         return await ctx.send(f'{config.greenTick} {item.title()} `{name}` granted to {member}')
 
     @commands.has_any_role(config.moderator, config.eh)
@@ -939,14 +937,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if item == 'trophy' and name in self.special_trophies:
             return await ctx.send(f'{config.redTick} Trophy cannot be revoked via command: {name}')
 
-        db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
-        key = {'background': 'backgrounds', 'trophy': 'trophies'}[item]
+        try:
+            await tools.commit_profile_change(self, member, item, name, revoke=True)
 
-        if name not in dbUser[key]:
+        except ValueError:
             return await ctx.send(f'{config.redTick} {member} does not have {item} {name}')
 
-        db.update_one({'_id': member.id}, {'$pull': {key: name}})
         return await ctx.send(f'{config.greenTick} {item.title()} `{name}` revoked from {member}')
 
     @commands.Cog.listener()
