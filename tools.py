@@ -1,17 +1,16 @@
 import asyncio
 import logging
+import os
 import re
 import time
 import typing
-import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import config
 import discord
-from exceptions import *
-
 import pymongo
+from exceptions import *
 
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
