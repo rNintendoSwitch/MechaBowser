@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 
 import config
 import discord
-from exceptions import *
 
 import pymongo
 
