@@ -362,7 +362,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             dbUser = db.find_one({'_id': member.id})
 
-        background = background_override or self.backgrounds[dbUser['background']]
+        background = self.backgrounds[background_override or dbUser['background']]
         theme = self.themes[background["theme"]]
 
         pfpBytes = io.BytesIO(await member.avatar.with_format('png').with_size(256).read())
@@ -898,7 +898,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='grant')
-    async def _profile_grant(self, ctx, item: str, member: discord.Member, name: str):
+    async def _profile_grant(self, ctx, item: str, members: commands.Greedy[tools.ResolveUser], name: str):
         '''Grants specified item, background or trophy, to a member'''
         item = item.lower()
         name = name.lower()
@@ -916,17 +916,29 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if name in self.special_trophies:
                 return await ctx.send(f'{config.redTick} Trophy cannot be granted via command: {name}')
 
-        try:
-            await tools.commit_profile_change(self.bot, member, item, name)
+        failCount = 0
+        for m in members:
+            try:
+                await tools.commit_profile_change(self.bot, m, item, name)
 
-        except ValueError:
-            return await ctx.send(f'{config.redTick} {member} already has {item} {name}')
+            except ValueError:
+                failCount += 1
 
-        return await ctx.send(f'{config.greenTick} {item.title()} `{name}` granted to {member}')
+        if not failCount:
+            # 0 Failures
+            return await ctx.send(f'{config.greenTick} {item.title()} `{name}` granted to {len(members)} member(s)')
+
+        elif failCount == len(members):
+            return await ctx.send(f'{config.redTick} {item.title()} `{name}` granted to 0 members')
+
+        else:
+            return await ctx.send(
+                f'{config.greenTick} {item.title()} `{name}` granted to {len(members) - failCount}/{len(members)} member(s).'
+            )
 
     @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='revoke')
-    async def _profile_revoke(self, ctx, item: str, member: discord.Member, name: str):
+    async def _profile_revoke(self, ctx, item: str, members: commands.Greedy[tools.ResolveUser], name: str):
         '''Revokes specified item, background or trophy, from a member'''
         item = item.lower()
         name = name.lower()
@@ -937,13 +949,25 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if item == 'trophy' and name in self.special_trophies:
             return await ctx.send(f'{config.redTick} Trophy cannot be revoked via command: {name}')
 
-        try:
-            await tools.commit_profile_change(self, member, item, name, revoke=True)
+        failCount = 0
+        for m in members:
+            try:
+                await tools.commit_profile_change(self.bot, m, item, name, revoke=True)
 
-        except ValueError:
-            return await ctx.send(f'{config.redTick} {member} does not have {item} {name}')
+            except ValueError:
+                failCount += 1
 
-        return await ctx.send(f'{config.greenTick} {item.title()} `{name}` revoked from {member}')
+        if not failCount:
+            # 0 Failures
+            return await ctx.send(f'{config.greenTick} {item.title()} `{name}` revoked from {len(members)} member(s)')
+
+        elif failCount == len(members):
+            return await ctx.send(f'{config.redTick} {item.title()} `{name}` revoked from 0 members')
+
+        else:
+            return await ctx.send(
+                f'{config.greenTick} {item.title()} `{name}` revoked from {len(members) - failCount}/{len(members)} member(s).'
+            )
 
     @commands.Cog.listener()
     async def on_message(self, message):
