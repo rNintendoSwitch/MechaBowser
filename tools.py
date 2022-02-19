@@ -342,7 +342,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
             await user.send(dmMsg, file=generated_background)
 
         except (discord.NotFound, discord.Forbidden):
-            raise
+            pass
 
     else:
         db.update({'_id': user.id}, {'$pull': {key: item}})
