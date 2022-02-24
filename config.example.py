@@ -40,6 +40,7 @@ automodChannel: int = automod_alerts
 # Category IDs
 eventCat: int = server_events
 modmailCat: int = modmail_category
+modHangoutCat: int = shared_mod_hangout_category
 
 showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel, modmailCat]
 
