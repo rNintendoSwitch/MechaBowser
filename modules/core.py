@@ -125,8 +125,8 @@ class MainEvents(commands.Cog):
 
         embed = discord.Embed(color=0x417505, timestamp=datetime.now(tz=timezone.utc))
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
-        created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
-        created_at += '' if not new else '\n' + tools.humanize_duration(member.created_at)
+        created_at = f'{new} <t:{int(member.created_at.timestamp())}:f>'
+        created_at += '' if not new else f'\n<t:{int(member.created_at.timestamp())}:R>'
         embed.add_field(name='Created at', value=created_at)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
 
@@ -251,7 +251,7 @@ class MainEvents(commands.Cog):
                 ).format(
                     str(member),  # Username
                     pun['type'][-1:],  # Tier type
-                    datetime.utcfromtimestamp(pun['timestamp']).strftime('%B %d, %Y'),  # Date of warn
+                    f'<t:{int(pun["timestamp"])}:D>',  # Date of warn
                     strikeCount,  # How many strikes will replace tier,
                     config.commandsChannel,  # Commands channel can only be used for the command
                     config.parakarry,  # Parakarry mention for DM

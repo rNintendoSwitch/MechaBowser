@@ -188,9 +188,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if duration:
             try:
                 _duration = tools.resolve_duration(duration)
-                humanized = tools.humanize_duration(_duration)
-                expireStr = f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({humanized})'
                 stamp = _duration.timestamp()
+                expireStr = f'<t:{int(stamp)}:f> (<t:{int(stamp)}:R>)'
                 try:
                     if int(duration):
                         raise TypeError
@@ -282,7 +281,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         reason,
                         details=(
                             doc['type'],
-                            datetime.utcfromtimestamp(doc['timestamp']).strftime("%B %d, %Y %H:%M:%S UTC"),
+                            f'<t:{int(doc["timestamp"])}:f>',
                         ),
                     )
                 )
@@ -570,12 +569,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             reason,
             user=member,
             moderator=ctx.author,
-            expires=f'{_duration.strftime("%B %d, %Y %H:%M:%S UTC")} ({tools.humanize_duration(_duration)})',
+            expires=f'<t:{int(_duration.timestamp())}:f> (<t:{int(_duration.timestamp())}:R>)',
             public=True,
         )
         error = ""
         try:
-            await member.send(tools.format_pundm('mute', reason, ctx.author, tools.humanize_duration(_duration)))
+            await member.send(tools.format_pundm('mute', reason, ctx.author, f'<t:{int(_duration.timestamp())}:R>'))
 
         except (discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'

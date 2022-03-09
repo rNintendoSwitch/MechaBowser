@@ -375,7 +375,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
                 embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
                 embed.set_thumbnail(url=user.display_avatar.url)
-                embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
+                embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
 
                 return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
 
@@ -401,7 +401,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name='Messages', value=str(msgCount), inline=True)
         if inServer:
-            embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+            embed.add_field(name='Join date', value=f'<t:{int(user.joined_at.timestamp())}:f>', inline=True)
         roleList = []
         if inServer:
             for role in reversed(user.roles):
@@ -432,14 +432,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.add_field(name='Roles', value=roles, inline=False)
 
         lastMsg = (
-            'N/a'
-            if msgCount == 0
-            else datetime.utcfromtimestamp(messages.sort('timestamp', pymongo.DESCENDING)[0]['timestamp']).strftime(
-                '%B %d, %Y %H:%M:%S UTC'
-            )
+            'N/a' if msgCount == 0 else f'<t:{int(messages.sort("timestamp", pymongo.DESCENDING)[0]["timestamp"])}:f>'
         )
         embed.add_field(name='Last message', value=lastMsg, inline=True)
-        embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+        embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>', inline=True)
 
         noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
         fieldValue = 'View history to get full details on all notes\n\n'
@@ -447,7 +443,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             noteCnt = noteDocs.count()
             noteList = []
             for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
-                stamp = datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
+                stamp = f'[<t:{int(x["timestamp"])}:d>]'
                 noteContent = f'{stamp}: {x["reason"]}'
 
                 fieldLength = 0
@@ -487,24 +483,24 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     continue
 
                 puns += 1
-                stamp = datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
+                stamp = f'<t:{int(pun["timestamp"])}:f>'
                 punType = config.punStrs[pun['type']]
                 if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist', 'destrike']:
                     if pun['type'] == 'destrike':
                         punType = f'Removed {pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
 
-                    punishments += f'- [{stamp}] {punType}\n'
+                    punishments += f'> {config.removeTick} {stamp} **{punType}**\n'
 
                 else:
                     if pun['type'] == 'strike':
                         punType = f'{pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
 
-                    punishments += f'+ [{stamp}] {punType}\n'
+                    punishments += f'> {config.addTick} {stamp} **{punType}**\n'
 
             punishments = (
                 f'Showing {puns}/{punsCol.count()} punishment entries. '
                 f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history {user.id}`'
-                f'\n```diff\n{punishments}```'
+                f'\n\n{punishments}'
             )
 
             if activeMute:
@@ -602,7 +598,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             activeStrikes = 0
             totalStrikes = 0
             for pun in puns.sort('timestamp', pymongo.DESCENDING):
-                datestamp = datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y %H:%M UTC')
+                datestamp = f'<t:{int(pun["timestamp"])}:f>'
                 moderator = ctx.guild.get_member(pun['moderator'])
                 if not moderator:
                     moderator = await self.bot.fetch_user(pun['moderator'])
@@ -620,7 +616,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     inf = punNames[pun['type']].format(pun['context'])
 
                 elif pun['type'] == 'appealdeny':
-                    inf = punNames[pun['type']].format(datetime.utcfromtimestamp(pun['expiry']).strftime('%b. %d, %Y'))
+                    inf = punNames[pun['type']].format(f'<t:{int(pun["expiry"])}:D>')
 
                 else:
                     inf = punNames[pun['type']]
