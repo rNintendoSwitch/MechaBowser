@@ -1,7 +1,7 @@
 import asyncio
 import copy
 import logging
-import re
+import pytz
 import time
 import typing
 from datetime import datetime
@@ -546,6 +546,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (KeyError, TypeError):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
+        durDiff = (_duration - datetime.now(tz=pytz.utc)).total_seconds()
+        if durDiff - 1 > 60 * 60 * 24 * 28:
+            # Discord Timeouts cannot exceed 28 days, so we must check this
+            return await ctx.send(f'{config.redTick} Mutes cannot be longer than 28 days')
+
         try:
             member = await ctx.guild.fetch_member(member.id)
             usr_role_pos = member.top_role.position
@@ -555,8 +560,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
             return await ctx.send(f'{config.redTick} Insufficent permissions to mute {member.name}')
 
-        docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.edit(timed_out_until=_duration, reason='Mute action performed by moderator')
+        docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await tools.send_modlog(
             self.bot,
             self.modLogs,
