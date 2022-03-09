@@ -365,7 +365,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         background = self.backgrounds[dbUser['background']]
         theme = self.themes[background["theme"]]
 
-        pfpBytes = io.BytesIO(await member.avatar.with_format('png').with_size(256).read())
+        pfpBytes = io.BytesIO(await member.display_avatar.with_format('png').with_size(256).read())
         pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
 
         card = theme['pfpBackground'].copy()
