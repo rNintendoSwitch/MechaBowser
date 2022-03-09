@@ -546,6 +546,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (KeyError, TypeError):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
+        try:
+            member = await ctx.guild.fetch_member(member.id)
+            usr_role_pos = member.top_role.position
+        except:
+            usr_role_pos = -1
+
+        if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
+            return await ctx.send(f'{config.redTick} Insufficent permissions to mute {member.name}')
+
         docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
         await member.edit(timed_out_until=_duration, reason='Mute action performed by moderator')
         await tools.send_modlog(
