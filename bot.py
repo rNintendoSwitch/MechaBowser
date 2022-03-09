@@ -21,7 +21,15 @@ except ImportError:
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 intents = discord.Intents(
-    guilds=True, members=True, bans=True, emojis=True, voice_states=True, presences=True, messages=True, reactions=True
+    guilds=True,
+    members=True,
+    bans=True,
+    emojis=True,
+    voice_states=True,
+    presences=True,
+    messages=True,
+    message_content=True,
+    reactions=True,
 )
 activityStatus = discord.Activity(type=discord.ActivityType.watching, name='over the server')
 bot = commands.Bot(

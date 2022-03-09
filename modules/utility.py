@@ -177,7 +177,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     webhook_message = await webhook.send(
                         content=content,
                         username=message.author.display_name,
-                        avatar_url=message.author.avatar.url,
+                        avatar_url=message.author.display_avatar.url,
                         wait=True,
                     )
 
@@ -191,7 +191,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     )
 
                     # #mab_remover is the special sauce that allows users to delete their messages, see on_raw_reaction_add()
-                    icon_url = f'{message.author.avatar.url}#mab_remover_{message.author.id}_{webhook_message.id}'
+                    icon_url = (
+                        f'{message.author.display_avatar.url}#mab_remover_{message.author.id}_{webhook_message.id}'
+                    )
                     embed.set_footer(text=f'Author: {str(message.author)} ({message.author.id})', icon_url=icon_url)
 
                     # A seperate message is sent so that the original message has embeds
@@ -371,8 +373,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `{ctx.prefix}history {user.id}` to view'
 
                 embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
-                embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar.url)
-                embed.set_thumbnail(url=user.avatar.url)
+                embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
+                embed.set_thumbnail(url=user.display_avatar.url)
                 embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
 
                 return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
@@ -395,8 +397,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         )
 
         embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
-        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar.url)
-        embed.set_thumbnail(url=user.avatar.url)
+        embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
+        embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name='Messages', value=str(msgCount), inline=True)
         if inServer:
             embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
@@ -468,6 +470,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             puns = 0
             activeStrikes = 0
             totalStrikes = 0
+            activeMute = None
             for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
                 if pun['type'] == 'strike':
                     totalStrikes += pun['strike_count']
@@ -475,6 +478,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
                 elif pun['type'] == 'destrike':
                     totalStrikes -= pun['strike_count']
+
+                elif pun['type'] == 'mute':
+                    if pun['active']:
+                        activeMute = pun['expiry']
 
                 if puns >= 5:
                     continue
@@ -500,11 +507,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 f'\n```diff\n{punishments}```'
             )
 
+            if activeMute:
+                embed.description += f'\n**User is currently muted until <t:{activeMute}:f>**'
+
             if totalStrikes:
-                embed.description = (
-                    embed.description
-                    + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
-                )
+                embed.description += f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
@@ -656,7 +663,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 )
                 await ctx.message.add_reaction('📬')
 
-            author = {'name': f'{user} | {user.id}', 'icon_url': user.avatar.url}
+            author = {'name': f'{user} | {user.id}', 'icon_url': user.display_avatar.url}
             await tools.send_paginated_embed(
                 self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author
             )
@@ -713,7 +720,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             await ctx.message.delete()
 
             embed = discord.Embed(title=tag['_id'], description=tag['content'])
-            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.avatar.url)
+            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.display_avatar.url)
 
             if 'img_main' in tag and tag['img_main']:
                 embed.set_image(url=tag['img_main'])

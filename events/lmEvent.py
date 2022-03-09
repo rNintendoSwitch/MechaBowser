@@ -797,7 +797,7 @@ class Mansion(commands.Cog):
         embed.set_thumbnail(
             url='https://cdn.discordapp.com/attachments/585528775471661244/638945309023797249/poltergust3000.png'
         )
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
         await ctx.message.delete()
         await ctx.send(embed=embed, delete_after=60)
 

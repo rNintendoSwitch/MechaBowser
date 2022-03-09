@@ -805,7 +805,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile'
             '\n\nWhen prompted, simply reply with what you would like to set the field as.',
         )
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar.url)
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
 
         try:
             mainMsg = await ctx.author.send(embed=embed)

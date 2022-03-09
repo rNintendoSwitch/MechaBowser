@@ -653,7 +653,7 @@ async def send_paginated_embed(
     embed = discord.Embed(description=None if not description else description, colour=color)
     if author:
         embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
-    embed.set_footer(icon_url=embed.Empty if not owner else owner.avatar.url)
+    embed.set_footer(icon_url=embed.Empty if not owner else owner.display_avatar.url)
 
     # Main loop
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
