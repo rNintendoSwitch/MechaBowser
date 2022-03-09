@@ -40,7 +40,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.publicModLogs = self.bot.get_channel(config.publicModChannel)
-        self.taskHandles = []
+        self.taskHandles = {}
         self.NS = self.bot.get_guild(config.nintendoswitch)
         self.roles = {'mute': self.NS.get_role(config.mute)}
 
@@ -68,29 +68,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         if user['strike_check'] - time.time() > twelveHr
                         else user['strike_check'] - time.time()
                     )
-                    self.taskHandles.append(
-                        self.bot.loop.call_later(
-                            tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)
-                        )
-                    )
+                    self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
                 else:  # In the past
-                    self.taskHandles.append(
-                        self.bot.loop.call_soon(
-                            asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)
-                        )
-                    )
+                    self.schedule_task(0, pun['_id'], config.nintendoswitch)
 
             elif pun['type'] == 'mute':
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
-                self.taskHandles.append(
-                    self.bot.loop.call_later(
-                        tryTime, asyncio.create_task, self.expire_actions(pun['_id'], config.nintendoswitch)
-                    )
-                )
+                self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
     def cog_unload(self):
-        for task in self.taskHandles:
+        for task in self.taskHandles.values():
             task.cancel()
 
     @commands.command(name='hide', aliases=['unhide'])
@@ -191,6 +179,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return ctx.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}')
 
         user = await self.bot.fetch_user(doc['user'])
+        try:
+            member = await ctx.guild.fetch_member(doc['user'])
+
+        except:
+            member = None
+
         if duration:
             try:
                 _duration = tools.resolve_duration(duration)
@@ -209,6 +203,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             if stamp - time.time() < 60:  # Less than a minute
                 return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
+
+            twelveHr = 60 * 60 * 12
+            tryTime = twelveHr if stamp - time.time() > twelveHr else stamp - time.time()
+            self.schedule_task(tryTime, infraction, config.nintendoswitch)
+
+            if member:
+                await member.edit(timed_out_until=_duration, reason='Mute duration modified by moderator')
 
             db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
             await tools.send_modlog(
@@ -237,34 +238,36 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 updated=doc['reason'],
             )
 
-        try:
-            pubChannel = self.bot.get_channel(doc['public_log_channel'])
-            pubMessage = await pubChannel.fetch_message(doc['public_log_message'])
-            embed = pubMessage.embeds[0]
-            embedDict = embed.to_dict()
-            newEmbedDict = copy.deepcopy(embedDict)
-            listIndex = 0
-            for field in embedDict['fields']:
-                # We are working with the dict because some logs can have `reason` at different indexes and we should not assume index position
-                if duration and field['name'] == 'Expires':
-                    # This is subject to a breaking change if `name` updated, but I'll take the risk
-                    newEmbedDict['fields'][listIndex]['value'] = expireStr
-                    break
+        if doc['public_log_message']:
+            # This could be None if the edit was done before the log post duration has passed
+            try:
+                pubChannel = self.bot.get_channel(doc['public_log_channel'])
+                pubMessage = await pubChannel.fetch_message(doc['public_log_message'])
+                embed = pubMessage.embeds[0]
+                embedDict = embed.to_dict()
+                newEmbedDict = copy.deepcopy(embedDict)
+                listIndex = 0
+                for field in embedDict['fields']:
+                    # We are working with the dict because some logs can have `reason` at different indexes and we should not assume index position
+                    if duration and field['name'] == 'Expires':
+                        # This is subject to a breaking change if `name` updated, but I'll take the risk
+                        newEmbedDict['fields'][listIndex]['value'] = expireStr
+                        break
 
-                elif not duration and field['name'] == 'Reason':
-                    newEmbedDict['fields'][listIndex]['value'] = reason
-                    break
+                    elif not duration and field['name'] == 'Reason':
+                        newEmbedDict['fields'][listIndex]['value'] = reason
+                        break
 
-                listIndex += 1
+                    listIndex += 1
 
-            assert (
-                embedDict['fields'] != newEmbedDict['fields']
-            )  # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow
-            newEmbed = discord.Embed.from_dict(newEmbedDict)
-            await pubMessage.edit(embed=newEmbed)
+                assert (
+                    embedDict['fields'] != newEmbedDict['fields']
+                )  # Will fail if message was unchanged, this is likely because of a breaking change upstream in the pun flow
+                newEmbed = discord.Embed.from_dict(newEmbedDict)
+                await pubMessage.edit(embed=newEmbed)
 
-        except Exception as e:
-            logging.error(f'[Moderation] _infraction_duration: {e}')
+            except Exception as e:
+                logging.error(f'[Moderation] _infraction_duration: {e}')
 
         error = ''
         try:
@@ -531,7 +534,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
             return await ctx.send(f'{config.redTick} {member} ({member.id}) is already muted')
 
-        muteRole = ctx.guild.get_role(config.mute)
         try:
             _duration = tools.resolve_duration(duration)
             try:
@@ -545,7 +547,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
         docID = await tools.issue_pun(member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()))
-        await member.add_roles(muteRole, reason='Mute action performed by moderator')
+        await member.edit(timed_out_until=_duration, reason='Mute action performed by moderator')
         await tools.send_modlog(
             self.bot,
             self.modLogs,
@@ -570,9 +572,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())
         tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
-        self.taskHandles.append(
-            self.bot.loop.call_later(tryTime, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
-        )
+        self.schedule_task(tryTime, docID, ctx.guild.id)
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
@@ -587,7 +587,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters'
             )
         db = mclient.bowser.puns
-        muteRole = ctx.guild.get_role(config.mute)
         action = db.find_one_and_update(
             {'user': member.id, 'type': 'mute', 'active': True}, {'$set': {'active': False}}
         )
@@ -597,7 +596,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
 
         docID = await tools.issue_pun(member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False)
-        await member.remove_roles(muteRole, reason='Unmute action performed by moderator')
+        await member.edit(timed_out_until=None, reason='Unmute action performed by moderator')
         await tools.send_modlog(
             self.bot, self.modLogs, 'unmute', docID, reason, user=member, moderator=ctx.author, public=True
         )
@@ -667,9 +666,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         docID = await tools.issue_pun(user.id, ctx.author.id, 'strike', reason, strike_count=count, public=True)
         userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
 
-        self.taskHandles.append(
-            self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(docID, ctx.guild.id))
-        )  # Check in 12 hours, prevents time drifting
+        self.schedule_task(60 * 60 * 12, docID, ctx.guild.id)
         await tools.send_modlog(
             self.bot,
             self.modLogs,
@@ -741,11 +738,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         },
                     )
                     userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})
-                    self.taskHandles.append(
-                        self.bot.loop.call_later(
-                            60 * 60 * 12, asyncio.create_task, self.expire_actions(pun['_id'], ctx.guild.id)
-                        )
-                    )  # Check in 12 hours, prevents time drifting
+                    self.schedule_task(60 * 60 * 12, pun['_id'], ctx.guild.id)
 
                     # Logic to calculate the remaining (diff) strikes will simplify to 0
                     # new_diff = diff - removed_strikes
@@ -819,6 +812,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
             raise error
 
+    def schedule_task(self, tryTime: int, _id: str, guild_id: int):
+        if _id in self.taskHandles.keys():
+            self.taskHandles[_id].cancel()
+
+        self.taskHandles[_id] = self.bot.loop.call_later(
+            tryTime, asyncio.create_task, self.expire_actions(_id, guild_id)
+        )
+
     async def expire_actions(self, _id, guild):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': _id})
@@ -843,9 +844,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         if user['strike_check'] - time.time() > twelveHr
                         else user['strike_check'] - time.time()
                     )
-                    self.taskHandles.append(
-                        self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild))
-                    )
+                    self.schedule_task(retryTime, _id, guild)
                     return
 
             except KeyError:  # This is a rare edge case, but if a pun is manually created the user may not have the flag yet. More a dev handler than not
@@ -860,24 +859,20 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     x for x in db.find({'user': doc['user'], 'type': 'strike', 'active': True}).sort('timestamp', 1)
                 ]
                 if not strikes:  # Last active strike expired, no additional
+                    del self.taskHandles[_id]
                     return
 
-                self.taskHandles.append(
-                    self.bot.loop.call_later(
-                        60 * 60 * 12, asyncio.create_task, self.expire_actions(strikes[0]['_id'], guild)
-                    )
-                )
+                self.schedule_task(60 * 60 * 12, strikes[0]['_id'], guild)
 
             elif doc['active_strike_count'] > 0:
                 db.update_one({'_id': doc['_id']}, {'$inc': {'active_strike_count': -1}})
-                self.taskHandles.append(
-                    self.bot.loop.call_later(60 * 60 * 12, asyncio.create_task, self.expire_actions(doc['_id'], guild))
-                )
+                self.schedule_task(60 * 60 * 12, doc['_id'], guild)
 
             else:
                 logging.warning(
                     f'[Moderation] Expiry failed. Doc {_id} had a negative active strike count and was skipped'
                 )
+                del self.taskHandles[_id]
                 return
 
             userDB.update_one({'_id': doc['user']}, {'$set': {'strike_check': time.time() + 60 * 60 * 24 * 7}})
@@ -887,9 +882,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             # This could also fail if the expiry time is changed by a mod
             if doc['expiry'] > time.time():
                 retryTime = twelveHr if doc['expiry'] - time.time() > twelveHr else doc['expiry'] - time.time()
-                self.taskHandles.append(
-                    self.bot.loop.call_later(retryTime, asyncio.create_task, self.expire_actions(_id, guild))
-                )
+                self.schedule_task(retryTime, _id, guild)
                 return
 
             punGuild = self.bot.get_guild(guild)
@@ -902,9 +895,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             except discord.HTTPException:
                 # Issue with API, lets just try again later in 30 seconds
-                self.taskHandles.append(
-                    self.bot.loop.call_later(30, asyncio.create_task, self.expire_actions(_id, guild))
-                )
+                self.schedule_task(30, _id, guild)
                 return
 
             newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {'active': False}})
@@ -917,13 +908,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     f'[Moderation] Expiry failed. Database failed to update user on pun expiration of {doc["_id"]}'
                 )
 
-            await member.remove_roles(self.roles[doc['type']])
+            await member.edit(timed_out_until=None, reason='Automatic: Mute has expired')
             try:
                 await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
 
             except discord.Forbidden:  # User has DMs off
                 pass
 
+            del self.taskHandles[_id]
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,

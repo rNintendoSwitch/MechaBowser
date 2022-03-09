@@ -1,7 +1,6 @@
 import asyncio
 import collections
 import logging
-import re
 import time
 import typing
 from datetime import datetime, timezone
@@ -9,6 +8,7 @@ from datetime import datetime, timezone
 import config  # type: ignore
 import discord
 import pymongo
+import pytz
 from discord.ext import commands, tasks
 
 import tools  # type: ignore
@@ -124,7 +124,7 @@ class MainEvents(commands.Cog):
         # log = f':inbox_tray: {new} User **{str(member)}** ({member.id}) joined'
 
         embed = discord.Embed(color=0x417505, timestamp=datetime.now(tz=timezone.utc))
-        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
         created_at = member.created_at.strftime(f'{new}%B %d, %Y %H:%M:%S UTC')
         created_at += '' if not new else '\n' + tools.humanize_duration(member.created_at)
         embed.add_field(name='Created at', value=created_at)
@@ -137,14 +137,15 @@ class MainEvents(commands.Cog):
                 if x == member.guild.id:
                     continue
 
-                restored = True
+                needsRestore = True
                 role = member.guild.get_role(x)
                 if role:
                     roleList.append(role)
 
             await member.edit(roles=roleList, reason='Automatic role restore action')
 
-        if restored:
+        punDB = mclient.bowser.puns
+        if needsRestore or punDB.find_one({'user': member.id, 'type': 'mute', 'active': True}):
             # roleText = ', '.split(x.name for x in roleList)
 
             # logRestore = f':shield: Roles have been restored for returning member **{str(member)}** ({member.id}):\n{roleText}'
@@ -152,14 +153,14 @@ class MainEvents(commands.Cog):
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',
             }
-            puns = mclient.bowser.puns.find({'user': member.id, 'active': True})
+            puns = punDB.find({'user': member.id, 'active': True})
             restoredPuns = []
             if puns.count():
                 for x in puns:
                     if x['type'] == 'blacklist':
                         restoredPuns.append(punTypes[x['type']].format(x['context']))
 
-                    elif x['type'] in ['strike', 'kick', 'ban']:
+                    elif x['type'] in ['strike', 'kick', 'ban', 'appealdeny']:
                         continue  # These are not punishments being "restored", instead only status is being tracked
 
                     elif x['type'] == 'mute':
@@ -169,25 +170,32 @@ class MainEvents(commands.Cog):
                             mod = self.bot.get_cog('Moderation Commands')
                             await mod.expire_actions(x['_id'], member.guild.id)
 
-                        restoredPuns.append(punTypes[x['type']])
+                        else:
+                            # The member rejoined while a mute is still active, reapply the chat timeout.
+                            # We want to make sure if the expiry was modified while they were not in the
+                            # server that the correct timeout is applied
+                            await member.edit(
+                                timed_out_until=datetime.fromtimestamp(x['expiry'], tz=pytz.utc),
+                                reason='Reapplying timeout after user rejoined',
+                            )
+
+                            restoredPuns.append(punTypes[x['type']])
 
                     else:
                         restoredPuns.append(punTypes[x['type']])
 
             embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
-            embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
-            embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList))
+            embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
+            embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList) or 'None')
             if restoredPuns:
                 embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
             embed.add_field(name='Mention', value=f'<@{member.id}>')
             await self.serverLogs.send(':shield: Member restored', embed=embed)
 
-        if mclient.bowser.puns.count_documents(
-            {'user': member.id, 'active': True, 'type': {'$in': ['mute', 'strike', 'blacklist']}}
-        ):
+        if punDB.count_documents({'user': member.id, 'active': True, 'type': {'$in': ['mute', 'strike', 'blacklist']}}):
             activeHist = []
             strikes = 0
-            for pun in mclient.bowser.puns.find(
+            for pun in punDB.find(
                 {'user': member.id, 'active': True, 'type': {'$in': ['mute', 'strike', 'blacklist']}}
             ):
                 if pun['type'] == 'strike':
@@ -209,12 +217,12 @@ class MainEvents(commands.Cog):
         if (
             'migrate_unnotified' in doc.keys() and doc['migrate_unnotified'] == True
         ):  # Migration of warnings to strikes for returning members
-            for pun in mclient.bowser.puns.find(
+            for pun in punDB.find(
                 {'active': True, 'type': {'$in': ['tier1', 'tier2', 'tier3']}, 'user': member.id}
             ):  # Should only be one, it's mutually exclusive
                 strikeCount = int(pun['type'][-1:]) * 4
 
-                mclient.bowser.puns.update_one({'_id': pun['_id']}, {'$set': {'active': False}})
+                punDB.update_one({'_id': pun['_id']}, {'$set': {'active': False}})
                 docID = await tools.issue_pun(
                     member.id,
                     self.bot.user.id,
@@ -254,14 +262,6 @@ class MainEvents(commands.Cog):
                 except:
                     pass
 
-        # After everything is done, if they don't have an active mute and the mute role, go ahead and remove it. This
-        # most likely happens if their mute was marked as false postive after they left the server.
-        active_mutes = mclient.bowser.puns.find_one({'user': member.id, 'active': True, 'type': 'mute'})
-        muteRole = self.bot.get_guild(config.nintendoswitch).get_role(config.mute)
-
-        if not active_mutes and muteRole in member.roles:
-            await member.remove_roles(muteRole, reason='Orphaned mute role removed')
-
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         # log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
@@ -293,7 +293,7 @@ class MainEvents(commands.Cog):
         else:
             embed = discord.Embed(color=0x8B572A, timestamp=datetime.now(tz=timezone.utc))
 
-        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar.url)
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
         embed.add_field(name='Mention', value=f'<@{member.id}>')
         await self.serverLogs.send(':outbox_tray: User left', embed=embed)
 
@@ -321,7 +321,7 @@ class MainEvents(commands.Cog):
                 )
 
         embed = discord.Embed(color=discord.Color(0xD0021B), timestamp=datetime.now(tz=timezone.utc))
-        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar.url)
+        embed.set_author(name=f'{user} ({user.id})', icon_url=user.display_avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
         await self.serverLogs.send(':rotating_light: User banned', embed=embed)
@@ -354,7 +354,7 @@ class MainEvents(commands.Cog):
                 )
 
         embed = discord.Embed(color=discord.Color(0x88FF00), timestamp=datetime.now(tz=timezone.utc))
-        embed.set_author(name=f'{user} ({user.id})', icon_url=user.avatar.url)
+        embed.set_author(name=f'{user} ({user.id})', icon_url=user.display_avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
 
         await self.serverLogs.send(':triangular_flag_on_post: User unbanned', embed=embed)
@@ -470,7 +470,7 @@ class MainEvents(commands.Cog):
             color=0xF8E71C,
             timestamp=datetime.now(tz=timezone.utc),
         )
-        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.avatar.url)
+        embed.set_author(name=f'{str(user)} ({user.id})', icon_url=user.display_avatar.url)
         embed.add_field(name='Mention', value=f'<@{user.id}>')
         if payload.cached_message and len(payload.cached_message.attachments) == 1:
             embed.set_image(url=payload.cached_message.attachments[0].proxy_url)
@@ -524,7 +524,7 @@ class MainEvents(commands.Cog):
                 timestamp=datetime.now(tz=timezone.utc),
             )
 
-        embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.avatar.url)
+        embed.set_author(name=f'{str(before.author)} ({before.author.id})', icon_url=before.author.display_avatar.url)
         embed.add_field(name='Mention', value=f'<@{before.author.id}>')
 
         await self.serverLogs.send(f':pencil: Message edited in <#{before.channel.id}>', embed=embed)
@@ -559,7 +559,7 @@ class MainEvents(commands.Cog):
                 after_name = discord.utils.escape_markdown(after.nick)
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
-            embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar.url)
+            embed.set_author(name=f'{before} ({before.id})', icon_url=before.display_avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
@@ -588,7 +588,7 @@ class MainEvents(commands.Cog):
 
             if rolesRemoved or rolesAdded:  # nop if no change, e.g. role moves in list
                 embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
-                embed.set_author(name=f'{before} ({before.id})', icon_url=before.avatar.url)
+                embed.set_author(name=f'{before} ({before.id})', icon_url=before.display_avatar.url)
 
                 if rolesRemoved:
                     embed.add_field(
@@ -631,7 +631,7 @@ class MainEvents(commands.Cog):
                 },
             )
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
-            embed.set_author(name=f'{after} ({after.id})', icon_url=after.avatar.url)
+            embed.set_author(name=f'{after} ({after.id})', icon_url=after.display_avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
