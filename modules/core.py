@@ -137,7 +137,7 @@ class MainEvents(commands.Cog):
                 if x == member.guild.id:
                     continue
 
-                restored = True
+                needsRestore = True
                 role = member.guild.get_role(x)
                 if role:
                     roleList.append(role)
@@ -145,10 +145,7 @@ class MainEvents(commands.Cog):
             await member.edit(roles=roleList, reason='Automatic role restore action')
 
         punDB = mclient.bowser.puns
-        if punDB.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-            restored = True
-
-        if restored:
+        if needsRestore or punDB.find_one({'user': member.id, 'type': 'mute', 'active': True}):
             # roleText = ', '.split(x.name for x in roleList)
 
             # logRestore = f':shield: Roles have been restored for returning member **{str(member)}** ({member.id}):\n{roleText}'
