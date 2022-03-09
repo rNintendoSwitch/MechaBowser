@@ -1,7 +1,6 @@
 import asyncio
 import copy
 import logging
-import pytz
 import time
 import typing
 from datetime import datetime
@@ -9,6 +8,7 @@ from datetime import datetime
 import config
 import discord
 import pymongo
+import pytz
 from discord.ext import commands, tasks
 
 import tools
