@@ -265,14 +265,6 @@ class MainEvents(commands.Cog):
                 except:
                     pass
 
-        # After everything is done, if they don't have an active mute and the mute role, go ahead and remove it. This
-        # most likely happens if their mute was marked as false postive after they left the server.
-        active_mutes = punDB.find_one({'user': member.id, 'active': True, 'type': 'mute'})
-        muteRole = self.bot.get_guild(config.nintendoswitch).get_role(config.mute)
-
-        if not active_mutes and muteRole in member.roles:
-            await member.remove_roles(muteRole, reason='Orphaned mute role removed')
-
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         # log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
