@@ -132,6 +132,7 @@ class MainEvents(commands.Cog):
 
         await self.serverLogs.send(':inbox_tray: User joined', embed=embed)
 
+        needsRestore = False
         if doc and doc['roles']:
             for x in doc['roles']:
                 if x == member.guild.id:
