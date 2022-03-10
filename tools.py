@@ -472,9 +472,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
     embed.set_footer(text=id)
     embed.add_field(name='User', value=user.mention, inline=True)
     if doc['expiry']:
-        expires = datetime.utcfromtimestamp(doc['expiry'])
-        duration = humanize_duration(expires.replace(tzinfo=timezone.utc))
-        embed.add_field(name='Expires', value=f'{expires.strftime("%B %d, %Y %H:%M:%S UTC")} ({duration})')
+        embed.add_field(name='Expires', value=f'<t:{doc["expiry"]}:f> (<t:{doc["expiry"]}:R>)')
     if doc['sensitive']:
         embed.add_field(
             name='Reason',

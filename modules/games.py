@@ -417,7 +417,7 @@ class Games(commands.Cog, name='Games'):
             if self.parse_expected_release_date(game):
                 game_desc += f'\n**Expected Release Date:** {self.parse_expected_release_date(game, True)}'
             elif game["original_release_date"]:
-                game_desc += f'\n**Release Date:** {game["original_release_date"].strftime("%b. %d, %Y")}'
+                game_desc += f'\n**Release Date:** <t:{int(game["original_release_date"].timestamp())}:D>'
             else:
                 game_desc += f'\n**Release Date:** *Unknown*'
 
@@ -481,7 +481,7 @@ class Games(commands.Cog, name='Games'):
                         if self.parse_expected_release_date(release):
                             date_strs[key] = self.parse_expected_release_date(release, True)
                         elif release["release_date"]:
-                            date_strs[key] = release["release_date"].strftime("%b. %d, %Y")
+                            date_strs[key] = f'<t:{int(release["release_date"].timestamp())}:D>'
                         else:
                             date_strs[key] = "*Unknown*"
                     else:
@@ -532,7 +532,7 @@ class Games(commands.Cog, name='Games'):
                 value = 'Never ran'
             else:
                 count = sync["count"]
-                value = f'{tools.humanize_duration(sync["at"])}: {count["games"]} games, {count["releases"]} releases'
+                value = f'<t:{int(sync["at"].timestamp())}:R>: {count["games"]} games, {count["releases"]} releases'
 
             embed.add_field(name=f'Last {string} Sync', value=value, inline=False)
 
