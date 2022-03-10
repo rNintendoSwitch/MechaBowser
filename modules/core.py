@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 import config  # type: ignore
 import discord
 import pymongo
-import pytz
 from discord.ext import commands, tasks
 
 import tools  # type: ignore
@@ -176,7 +175,7 @@ class MainEvents(commands.Cog):
                             # We want to make sure if the expiry was modified while they were not in the
                             # server that the correct timeout is applied
                             await member.edit(
-                                timed_out_until=datetime.fromtimestamp(x['expiry'], tz=pytz.utc),
+                                timed_out_until=datetime.fromtimestamp(x['expiry'], tz=timezone.utc),
                                 reason='Reapplying timeout after user rejoined',
                             )
 

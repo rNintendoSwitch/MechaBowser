@@ -3,12 +3,11 @@ import copy
 import logging
 import time
 import typing
-from datetime import datetime
+from datetime import datetime, timezone
 
 import config
 import discord
 import pymongo
-import pytz
 from discord.ext import commands, tasks
 
 import tools
@@ -545,7 +544,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (KeyError, TypeError):
             return await ctx.send(f'{config.redTick} Invalid duration passed')
 
-        durDiff = (_duration - datetime.now(tz=pytz.utc)).total_seconds()
+        durDiff = (_duration - datetime.now(tz=timezone.utc)).total_seconds()
         if durDiff - 1 > 60 * 60 * 24 * 28:
             # Discord Timeouts cannot exceed 28 days, so we must check this
             return await ctx.send(f'{config.redTick} Mutes cannot be longer than 28 days')

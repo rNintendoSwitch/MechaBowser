@@ -467,7 +467,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
     author += f'| {user} ({user.id})'
 
-    embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.utcfromtimestamp(doc['timestamp']))
+    embed = discord.Embed(color=config.punColors[doc['type']], timestamp=datetime.fromtimestamp(doc['timestamp'], tz=timezone.utc))
     embed.set_author(name=author)
     embed.set_footer(text=id)
     embed.add_field(name='User', value=user.mention, inline=True)

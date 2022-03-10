@@ -7,7 +7,7 @@ import random
 import re
 import time
 import typing
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import codepoints
@@ -429,7 +429,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         joins = dbUser['joins']
         joins.sort()
-        joinDate = datetime.utcfromtimestamp(joins[0])
+        joinDate = datetime.fromtimestamp(joins[0], tz=timezone.utc)
         try:  # -d doesn't work on all platforms, such as Windows
             joinDateF = joinDate.strftime('%b. %-d, %Y')
         except:
