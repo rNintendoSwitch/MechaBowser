@@ -719,7 +719,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
                     return True
 
-                result = Games.search(response.content.strip(), True)
+                result = Games.search(response.content.strip())
 
                 if result:
                     if len(userGames) == 0 and dbUser['favgames']:

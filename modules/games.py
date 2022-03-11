@@ -196,7 +196,7 @@ class Games(commands.Cog, name='Games'):
 
         return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
 
-    def search(self, query: str, ignore_unreleased: bool = False) -> Optional[dict]:
+    def search(self, query: str) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
 
         pipeline = [
@@ -229,14 +229,6 @@ class Games(commands.Cog, name='Games'):
                 names.update(game['aliases'])
             if game['_releases']:
                 names.update([release['name'] for release in game['_releases']])
-
-            # If ignore unreleased flag is set, we must consider ignoring this game
-            if ignore_unreleased and game['original_release_date'] is None:
-                if game['_releases']:
-                    if all(release['release_date'] is None for release in game['_releases']):
-                        continue  # Has releases, but no release with release date, nor any orig. release date -- ignore
-                else:
-                    continue  # No releases, no release date -- ignore
 
             for name in names:
                 methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
