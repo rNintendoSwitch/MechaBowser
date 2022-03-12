@@ -518,13 +518,13 @@ def format_pundm(_type, reason, moderator=None, details=None, auto=False):
 
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
     if _type == 'reason-update':
-        punDM += f'Updated reason:```{reason}```'
+        punDM += f'Updated reason: ```{reason}``` '
     else:
-        punDM += f'Reason:```{reason}```'
+        punDM += f'Reason: ```{reason}``` '
 
     if moderator:
         mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
-        punDM += f'Responsible moderator: {mod}\n\n'
+        punDM += f' Responsible moderator: {mod}\n\n'
 
     if details == 'modmail':
         punDM += 'If you have questions concerning this matter, please feel free to contact the moderator that took this action or another member of the moderation team.\n'
