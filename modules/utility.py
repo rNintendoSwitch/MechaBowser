@@ -69,9 +69,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
         if message.type == discord.MessageType.premium_guild_subscription:
-            boost_message = message.system_content.replace(message.author.name, message.author.mention)
-            await self.adminChannel.send(boost_message, allowed_mentions=discord.AllowedMentions.none())
-            await self.boostChannel.send(boost_message, allowed_mentions=discord.AllowedMentions.none())
+            boost_message = message.system_content.replace(message.author.name, f'{message.author.name} ({message.author.mention})')
+            await self.adminChannel.send(boost_message)
+            await self.boostChannel.send(boost_message)
 
         if message.author.bot or message.type not in [discord.MessageType.default, discord.MessageType.reply]:
             logging.debug(f'on_automod_finished discarding non-normal-message: {message.type=}, {message.id=}')
