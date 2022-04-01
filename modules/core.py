@@ -181,6 +181,10 @@ class MainEvents(commands.Cog):
 
                             restoredPuns.append(punTypes[x['type']])
 
+                    elif x['type'] in ['tier1', 'tier2', 'tier3']:
+                        # We don't want to handle this, these will be converted to strikes further on
+                        pass
+
                     else:
                         restoredPuns.append(punTypes[x['type']])
 
