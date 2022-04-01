@@ -518,9 +518,9 @@ def format_pundm(_type, reason, moderator=None, details=None, auto=False):
 
     punDM = infoStrs[_type] + f' the /r/NintendoSwitch Discord server.\n'
     if _type == 'reason-update':
-        punDM += f'Updated reason:```{reason}```'
+        punDM += f'Updated reason: ```{reason}``` '
     else:
-        punDM += f'Reason:```{reason}```'
+        punDM += f'Reason: ```{reason}``` '
 
     if moderator:
         mod = f'{moderator} ({moderator.mention})' if not auto else 'Automatic action'
