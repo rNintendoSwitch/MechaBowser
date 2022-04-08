@@ -268,6 +268,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @commands.command(name='clean')
     @commands.has_any_role(config.moderator, config.eh)
     async def _clean(self, ctx, messages: int, members: commands.Greedy[discord.Member]):
+        if messages > 2000 or messages <= 0:
+            return await ctx.send(
+                f'{config.redTick} Invalid message count {messages}. Must be greater than 0 and not more than 2000'
+            )
+
         if messages >= 100:
 
             def confirm_check(reaction, member):
