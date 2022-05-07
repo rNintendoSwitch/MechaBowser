@@ -117,6 +117,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         )
                         await message.delete()
 
+                        # you can't delete "removed from thread" messages, so we just don't remove people from threads
+                        # await message.channel.remove_user(message.author)
+
                         if message.channel.slowmode_delay != 6 * 60 * 60:
                             await message.channel.edit(slowmode_delay=6 * 60 * 60)
 
