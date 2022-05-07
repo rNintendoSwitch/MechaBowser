@@ -111,7 +111,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         ):
                             return
 
-                        message.delete()
+                        await message.delete()
                         await message.reply(f':bangbang: Messages are not permitted in pinned threads', delete_after=10)
 
                         if message.channel.slowmode_delay != 6 * 60 * 60:
