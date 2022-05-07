@@ -79,6 +79,46 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             logging.debug(f'on_automod_finished discarding non-normal-message: {message.type=}, {message.id=}')
             return
 
+        # Auto delete messages in pinned threads in forum channels
+        # Using api calls because we're using an outdated version of discord.py
+        if type(message.channel) != discord.threads.Thread:
+            return
+
+        async with aiohttp.ClientSession() as session:
+            headers = {'Authorization': f'Bot {config.token}'}
+            url = f'https://discord.com/api/guilds/{message.guild.id}/threads/active'
+            async with session.get(url, headers=headers) as resp:
+                json = await resp.json()
+
+                for thread in json['threads']:
+                    if int(thread['id']) != message.channel.id:
+                        continue
+
+                    # If thread is pinned...
+                    # 0x2 - Channel Flags - PINNED
+                    # https://discord.com/developers/docs/resources/channel#channel-object-channel-flags
+                    if thread['flags'] & 0x2:
+                        if message.author.bot:
+                            return
+
+                        # We can't check permissions because the parent channel won't fetch in fourm channels with an
+                        # outdated version of discord.py. We should be checking if the user has
+                        # manage_channels or manage_messages.
+                        if (
+                            message.guild.get_role(config.moderator) in message.author.roles
+                            or message.guild.get_role(config.helpfulUser) in message.author.roles
+                            or message.guild.get_role(config.trialHelpfulUser) in message.author.roles
+                        ):
+                            return
+
+                        message.delete()
+                        await message.reply(f':bangbang: Messages are not permitted in pinned threads', delete_after=10)
+
+                        if message.channel.slowmode_delay != 6 * 60 * 60:
+                            await message.channel.edit(slowmode_delay=6 * 60 * 60)
+
+                        return
+
         # Filter invite links
         msgInvites = re.findall(self.inviteRe, message.content)
         if msgInvites and config.moderator not in [x.id for x in message.author.roles]:
