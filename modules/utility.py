@@ -111,8 +111,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         ):
                             return
 
+                        await message.channel.send(
+                            f':bangbang: {message.author.mention} Messages are not permitted in pinned threads',
+                            delete_after=10,
+                        )
                         await message.delete()
-                        await message.reply(f':bangbang: Messages are not permitted in pinned threads', delete_after=10)
 
                         if message.channel.slowmode_delay != 6 * 60 * 60:
                             await message.channel.edit(slowmode_delay=6 * 60 * 60)
