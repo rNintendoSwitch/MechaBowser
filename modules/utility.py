@@ -103,6 +103,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
                         # If thread is pinned...
                         if thread['flags'] & CHANNEL_PINNED:
+                            if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
+                                await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
+
                             # We can't check permissions because the parent channel won't fetch in fourm channels
                             # with an outdated version of discord.py. We should be checking if the user has
                             # manage_channels or manage_messages.
@@ -117,12 +120,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                                     delete_after=10,
                                 )
                                 await message.delete()
+                                return
 
                                 # you can't delete "removed user from thread" messages, so we just don't do it
                                 # await message.channel.remove_user(message.author)
-
-                                if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
-                                    await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
 
                         else:  # not pinned, remove slowmode
                             if message.channel.slowmode_delay == UNIQUE_SLOWMODE:
