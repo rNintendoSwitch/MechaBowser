@@ -81,6 +81,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         # Auto delete messages in pinned threads in forum channels
         # Using api calls because we're using an outdated version of discord.py
+        CHANNEL_PINNED = 0x2  # https://discord.com/developers/docs/resources/channel#channel-object-channel-flags
+        UNIQUE_SLOWMODE = (6 * 60 * 60) - 60  # Unique slowmode time that is not quite 6h so we can test for & remove it
+
         if type(message.channel) != discord.threads.Thread:
             return
 
@@ -95,9 +98,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         continue
 
                     # If thread is pinned...
-                    # 0x2 - Channel Flags - PINNED
-                    # https://discord.com/developers/docs/resources/channel#channel-object-channel-flags
-                    if thread['flags'] & 0x2:
+                    if thread['flags'] & CHANNEL_PINNED:
                         if message.author.bot:
                             return
 
@@ -120,10 +121,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                         # you can't delete "removed from thread" messages, so we just don't remove people from threads
                         # await message.channel.remove_user(message.author)
 
-                        if message.channel.slowmode_delay != 6 * 60 * 60:
-                            await message.channel.edit(slowmode_delay=6 * 60 * 60)
+                        if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
+                            await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
 
                         return
+
+                    else:  # not pinned, remove slowmode
+                        if message.channel.slowmode_delay == UNIQUE_SLOWMODE:
+                            await message.channel.edit(slowmode_delay=0)
 
         # Filter invite links
         msgInvites = re.findall(self.inviteRe, message.content)
