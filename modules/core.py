@@ -131,7 +131,7 @@ class MainEvents(commands.Cog):
 
         needsRestore = False
         if doc and doc['roles']:
-            myTop = member.guild.me.top_role.position
+            myTop = member.guild.me.top_role
             hierarchyFails = []
             for x in doc['roles']:
                 if x == member.guild.id:
@@ -141,7 +141,7 @@ class MainEvents(commands.Cog):
                 role = member.guild.get_role(x)
                 if role:
                     # Checks if role exists
-                    if role.position < myTop:
+                    if myTop > role:
                         roleList.append(role)
 
                     else:
