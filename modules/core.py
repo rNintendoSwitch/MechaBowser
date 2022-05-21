@@ -131,6 +131,8 @@ class MainEvents(commands.Cog):
 
         needsRestore = False
         if doc and doc['roles']:
+            myTop = member.guild.me.top_role.position
+            hierarchyFails = []
             for x in doc['roles']:
                 if x == member.guild.id:
                     continue
@@ -139,7 +141,11 @@ class MainEvents(commands.Cog):
                 role = member.guild.get_role(x)
                 if role:
                     # Checks if role exists
-                    roleList.append(role)
+                    if role.position < myTop:
+                        roleList.append(role)
+
+                    else:
+                        hierarchyFails.append(role)
 
             await member.edit(roles=roleList, reason='Automatic role restore action')
 
@@ -188,6 +194,11 @@ class MainEvents(commands.Cog):
             embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
             embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
             embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList) or 'None')
+            if hierarchyFails:
+                embed.description = (
+                    f'⚠️ Failed to reassign some or all roles due to missing permissions.\n'
+                    + ', '.join(x.name for x in hierarchyFails)
+                )
             if restoredPuns:
                 embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
             embed.add_field(name='Mention', value=f'<@{member.id}>')
