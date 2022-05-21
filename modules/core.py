@@ -196,7 +196,11 @@ class MainEvents(commands.Cog):
             embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList) or 'None')
             if hierarchyFails:
                 embed.description = (
-                    f'⚠️ Failed to reassign some or all roles due to missing permissions.\n'
+                    f':warning: Failed to reassign some or all roles due to missing permissions:\n> '
+                    + ', '.join(x.name for x in hierarchyFails)
+                )
+                await self.adminChannel.send(
+                    f':warning: **{member}** ({member.id}) rejoined the server, but I failed to restore some or all roles due to missing permissions: '
                     + ', '.join(x.name for x in hierarchyFails)
                 )
             if restoredPuns:
@@ -223,7 +227,7 @@ class MainEvents(commands.Cog):
                 activeHist.append(f'{strikes} Strike{"s" if strikes > 1 else ""}')
 
             await self.adminChannel.send(
-                f':grey_exclamation: **{member}** ({member.id}) has returned to the server after leaving with the following active punishments:\n{", ".join(activeHist)}'
+                f':grey_exclamation: **{member}** ({member.id}) rejoined the server after leaving with the following active punishments:\n{", ".join(activeHist)}'
             )
 
         if (
