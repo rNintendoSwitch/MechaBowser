@@ -664,6 +664,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
         punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
+        userDoc = userDB.find_one({'_id': user.id})
+        if not userDoc:
+            return await ctx.send(f'{config.redTick} Unable strike user who has never joined the server')
 
         activeStrikes = 0
         for pun in punDB.find({'user': user.id, 'type': 'strike', 'active': True}):
@@ -740,6 +743,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             for pun in puns:
                 if pun['active_strike_count'] - diff >= 0:
                     userDB = mclient.bowser.users
+                    userDoc = userDB.find_one({'_id': user.id})
+                    if not userDoc:
+                        return await ctx.send(f'{config.redTick} Unable strike user who has never joined the server')
+
                     punDB.update_one(
                         {'_id': pun['_id']},
                         {
