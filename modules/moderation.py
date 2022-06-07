@@ -708,7 +708,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         if tools.mod_cmd_invoke_delete(ctx.channel):
             await ctx.send(
-                '{config.greenTick} {user} ({user.id}) has been successfully struck, they now have'
+                f'{config.greenTick} {user} ({user.id}) has been successfully struck, they now have '
                 f'{activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count}){error}'
             )
 
@@ -826,7 +826,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             if tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(
-                    f'{user} ({user.id}) has had {removedStrikes} strikes removed, '
+                    f'{config.greenTick} {user} ({user.id}) has had {removedStrikes} strikes removed, '
                     f'they now have {count} strike{"s" if count > 1 else ""} '
                     f'({activeStrikes} - {removedStrikes}) {error}'
                 )

@@ -465,7 +465,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
         author += 's ' if doc['strike_count'] > 1 else ' '
 
     elif doc['type'] in ['blacklist', 'unblacklist']:
-        author += f' ({doc["context"]}) '
+        author += f'({doc["context"]}) '
 
     author += f'| {user} ({user.id})'
 
@@ -491,7 +491,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
         embed.description = 'This is an automatic action'
 
     if doc['public_notify']:
-        content = f'<@user.mention>, I was unable to DM you for this infraction. Send `!history` in <#{config.commandsChannel}> for further details.'
+        content = f'{user.mention}, I was unable to DM you for this infraction. Send `!history` in <#{config.commandsChannel}> for further details.'
     else:
         content = None
 
