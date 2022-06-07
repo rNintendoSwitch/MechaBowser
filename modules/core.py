@@ -120,8 +120,6 @@ class MainEvents(commands.Cog):
             ':new: ' if (datetime.now(tz=timezone.utc) - member.created_at).total_seconds() <= 60 * 60 * 24 * 14 else ''
         )  # Two weeks
 
-        # log = f':inbox_tray: {new} User **{str(member)}** ({member.id}) joined'
-
         embed = discord.Embed(color=0x417505, timestamp=datetime.now(tz=timezone.utc))
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
         created_at = f'{new} <t:{int(member.created_at.timestamp())}:f>'
@@ -133,6 +131,8 @@ class MainEvents(commands.Cog):
 
         needsRestore = False
         if doc and doc['roles']:
+            myTop = member.guild.me.top_role
+            hierarchyFails = []
             for x in doc['roles']:
                 if x == member.guild.id:
                     continue
@@ -140,15 +140,18 @@ class MainEvents(commands.Cog):
                 needsRestore = True
                 role = member.guild.get_role(x)
                 if role:
-                    roleList.append(role)
+                    # Checks if role exists
+                    if myTop > role:
+                        roleList.append(role)
+
+                    else:
+                        hierarchyFails.append(role)
 
             await member.edit(roles=roleList, reason='Automatic role restore action')
 
         punDB = mclient.bowser.puns
         if needsRestore or punDB.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-            # roleText = ', '.split(x.name for x in roleList)
 
-            # logRestore = f':shield: Roles have been restored for returning member **{str(member)}** ({member.id}):\n{roleText}'
             punTypes = {
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',
@@ -191,6 +194,15 @@ class MainEvents(commands.Cog):
             embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
             embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
             embed.add_field(name='Restored roles', value=', '.join(x.name for x in roleList) or 'None')
+            if hierarchyFails:
+                embed.description = (
+                    f':warning: Failed to reassign some or all roles due to missing permissions:\n> '
+                    + ', '.join(x.name for x in hierarchyFails)
+                )
+                await self.adminChannel.send(
+                    f':warning: **{member}** ({member.id}) rejoined the server, but I failed to restore some or all roles due to missing permissions: '
+                    + ', '.join(x.name for x in hierarchyFails)
+                )
             if restoredPuns:
                 embed.add_field(name='Restored punishments', value=', '.join(restoredPuns))
             embed.add_field(name='Mention', value=f'<@{member.id}>')
@@ -215,7 +227,7 @@ class MainEvents(commands.Cog):
                 activeHist.append(f'{strikes} Strike{"s" if strikes > 1 else ""}')
 
             await self.adminChannel.send(
-                f':grey_exclamation: **{member}** ({member.id}) has returned to the server after leaving with the following active punishments:\n{", ".join(activeHist)}'
+                f':grey_exclamation: **{member}** ({member.id}) rejoined the server after leaving with the following active punishments:\n{", ".join(activeHist)}'
             )
 
         if (
@@ -271,7 +283,6 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        # log = f':outbox_tray: User **{str(member)}** ({member.id}) left'
         db = mclient.bowser.puns
         puns = db.find({'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}})
 
@@ -430,7 +441,6 @@ class MainEvents(commands.Cog):
 
         archiveID = await tools.message_archive(messages)
 
-        # log = f':printer: New message archive has been generated, view it at {config.baseUrl}/archive/{archiveID}'
         embed = discord.Embed(
             description=f'Archive URL: {config.baseUrl}/logs/{archiveID}',
             color=0xF5A623,
@@ -509,11 +519,6 @@ class MainEvents(commands.Cog):
 
         if not after.content or not before.content:
             return  # Blank or null content (could be embed)
-
-        # log = f':pencil: Message by **{str(before.author)}** ({before.author.id}) in <#{before.channel.id}> edited:\n'
-        # editedMsg = f'__Before:__ {before.clean_content}\n\n__After:__ {after.clean_content}'
-        # fullLog = log + editedMsg if (len(log) + len(editedMsg)) < 2000 else log + 'Message exceeds character limit, ' \
-        #    f'view at {config.baseUrl}/archive/{await utils.message_archive([before, after], True)}'
 
         if len(before.content) <= 1024 and len(after.content) <= 1024:
             embed = discord.Embed(
@@ -741,12 +746,6 @@ class MainEvents(commands.Cog):
                         'timestamp': int(message.created_at.timestamp()),
                     }
                 )
-                # if not users.find_one({'_id': message.author.id}):
-                # users.insert_one({'_id': message.author.id, 'roles': []})
-
-            # else:
-            # if not users.find_one({'_id': message.author.id}):
-            # users.insert_one({'_id': message.author.id, 'roles': []})
 
         return x, y
 

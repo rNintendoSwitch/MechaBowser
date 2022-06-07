@@ -16,12 +16,12 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://extra-life.org/api/participants/455769/donations'
+        self.DONATIONS_URL = 'https://extra-life.org/api/participants/478021/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 777723175274020924
+        self.CHAT_ROLE = 927032355032547349
         ################################################################################################################################
 
         self.bot = bot
