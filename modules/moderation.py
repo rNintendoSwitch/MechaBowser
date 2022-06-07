@@ -706,7 +706,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if activeStrikes == 16:
             error += '.\n:exclamation: You may want to consider a ban'
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
+        if not tools.mod_cmd_invoke_delete(ctx.channel):
             await ctx.send(
                 f'{config.greenTick} {user} ({user.id}) has been successfully struck, they now have '
                 f'{activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count}){error}'
