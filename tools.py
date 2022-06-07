@@ -202,6 +202,7 @@ async def issue_pun(
     _date=None,
     public=True,
     strike_count=None,
+    public_notify=False,
 ):
     db = mclient.bowser.puns
     timestamp = time.time() if not _date else _date
@@ -226,6 +227,7 @@ async def issue_pun(
             'public': public,
             'public_log_message': None,
             'public_log_channel': None,
+            'public_notify': public_notify,
         }
     )
     return docID
@@ -331,7 +333,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
         db.update({'_id': user.id}, {'$push': {key: item}})
         dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)}!\nYou have received a new item for your profile on the r/NintendoSwitch Discord server!\n\nThe **{item.replace("-", " ")}** {element} is now yours, enjoy! '
         if element == 'background':
-            dmMsg += 'If you wish to use this background, use the `!profile edit` command in the #commands-central channel. Here\'s what your profile could look like:'
+            dmMsg += f'If you wish to use this background, use the `!profile edit` command in the <#{config.commandsChannel}> channel. Here\'s what your profile could look like:'
             generated_background = socialCog._generate_background_preview([item])
 
         else:
@@ -352,7 +354,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
 
         dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)},\nA profile item has been revoked from you on the r/NintendoSwitch Discord server.\n\nThe **{item.replace("-", " ")}** {element} was revoked from you. '
         if element == 'background':
-            'If you were using this as your current background then your background has been reset to default. Use the `!profile edit` command in the #commands-central channel if you\'d like to change it.'
+            f'If you were using this as your current background then your background has been reset to default. Use the `!profile edit` command in the <#{config.commandsChannel}> channel if you\'d like to change it.'
         dmMsg += f'If you have questions about this action, please feel free to reach out to us via modmail by DMing <@{config.parakarry}>.'
 
         try:
@@ -463,7 +465,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
         author += 's ' if doc['strike_count'] > 1 else ' '
 
     elif doc['type'] in ['blacklist', 'unblacklist']:
-        author += f' ({doc["context"]}) '
+        author += f'({doc["context"]}) '
 
     author += f'| {user} ({user.id})'
 
@@ -488,7 +490,12 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
     if doc['moderator'] == bot.user.id:
         embed.description = 'This is an automatic action'
 
-    message = await channel.send(embed=embed)
+    if doc['public_notify']:
+        content = f'{user.mention}, I was unable to DM you for this infraction. Send `!history` in <#{config.commandsChannel}> for further details.'
+    else:
+        content = None
+
+    message = await channel.send(content, embed=embed)
 
     if id:
         db.update_one({'_id': id}, {'$set': {'public_log_message': message.id, 'public_log_channel': channel.id}})

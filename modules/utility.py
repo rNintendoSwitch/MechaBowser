@@ -1121,9 +1121,19 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await ctx.send(f'{config.redTick} You cannot blacklist a user from that channel')
 
+        public_notify = False
+        try:
+            await member.send(tools.format_pundm(statusText.lower()[:-2], reason, ctx.author, mention))
+
+        except (discord.Forbidden, AttributeError):  # User has DMs off, or cannot send to Obj
+            public_notify = True
+
         db = mclient.bowser.puns
+
         if statusText.lower() == 'blacklisted':
-            docID = await tools.issue_pun(member.id, ctx.author.id, 'blacklist', reason, context=context)
+            docID = await tools.issue_pun(
+                member.id, ctx.author.id, 'blacklist', reason, context=context, public_notify=public_notify
+            )
 
         else:
             db.find_one_and_update(
@@ -1131,7 +1141,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 {'$set': {'active': False}},
             )
             docID = await tools.issue_pun(
-                member.id, ctx.author.id, 'unblacklist', reason, active=False, context=context
+                member.id,
+                ctx.author.id,
+                'unblacklist',
+                reason,
+                active=False,
+                context=context,
+                public_notify=public_notify,
             )
 
         await tools.send_modlog(
@@ -1146,17 +1162,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             public=True,
         )
 
-        try:
-            statusText = 'blacklist' if statusText == 'Blacklisted' else 'unblacklist'
-            await member.send(tools.format_pundm(statusText, reason, ctx.author, mention))
-
-        except (discord.Forbidden, AttributeError):  # User has DMs off, or cannot send to Obj
-            pass
-
         if tools.mod_cmd_invoke_delete(ctx.channel):
             return await ctx.message.delete()
 
-        await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()}ed from {mention}')
+        await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()} from {mention}')
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:
