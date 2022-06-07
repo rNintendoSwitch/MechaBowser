@@ -227,21 +227,6 @@ class MainEvents(commands.Cog):
                 strikeCount = int(pun['type'][-1:]) * 4
 
                 punDB.update_one({'_id': pun['_id']}, {'$set': {'active': False}})
-                docID = await tools.issue_pun(
-                    member.id,
-                    self.bot.user.id,
-                    'strike',
-                    f'[Migrated] {pun["reason"]}',
-                    strike_count=strikeCount,
-                    context='strike-migration',
-                    public=False,
-                )
-                db.update_one(
-                    {'_id': member.id},
-                    {'$set': {'migrate_unnotified': False, 'strike_check': time.time() + (60 * 60 * 24 * 7)}},
-                )  # Setting the next expiry check time
-                mod = self.bot.get_cog('Moderation Commands')
-                await mod.expire_actions(docID, member.guild.id)
 
                 explanation = (
                     'Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
@@ -260,11 +245,29 @@ class MainEvents(commands.Cog):
                     config.parakarry,  # Parakarry mention for DM
                 )
 
+                public_notify = False
                 try:
                     await member.send(explanation)
 
                 except:
-                    pass
+                    public_notify = True
+
+                docID = await tools.issue_pun(
+                    member.id,
+                    self.bot.user.id,
+                    'strike',
+                    f'[Migrated] {pun["reason"]}',
+                    strike_count=strikeCount,
+                    context='strike-migration',
+                    public=False,
+                    public_notify=public_notify,
+                )
+                db.update_one(
+                    {'_id': member.id},
+                    {'$set': {'migrate_unnotified': False, 'strike_check': time.time() + (60 * 60 * 24 * 7)}},
+                )  # Setting the next expiry check time
+                mod = self.bot.get_cog('Moderation Commands')
+                await mod.expire_actions(docID, member.guild.id)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
