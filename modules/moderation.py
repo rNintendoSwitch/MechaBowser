@@ -824,7 +824,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 public=True,
             )
 
-            if tools.mod_cmd_invoke_delete(ctx.channel):
+            if not tools.mod_cmd_invoke_delete(ctx.channel):
                 await ctx.send(
                     f'{config.greenTick} {user} ({user.id}) has had {removedStrikes} strikes removed, '
                     f'they now have {count} strike{"s" if count > 1 else ""} '
