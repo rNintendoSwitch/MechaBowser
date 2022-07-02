@@ -33,7 +33,7 @@ class MainEvents(commands.Cog):
             except commands.errors.ExtensionNotFound:
                 logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
 
-#            self.sanitize_eud.start()  # pylint: disable=no-member
+        #            self.sanitize_eud.start()  # pylint: disable=no-member
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
@@ -58,8 +58,8 @@ class MainEvents(commands.Cog):
                 }
             )
 
-#    def cog_unload(self):
-#        self.sanitize_eud.cancel()  # pylint: disable=no-member
+    #    def cog_unload(self):
+    #        self.sanitize_eud.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=24)
     async def sanitize_eud(self):
