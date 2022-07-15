@@ -454,6 +454,11 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
     user = await bot.fetch_user(doc['user'])
 
+    try:
+        member = await channel.guild.fetch_member(doc['user'])
+    except:
+        member = None
+
     author = f'{config.punStrs[doc["type"]]} '
 
     if doc['type'] == 'strike':
@@ -490,7 +495,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
     if doc['moderator'] == bot.user.id:
         embed.description = 'This is an automatic action'
 
-    if doc['public_notify']:
+    if doc['public_notify'] and member:
         content = f'{user.mention}, I was unable to DM you for this infraction. Send `!history` in <#{config.commandsChannel}> for further details.'
     else:
         content = None
