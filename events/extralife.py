@@ -97,6 +97,7 @@ class ExtraLife(commands.Cog):
 
         donation_embeds.reverse()
         for embed in donation_embeds:
+            await self.extra_life_admin.send(embed=embed)
             await self.extra_life.send(embed=embed)
             await self.general.send(embed=embed)
             await self.donations.send(embed=embed)
