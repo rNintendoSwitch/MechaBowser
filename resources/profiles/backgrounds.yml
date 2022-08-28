@@ -1,10 +1,10 @@
-transparent-light:
-    theme: light
-    trophy-bg-opacity: 50
+# transparent-light:
+#     theme: light
+#     trophy-bg-opacity: 50
 
-transparent-dark:
-    theme: dark
-    trophy-bg-opacity: 50
+# transparent-dark:
+#     theme: dark
+#     trophy-bg-opacity: 50
 
 default-light:
     theme: light
