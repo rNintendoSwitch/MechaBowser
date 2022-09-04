@@ -97,3 +97,7 @@ trivia-xenoblade:
 trivia-smash:
     theme: dark
     trophy-bg-opacity: 30
+
+trivia-splatoon:
+    theme: dark
+    trophy-bg-opacity: 50
