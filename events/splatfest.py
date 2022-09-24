@@ -102,7 +102,7 @@ class Splatfest(commands.Cog):
 
             # Team 3 Logic
             await ctx.send(
-                f'Team 2 has been set as {_team2}! What is the name of team 3? (type `skip` for only 2 teams)?'
+                f'Team 2 has been set as {_team2}! What is the name of team 3? (Type "skip" for only 2 teams)'
             )
             _team3 = await self.bot.wait_for('message', check=check, timeout=60.0)
             _team3 = _team3.content
