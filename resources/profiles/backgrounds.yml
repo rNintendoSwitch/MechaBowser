@@ -105,3 +105,7 @@ trivia-splatoon:
 direct-light:
     theme: light
     trophy-bg-opacity: 100
+
+trivia-bayonetta:
+    theme: dark
+    trophy-bg-opacity: 50
