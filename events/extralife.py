@@ -3,12 +3,12 @@ import re
 from datetime import datetime
 from typing import List
 
+import config
 import discord
 import pymongo
 import requests
 from discord.ext import commands, tasks
 
-import config
 import tools
 
 
