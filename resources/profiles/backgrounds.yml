@@ -113,3 +113,7 @@ trivia-bayonetta:
 extra-life:
     theme: dark
     trophy-bg-opacity: 40
+
+the-game-awards-2022:
+    theme: dark
+    trophy-bg-opacity: 30
