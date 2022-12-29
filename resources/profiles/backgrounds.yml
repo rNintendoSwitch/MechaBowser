@@ -117,3 +117,11 @@ extra-life:
 the-game-awards-2022:
     theme: dark
     trophy-bg-opacity: 30
+
+trivia-sonic:
+    theme: dark
+    theme-bg-opacity: 30
+
+trivia-mariokart:
+    theme: light
+    theme-bg-opacity: 100
