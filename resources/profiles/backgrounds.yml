@@ -120,8 +120,8 @@ the-game-awards-2022:
 
 trivia-sonic:
     theme: dark
-    theme-bg-opacity: 30
+    trophy-bg-opacity: 30
 
 trivia-mariokart:
     theme: light
-    theme-bg-opacity: 100
+    trophy-bg-opacity: 100
