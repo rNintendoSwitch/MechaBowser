@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from sys import exit
 
@@ -31,19 +32,6 @@ intents = discord.Intents(
     message_content=True,
     reactions=True,
 )
-activityStatus = discord.Activity(type=discord.ActivityType.watching, name='over the server')
-bot = commands.Bot(
-    config.command_prefixes,
-    intents=intents,
-    max_messages=300000,
-    fetch_offline_members=True,
-    activity=activityStatus,
-    case_insensitive=True,
-)
-if config.DSN:
-    from discord_sentry_reporting import use_sentry
-
-    use_sentry(bot, dsn=config.DSN, traces_sample_rate=1.0, environment='production')
 
 
 class BotCache(commands.Cog):
@@ -55,12 +43,12 @@ class BotCache(commands.Cog):
     async def on_ready(self):
         logging.info('[Bot] on_ready')
         if not self.READY:
-            self.bot.load_extension('modules.core')
+            await self.bot.load_extension('modules.core')
             # self.READY = True
             # return
             logging.info('[Cache] Performing initial database synchronization')
             db = mclient.bowser.users
-            NS = bot.get_guild(config.nintendoswitch)
+            NS = self.bot.get_guild(config.nintendoswitch)
 
             guildCount = len(NS.members)
             userCount = 0
@@ -107,15 +95,41 @@ async def safe_send_message(channel, content=None, embeds=None):
     await channel.send(content, embed=embeds)
 
 
-@bot.event
-async def on_message(message):
-    return  # Return so commands will not process, and main extension can process instead
+class MechaBowser(commands.Bot):
+    def __init__(self):
+        super().__init__(
+            activity=discord.Activity(type=discord.ActivityType.watching, name='over the server'),
+            case_insensitive=True,
+            command_prefix=config.command_prefixes,
+            fetch_offline_members=True,
+            intents=discord.Intents(
+                guilds=True,
+                members=True,
+                bans=True,
+                emojis=True,
+                voice_states=True,
+                presences=True,
+                messages=True,
+                message_content=True,
+                reactions=True,
+            ),
+            max_messages=300000,
+        )
+
+        if config.DSN:
+            from discord_sentry_reporting import use_sentry
+
+            use_sentry(self, dsn=config.DSN, traces_sample_rate=1.0, environment='production')
+
+    async def setup_hook(self):
+        await self.add_cog(BotCache(self))
+        await self.add_cog(AutomodSubstitute(self))
+        await self.load_extension('jishaku')
+
+    async def on_message(self, message):
+        return  # Return so commands will not process, and main extension can process instead
 
 
 if __name__ == '__main__':
     print('\033[94mMechaBowser by MattBSG#8888 2019\033[0m')
-
-    bot.add_cog(BotCache(bot))
-    bot.add_cog(AutomodSubstitute(bot))
-    bot.load_extension('jishaku')
-    bot.run(config.token)
+    asyncio.run(MechaBowser().start(config.token))
