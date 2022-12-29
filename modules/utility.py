@@ -66,12 +66,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             except:
                 mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
 
-    # Auto unarchive threads in select channels
-    @commands.Cog.listener()
-    async def on_thread_update(self, before, after):
-        if after.archived and after.parent_id in config.preventArchivedThreads:
-            await after.edit(archived=False)
-
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
         if message.type == discord.MessageType.premium_guild_subscription:
