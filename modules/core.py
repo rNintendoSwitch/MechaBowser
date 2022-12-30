@@ -392,12 +392,7 @@ class MainEvents(commands.Cog):
             logging.debug(f'on_message discarding non-normal-message: {message.type=}, {message.id=}')
             return
 
-        if message.channel.type not in [
-            discord.ChannelType.text,
-            discord.ChannelType.news,
-            discord.ChannelType.public_thread,
-            discord.ChannelType.private_thread,
-        ]:
+        if not message.guild:
             logging.debug(f'Discarding non guild message {message.channel.type} {message.id}')
             return
 
@@ -413,7 +408,8 @@ class MainEvents(commands.Cog):
             'timestamp': timestamp,
             'sanitized': False,
         }
-        if message.channel.type in [discord.ChannelType.public_thread, discord.ChannelType.private_thread]:
+
+        if issubclass(message.channel.__class__, discord.Thread):
             obj['parent_channel'] = message.channel.parent_id
 
         db.insert_one(obj)
@@ -423,7 +419,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):  # TODO: Work with archives channel attribute to list channels
-        if messages[0].channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+        if not messages[0].guild:
             logging.debug(f'Discarding non guild bulk delete {messages[0].channel.type}  {messages[0].id}')
             return
 
@@ -505,7 +501,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
-        if before.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+        if not before.guild:
             logging.debug(f'Discarding non guild edit {before.channel.type} {before.id}')
             return
 
@@ -687,7 +683,7 @@ class MainEvents(commands.Cog):
                 'Starting syncronization of db for all messages in server. This will take a conciderable amount of time.'
             )
             for channel in ctx.guild.channels:
-                if channel.type != discord.ChannelType.text:
+                if not issubclass(channel.__class__, discord.abc.Messageable):
                     continue
 
                 await ctx.send(f'Starting syncronization for <#{channel.id}>')

@@ -977,7 +977,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.channel.type != discord.ChannelType.text or message.author.bot:
+        if (not message.guild) or message.author.bot:
             return
 
         content = re.sub(r'(<@!?\d+>)', '', message.content)
