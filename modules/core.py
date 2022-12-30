@@ -103,6 +103,20 @@ class MainEvents(commands.Cog):
         if before.channel == after.channel:  # If other info than channel (such as mute status), ignore
             return
 
+        # Add to database
+        mclient.bowser.users.update_one(
+            {'_id': member.id},
+            {
+                '$push': {
+                    'voiceHistory': {
+                        'before': before.channel.id if before.channel else None,
+                        'after': after.channel.id if after.channel else None,
+                        'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+                    }
+                }
+            },
+        )
+
         embed = discord.Embed(color=0x65A398, timestamp=datetime.now(tz=timezone.utc))
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
 
