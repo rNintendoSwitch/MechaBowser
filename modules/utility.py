@@ -80,48 +80,26 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return
 
         # Auto delete messages in pinned threads in forum channels
-        # Using api calls because we're using an outdated version of discord.py
-        CHANNEL_PINNED = 0x2  # https://discord.com/developers/docs/resources/channel#channel-object-channel-flags
-        UNIQUE_SLOWMODE = (6 * 60 * 60) - 60  # Unique slowmode time that is not quite 6h so we can test for & remove it
+        if issubclass(message.channel.__class__, discord.Thread):
+            # Unique slowmode time that is not quite 6h so we can test for & remove it
+            UNIQUE_SLOWMODE = (6 * 60 * 60) - 60
 
-        if type(message.channel) == discord.threads.Thread:
-            async with aiohttp.ClientSession() as session:
-                headers = {'Authorization': f'Bot {config.token}'}
-                url = f'https://discord.com/api/guilds/{message.guild.id}/threads/active'
-                async with session.get(url, headers=headers) as resp:
-                    json = await resp.json()
+            if message.channel.flags.pinned:
+                if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
+                    await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
 
-                    for thread in json['threads']:
-                        if int(thread['id']) != message.channel.id:
-                            continue
+                perms = message.channel.permissions_for(message.author)
+                if not (perms.manage_channels or perms.manage_messages):
+                    await message.channel.send(
+                        f':bangbang: {message.author.mention} Messages are not permitted in pinned threads',
+                        delete_after=10,
+                    )
+                    await message.delete()
+                    return
 
-                        # If thread is pinned...
-                        if thread['flags'] & CHANNEL_PINNED:
-                            if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
-                                await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
-
-                            # We can't check permissions because the parent channel won't fetch in fourm channels
-                            # with an outdated version of discord.py. We should be checking if the user has
-                            # manage_channels or manage_messages.
-                            if not (
-                                message.author.bot
-                                or message.guild.get_role(config.moderator) in message.author.roles
-                                or message.guild.get_role(config.helpfulUser) in message.author.roles
-                                or message.guild.get_role(config.trialHelpfulUser) in message.author.roles
-                            ):
-                                await message.channel.send(
-                                    f':bangbang: {message.author.mention} Messages are not permitted in pinned threads',
-                                    delete_after=10,
-                                )
-                                await message.delete()
-                                return
-
-                                # you can't delete "removed user from thread" messages, so we just don't do it
-                                # await message.channel.remove_user(message.author)
-
-                        else:  # not pinned, remove slowmode
-                            if message.channel.slowmode_delay == UNIQUE_SLOWMODE:
-                                await message.channel.edit(slowmode_delay=0)
+            # No longer pinned, remove slowmode.
+            elif message.channel.slowmode_delay == UNIQUE_SLOWMODE:
+                await message.channel.edit(slowmode_delay=0)
 
         # Filter invite links
         msgInvites = re.findall(self.inviteRe, message.content)
