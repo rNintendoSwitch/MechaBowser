@@ -136,7 +136,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             member = ctx.author
 
         # If channel can be ratelimited
-        if ctx.message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
+        if ctx.message.channel.id not in [config.commandsChannel, config.debugChannel]:
             channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
             if channel_being_rate_limited:
 
@@ -985,7 +985,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if not contains_code:
             return
-        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
+        if message.channel.id not in [config.commandsChannel]:
             await message.channel.send(
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )

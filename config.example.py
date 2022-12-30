@@ -32,7 +32,6 @@ offclockChannel: int = admin_offtopic_id
 switchHelp: int = switch_help
 spoilers: int = spoilers
 suggestions: int = suggestions
-voiceTextChannel: int = voice_text
 commandsChannel: int = commands
 splatoon2Channel: int = splatoon2
 automodChannel: int = automod_alerts
@@ -61,7 +60,6 @@ noSuggestions: int = suggestion_restricted
 noReactions: int = reaction_restricted
 noEmbeds: int = attachments_and_embeds_restricted
 noEvents: int = event_restricted
-voiceTextAccess: int = voice_chat
 verified: int = verified_role
 
 # Emoji IDs
