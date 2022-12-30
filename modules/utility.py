@@ -6,7 +6,7 @@ import re
 import time
 import typing
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 
 import aiohttp
 import config
@@ -48,21 +48,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.inviteRe = re.compile(
             r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/+[\da-z-]+)', re.I
         )
-
-    # @commands.Cog.listener()
-    # async def on_voice_state_update(self, member, before, after):
-    #     if before.channel == after.channel:  # If other info than channel (such as mute status), ignore
-    #         return
-
-    #     if not before.channel:  # User just joined a channel
-    #         await member.add_roles(self.voiceTextAccess)
-
-    #     elif not after.channel:  # User just left a channel or moved to AFK
-    #         try:
-    #             await member.remove_roles(self.voiceTextAccess)
-
-    #         except:
-    #             mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
 
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):

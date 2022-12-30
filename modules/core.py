@@ -99,6 +99,26 @@ class MainEvents(commands.Cog):
         logging.warning('[Main] The bot has been resumed on Discord')
 
     @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if before.channel == after.channel:  # If other info than channel (such as mute status), ignore
+            return
+
+        embed = discord.Embed(color=0x65A398, timestamp=datetime.now(tz=timezone.utc))
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
+
+        if not before.channel:  # User just joined
+            embed.add_field(name='→ Connected to', value=after.channel.mention, inline=True)
+
+        elif not after.channel:  # User just left a channel
+            embed.add_field(name='← Disconnected from', value=before.channel.mention, inline=True)
+
+        else:  # Changed channel
+            embed.add_field(name='Moved from', value=before.channel.mention, inline=True)
+            embed.add_field(name='→ to', value=after.channel.mention, inline=True)
+
+        await self.serverLogs.send(':microphone2: User changed voice channel', embed=embed)
+
+    @commands.Cog.listener()
     async def on_member_join(self, member):
         db = mclient.bowser.users
         doc = db.find_one({'_id': member.id})
