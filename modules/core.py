@@ -21,19 +21,18 @@ class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def cog_load(self):
         try:
-            self.bot.load_extension('tools')
-            self.bot.load_extension('modules.moderation')
-            self.bot.load_extension('modules.utility')
-            self.bot.load_extension('modules.statistics')
-            self.bot.load_extension('modules.social')
-            self.bot.load_extension('modules.games')
+            await self.bot.load_extension('tools')
+            await self.bot.load_extension('modules.moderation')
+            await self.bot.load_extension('modules.utility')
+            await self.bot.load_extension('modules.statistics')
+            await self.bot.load_extension('modules.social')
+            await self.bot.load_extension('modules.games')
             try:  # Private submodule extensions
-                self.bot.load_extension('private.automod')
+                await self.bot.load_extension('private.automod')
             except commands.errors.ExtensionNotFound:
                 logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
-
-        #            self.sanitize_eud.start()  # pylint: disable=no-member
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
@@ -750,11 +749,11 @@ class MainEvents(commands.Cog):
         return x, y
 
 
-def setup(bot):
-    bot.add_cog(MainEvents(bot))
+async def setup(bot):
+    await bot.add_cog(MainEvents(bot))
     logging.info('[Extension] Main module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('MainEvents')
+async def teardown(bot):
+    await bot.remove_cog('MainEvents')
     logging.info('[Extension] Main module unloaded')

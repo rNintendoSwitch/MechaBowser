@@ -985,11 +985,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
 
 
-def setup(bot):
-    bot.add_cog(Moderation(bot))
+async def setup(bot):
+    await bot.add_cog(Moderation(bot))
     logging.info('[Extension] Moderation module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('Moderation')
+async def teardown(bot):
+    await bot.remove_cog('Moderation')
     logging.info('[Extension] Moderation module unloaded')

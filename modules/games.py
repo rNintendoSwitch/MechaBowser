@@ -576,11 +576,11 @@ class Games(commands.Cog, name='Games'):
             raise error
 
 
-def setup(bot):
-    bot.add_cog(Games(bot))
+async def setup(bot):
+    await bot.add_cog(Games(bot))
     logging.info('[Extension] Games module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('Games')
+async def teardown(bot):
+    await bot.remove_cog('Games')
     logging.info('[Extension] Games module unloaded')

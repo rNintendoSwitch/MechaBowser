@@ -1018,11 +1018,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             raise error
 
 
-def setup(bot):
-    bot.add_cog(SocialFeatures(bot))
+async def setup(bot):
+    await bot.add_cog(SocialFeatures(bot))
     logging.info('[Extension] Social module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('SocialFeatures')
+async def teardown(bot):
+    await bot.remove_cog('SocialFeatures')
     logging.info('[Extension] Social module unloaded')

@@ -798,9 +798,9 @@ class ResolveUser(discord.ext.commands.Converter):
             raise discord.ext.commands.BadArgument
 
 
-def setup(bot):
+async def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
 
-def teardown(bot):
+async def teardown(bot):
     logging.info('[Extension] Utils module unloaded')

@@ -1194,17 +1194,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             raise error
 
 
-def setup(bot):
+async def setup(bot):
     global serverLogs
     global modLogs
 
     serverLogs = bot.get_channel(config.logChannel)
     modLogs = bot.get_channel(config.modChannel)
 
-    bot.add_cog(ChatControl(bot))
+    await bot.add_cog(ChatControl(bot))
     logging.info('[Extension] Utility module loaded')
 
 
-def teardown(bot):
+async def teardown(bot):
     bot.remove_cog('ChatControl')
     logging.info('[Extension] Utility module unloaded')
