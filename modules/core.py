@@ -130,6 +130,8 @@ class MainEvents(commands.Cog):
             embed.add_field(name='Moved from', value=before.channel.mention, inline=True)
             embed.add_field(name='→ to', value=after.channel.mention, inline=True)
 
+        embed.add_field(name='Mention', value=f'<@{member.id}>', inline=False)
+
         await self.serverLogs.send(':microphone2: User changed voice channel', embed=embed)
 
     @commands.Cog.listener()
