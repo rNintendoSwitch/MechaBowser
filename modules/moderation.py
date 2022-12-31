@@ -661,11 +661,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
 
-    @commands.command(name='warn', invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _warning(self, ctx):
-        await ctx.send(':warning: Warns are depreciated. Please use the strike system instead (`!help strike`)')
-
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
     async def _strike(self, ctx, user: tools.ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
