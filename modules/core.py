@@ -691,6 +691,14 @@ class MainEvents(commands.Cog):
             storedRoles.remove(role.id)
             db.update_one({'_id': user['_id']}, {'$set': {'roles': storedRoles}})
 
+    @commands.Cog.listener()
+    async def on_command_error(context, exception):
+        if isinstance(exception, commands.CommandNotFound):
+            pass
+
+        else:
+            raise exception
+
     @commands.command(name='update')
     @commands.is_owner()
     async def _update(self, ctx, sub, *args):
