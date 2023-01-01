@@ -136,7 +136,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             member = ctx.author
 
         # If channel can be ratelimited
-        if ctx.message.channel.id not in [config.commandsChannel, config.voiceTextChannel, config.debugChannel]:
+        if ctx.message.channel.id not in [config.commandsChannel, config.debugChannel]:
             channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
             if channel_being_rate_limited:
 
@@ -977,7 +977,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.channel.type != discord.ChannelType.text or message.author.bot:
+        if (not message.guild) or message.author.bot:
             return
 
         content = re.sub(r'(<@!?\d+>)', '', message.content)
@@ -985,7 +985,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if not contains_code:
             return
-        if message.channel.id not in [config.commandsChannel, config.voiceTextChannel]:
+        if message.channel.id not in [config.commandsChannel]:
             await message.channel.send(
                 f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
             )
@@ -1018,11 +1018,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             raise error
 
 
-def setup(bot):
-    bot.add_cog(SocialFeatures(bot))
+async def setup(bot):
+    await bot.add_cog(SocialFeatures(bot))
     logging.info('[Extension] Social module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('SocialFeatures')
+async def teardown(bot):
+    await bot.remove_cog('SocialFeatures')
     logging.info('[Extension] Social module unloaded')

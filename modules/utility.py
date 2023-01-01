@@ -6,7 +6,7 @@ import re
 import time
 import typing
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 
 import aiohttp
 import config
@@ -30,8 +30,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.adminChannel = self.bot.get_channel(config.adminChannel)
         self.boostChannel = self.bot.get_channel(config.boostChannel)
-        self.voiceTextChannel = self.bot.get_channel(config.voiceTextChannel)
-        self.voiceTextAccess = self.bot.get_guild(config.nintendoswitch).get_role(config.voiceTextAccess)
         self.affiliateTags = {
             "*": ["awc"],
             "amazon.*": ["colid", "coliid", "tag", "ascsubtag"],
@@ -51,27 +49,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/+[\da-z-]+)', re.I
         )
 
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, member, before, after):
-        if before.channel == after.channel:  # If other info than channel (such as mute status), ignore
-            return
-
-        if not before.channel:  # User just joined a channel
-            await member.add_roles(self.voiceTextAccess)
-
-        elif not after.channel:  # User just left a channel or moved to AFK
-            try:
-                await member.remove_roles(self.voiceTextAccess)
-
-            except:
-                mclient.bowser.users.update_one({'_id': member.id}, {'$pull': {'roles': config.voiceTextAccess}})
-
-    # Auto unarchive threads in select channels
-    @commands.Cog.listener()
-    async def on_thread_update(self, before, after):
-        if after.archived and after.parent_id in config.preventArchivedThreads:
-            await after.edit(archived=False)
-
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
         if message.type == discord.MessageType.premium_guild_subscription:
@@ -86,48 +63,26 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return
 
         # Auto delete messages in pinned threads in forum channels
-        # Using api calls because we're using an outdated version of discord.py
-        CHANNEL_PINNED = 0x2  # https://discord.com/developers/docs/resources/channel#channel-object-channel-flags
-        UNIQUE_SLOWMODE = (6 * 60 * 60) - 60  # Unique slowmode time that is not quite 6h so we can test for & remove it
+        if issubclass(message.channel.__class__, discord.Thread):
+            # Unique slowmode time that is not quite 6h so we can test for & remove it
+            UNIQUE_SLOWMODE = (6 * 60 * 60) - 60
 
-        if type(message.channel) == discord.threads.Thread:
-            async with aiohttp.ClientSession() as session:
-                headers = {'Authorization': f'Bot {config.token}'}
-                url = f'https://discord.com/api/guilds/{message.guild.id}/threads/active'
-                async with session.get(url, headers=headers) as resp:
-                    json = await resp.json()
+            if message.channel.flags.pinned:
+                if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
+                    await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
 
-                    for thread in json['threads']:
-                        if int(thread['id']) != message.channel.id:
-                            continue
+                perms = message.channel.permissions_for(message.author)
+                if not (perms.manage_channels or perms.manage_messages):
+                    await message.channel.send(
+                        f':bangbang: {message.author.mention} Messages are not permitted in pinned threads',
+                        delete_after=10,
+                    )
+                    await message.delete()
+                    return
 
-                        # If thread is pinned...
-                        if thread['flags'] & CHANNEL_PINNED:
-                            if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
-                                await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
-
-                            # We can't check permissions because the parent channel won't fetch in fourm channels
-                            # with an outdated version of discord.py. We should be checking if the user has
-                            # manage_channels or manage_messages.
-                            if not (
-                                message.author.bot
-                                or message.guild.get_role(config.moderator) in message.author.roles
-                                or message.guild.get_role(config.helpfulUser) in message.author.roles
-                                or message.guild.get_role(config.trialHelpfulUser) in message.author.roles
-                            ):
-                                await message.channel.send(
-                                    f':bangbang: {message.author.mention} Messages are not permitted in pinned threads',
-                                    delete_after=10,
-                                )
-                                await message.delete()
-                                return
-
-                                # you can't delete "removed user from thread" messages, so we just don't do it
-                                # await message.channel.remove_user(message.author)
-
-                        else:  # not pinned, remove slowmode
-                            if message.channel.slowmode_delay == UNIQUE_SLOWMODE:
-                                await message.channel.edit(slowmode_delay=0)
+            # No longer pinned, remove slowmode.
+            elif message.channel.slowmode_delay == UNIQUE_SLOWMODE:
+                await message.channel.edit(slowmode_delay=0)
 
         # Filter invite links
         msgInvites = re.findall(self.inviteRe, message.content)
@@ -754,11 +709,20 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
     async def _roles(self, ctx):
-        roleList = 'List of roles in guild:\n```\n'
+        lines = []
         for role in reversed(ctx.guild.roles):
-            roleList += f'{role.name} ({role.id})\n'
+            lines.append(f'{role.name} ({role.id})')
 
-        await ctx.send(f'{roleList}```')
+        fields = tools.convert_list_to_fields(lines, codeblock=True)
+        return await tools.send_paginated_embed(
+            self.bot,
+            ctx.channel,
+            fields,
+            owner=ctx.author,
+            title='List of roles in guild:',
+            description='',
+            page_character_limit=1500,
+        )
 
     @commands.group(name='tag', aliases=['tags'], invoke_without_command=True)
     async def _tag(self, ctx, *, query=None):
@@ -1026,7 +990,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _roles_set(
+    async def _blacklist_set(
         self,
         ctx,
         member: discord.Member,
@@ -1200,17 +1164,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             raise error
 
 
-def setup(bot):
+async def setup(bot):
     global serverLogs
     global modLogs
 
     serverLogs = bot.get_channel(config.logChannel)
     modLogs = bot.get_channel(config.modChannel)
 
-    bot.add_cog(ChatControl(bot))
+    await bot.add_cog(ChatControl(bot))
     logging.info('[Extension] Utility module loaded')
 
 
-def teardown(bot):
+async def teardown(bot):
     bot.remove_cog('ChatControl')
     logging.info('[Extension] Utility module unloaded')

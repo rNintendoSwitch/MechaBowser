@@ -271,11 +271,11 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             raise error
 
 
-def setup(bot):
-    bot.add_cog(StatCommands(bot))
+async def setup(bot):
+    await bot.add_cog(StatCommands(bot))
     logging.info('[Extension] Statistics module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('ChatControl')
+async def teardown(bot):
+    await bot.remove_cog('StatCommands')
     logging.info('[Extension] Statistics module unloaded')

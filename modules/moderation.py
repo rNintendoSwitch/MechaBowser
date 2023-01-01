@@ -661,11 +661,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
 
-    @commands.command(name='warn', invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _warning(self, ctx):
-        await ctx.send(':warning: Warns are depreciated. Please use the strike system instead (`!help strike`)')
-
     @commands.has_any_role(config.moderator, config.eh)
     @commands.group(name='strike', invoke_without_command=True)
     async def _strike(self, ctx, user: tools.ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
@@ -985,11 +980,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             )
 
 
-def setup(bot):
-    bot.add_cog(Moderation(bot))
+async def setup(bot):
+    await bot.add_cog(Moderation(bot))
     logging.info('[Extension] Moderation module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('Moderation')
+async def teardown(bot):
+    await bot.remove_cog('Moderation')
     logging.info('[Extension] Moderation module unloaded')

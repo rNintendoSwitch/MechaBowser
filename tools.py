@@ -606,7 +606,7 @@ async def send_paginated_embed(
     timeout: int = 600,
     title: typing.Optional[str] = '',
     description: typing.Optional[str] = None,
-    color: typing.Union[discord.Colour, int, None] = discord.Embed.Empty,
+    color: typing.Union[discord.Colour, int, None] = None,
     author: typing.Optional[typing.Dict] = None,
     page_character_limit: typing.Optional[int] = 6000,
 ) -> discord.Message:  # author = name: str, icon_url: optional str
@@ -664,8 +664,8 @@ async def send_paginated_embed(
     # Init embed
     embed = discord.Embed(description=None if not description else description, colour=color)
     if author:
-        embed.set_author(name=author['name'], icon_url=embed.Empty if not 'icon_url' in author else author['icon_url'])
-    embed.set_footer(icon_url=embed.Empty if not owner else owner.display_avatar.url)
+        embed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
+    embed.set_footer(icon_url=None if not owner else owner.display_avatar.url)
 
     # Main loop
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
@@ -798,9 +798,9 @@ class ResolveUser(discord.ext.commands.Converter):
             raise discord.ext.commands.BadArgument
 
 
-def setup(bot):
+async def setup(bot):
     logging.info('[Extension] Utils module loaded')
 
 
-def teardown(bot):
+async def teardown(bot):
     logging.info('[Extension] Utils module unloaded')

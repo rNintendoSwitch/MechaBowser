@@ -21,22 +21,23 @@ class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def cog_load(self):
         try:
-            self.bot.load_extension('tools')
-            self.bot.load_extension('modules.moderation')
-            self.bot.load_extension('modules.utility')
-            self.bot.load_extension('modules.statistics')
-            self.bot.load_extension('modules.social')
-            self.bot.load_extension('modules.games')
+            await self.bot.load_extension('tools')
+            await self.bot.load_extension('modules.moderation')
+            await self.bot.load_extension('modules.utility')
+            await self.bot.load_extension('modules.statistics')
+            await self.bot.load_extension('modules.social')
+            await self.bot.load_extension('modules.games')
             try:  # Private submodule extensions
-                self.bot.load_extension('private.automod')
+                await self.bot.load_extension('private.automod')
             except commands.errors.ExtensionNotFound:
                 logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
 
-        #            self.sanitize_eud.start()  # pylint: disable=no-member
-
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
+
+        # self.sanitize_eud.start()  # pylint: disable=no-member
 
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
@@ -98,6 +99,42 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_resume(self):
         logging.warning('[Main] The bot has been resumed on Discord')
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if before.channel == after.channel:  # If other info than channel (such as mute status), ignore
+            return
+
+        # Add to database
+        mclient.bowser.users.update_one(
+            {'_id': member.id},
+            {
+                '$push': {
+                    'voiceHistory': {
+                        'before': before.channel.id if before.channel else None,
+                        'after': after.channel.id if after.channel else None,
+                        'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+                    }
+                }
+            },
+        )
+
+        embed = discord.Embed(color=0x65A398, timestamp=datetime.now(tz=timezone.utc))
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.display_avatar.url)
+
+        if not before.channel:  # User just joined
+            embed.add_field(name='→ Connected to', value=after.channel.mention, inline=True)
+
+        elif not after.channel:  # User just left a channel
+            embed.add_field(name='← Disconnected from', value=before.channel.mention, inline=True)
+
+        else:  # Changed channel
+            embed.add_field(name='Moved from', value=before.channel.mention, inline=True)
+            embed.add_field(name='→ to', value=after.channel.mention, inline=True)
+
+        embed.add_field(name='Mention', value=f'<@{member.id}>', inline=False)
+
+        await self.serverLogs.send(':microphone2: User changed voice channel', embed=embed)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -393,12 +430,7 @@ class MainEvents(commands.Cog):
             logging.debug(f'on_message discarding non-normal-message: {message.type=}, {message.id=}')
             return
 
-        if message.channel.type not in [
-            discord.ChannelType.text,
-            discord.ChannelType.news,
-            discord.ChannelType.public_thread,
-            discord.ChannelType.private_thread,
-        ]:
+        if not message.guild:
             logging.debug(f'Discarding non guild message {message.channel.type} {message.id}')
             return
 
@@ -414,7 +446,8 @@ class MainEvents(commands.Cog):
             'timestamp': timestamp,
             'sanitized': False,
         }
-        if message.channel.type in [discord.ChannelType.public_thread, discord.ChannelType.private_thread]:
+
+        if issubclass(message.channel.__class__, discord.Thread):
             obj['parent_channel'] = message.channel.parent_id
 
         db.insert_one(obj)
@@ -424,7 +457,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):  # TODO: Work with archives channel attribute to list channels
-        if messages[0].channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+        if not messages[0].guild:
             logging.debug(f'Discarding non guild bulk delete {messages[0].channel.type}  {messages[0].id}')
             return
 
@@ -506,7 +539,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
-        if before.channel.type not in [discord.ChannelType.text, discord.ChannelType.news]:
+        if not before.guild:
             logging.debug(f'Discarding non guild edit {before.channel.type} {before.id}')
             return
 
@@ -688,7 +721,7 @@ class MainEvents(commands.Cog):
                 'Starting syncronization of db for all messages in server. This will take a conciderable amount of time.'
             )
             for channel in ctx.guild.channels:
-                if channel.type != discord.ChannelType.text:
+                if not issubclass(channel.__class__, discord.abc.Messageable):
                     continue
 
                 await ctx.send(f'Starting syncronization for <#{channel.id}>')
@@ -750,11 +783,11 @@ class MainEvents(commands.Cog):
         return x, y
 
 
-def setup(bot):
-    bot.add_cog(MainEvents(bot))
+async def setup(bot):
+    await bot.add_cog(MainEvents(bot))
     logging.info('[Extension] Main module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('MainEvents')
+async def teardown(bot):
+    await bot.remove_cog('MainEvents')
     logging.info('[Extension] Main module unloaded')

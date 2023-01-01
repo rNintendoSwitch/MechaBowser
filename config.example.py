@@ -32,11 +32,9 @@ offclockChannel: int = admin_offtopic_id
 switchHelp: int = switch_help
 spoilers: int = spoilers
 suggestions: int = suggestions
-voiceTextChannel: int = voice_text
 commandsChannel: int = commands
 splatoon2Channel: int = splatoon2
 automodChannel: int = automod_alerts
-switchGuidesChannel: int = switch_help_guides
 
 # Category IDs
 eventCat: int = server_events
@@ -44,7 +42,6 @@ modmailCat: int = modmail_category
 modHangoutCat: int = shared_mod_hangout_category
 
 # Channel groups
-preventArchivedThreads = [switchGuidesChannel]
 showModCTX = [debugChannel, adminChannel, offclockChannel, trialModChannel, modmailCat]
 
 # Role IDs
@@ -63,7 +60,6 @@ noSuggestions: int = suggestion_restricted
 noReactions: int = reaction_restricted
 noEmbeds: int = attachments_and_embeds_restricted
 noEvents: int = event_restricted
-voiceTextAccess: int = voice_chat
 verified: int = verified_role
 
 # Emoji IDs
