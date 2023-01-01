@@ -709,11 +709,20 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @commands.command(name='roles')
     @commands.has_any_role(config.moderator, config.eh)
     async def _roles(self, ctx):
-        roleList = 'List of roles in guild:\n```\n'
+        lines = []
         for role in reversed(ctx.guild.roles):
-            roleList += f'{role.name} ({role.id})\n'
+            lines.append(f'{role.name} ({role.id})')
 
-        await ctx.send(f'{roleList}```')
+        fields = tools.convert_list_to_fields(lines, codeblock=True)
+        return await tools.send_paginated_embed(
+            self.bot,
+            ctx.channel,
+            fields,
+            owner=ctx.author,
+            title='List of roles in guild:',
+            description='',
+            page_character_limit=1500,
+        )
 
     @commands.group(name='tag', aliases=['tags'], invoke_without_command=True)
     async def _tag(self, ctx, *, query=None):
@@ -981,7 +990,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @commands.command(name='blacklist')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _roles_set(
+    async def _blacklist_set(
         self,
         ctx,
         member: discord.Member,
