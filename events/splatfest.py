@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import logging
 import re
 
@@ -259,6 +260,41 @@ class Splatfest(commands.Cog):
 
             except (discord.Forbidden, discord.HTTPException):
                 raise
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        if self.ACTIVE:
+            team1Role = before.guild.get_role(self.team1['role'])
+            team2Role = before.guild.get_role(self.team2['role'])
+            team3Role = before.guild.get_role(self.team3['role']) if self.team3 else None
+
+        if before.roles != after.roles:
+            beforeCounter = collections.Counter(before.roles)
+            afterCounter = collections.Counter(after.roles)
+
+            rolesAdded = list(afterCounter - beforeCounter)
+
+            for roleAdded in rolesAdded:
+                if roleAdded.id == team1Role.id:
+                    if team2Role in after.roles:
+                        await after.remove_roles(team2Role)
+
+                    if self.team3 and team3Role in after.roles:
+                        await after.remove_roles(team3Role)
+
+                elif roleAdded.id == team2Role.id:
+                    if team1Role in after.roles:
+                        await after.remove_roles(team1Role)
+
+                    if self.team3 and team3Role in after.roles:
+                        await after.remove_roles(team3Role)
+
+                elif self.team3 and roleAdded.id == team3Role.id:
+                    if team1Role in after.roles:
+                        await after.remove_roles(team1Role)
+
+                    if team2Role in after.roles:
+                        await after.remove_roles(team2Role)
 
 
 async def setup(bot):
