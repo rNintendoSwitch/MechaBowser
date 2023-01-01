@@ -692,7 +692,7 @@ class MainEvents(commands.Cog):
             db.update_one({'_id': user['_id']}, {'$set': {'roles': storedRoles}})
 
     @commands.Cog.listener()
-    async def on_command_error(context, exception):
+    async def on_command_error(self, context, exception):
         if isinstance(exception, commands.CommandNotFound):
             pass
 
