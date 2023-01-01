@@ -42,7 +42,7 @@ class Splatfest(commands.Cog):
                     await msg.remove_reaction(_team1_emote, self.bot.user)
                     break
 
-                except (discord.NotFound, discord.InvalidArgument, discord.HTTPException):
+                except (discord.NotFound, TypeError, ValueError, discord.HTTPException):
                     await ctx.send(
                         f'{config.redTick} That is not a valid emoji, please send a valid unicode or custom emoji'
                     )
@@ -80,7 +80,7 @@ class Splatfest(commands.Cog):
                     await msg.remove_reaction(_team2_emote, self.bot.user)
                     break
 
-                except (discord.NotFound, discord.InvalidArgument, discord.HTTPException):
+                except (discord.NotFound, TypeError, ValueError, discord.HTTPException):
                     await ctx.send(
                         f'{config.redTick} That is not a valid emoji, please send a valid unicode or custom emoji'
                     )
@@ -124,7 +124,7 @@ class Splatfest(commands.Cog):
                         await msg.remove_reaction(_team3_emote, self.bot.user)
                         break
 
-                    except (discord.NotFound, discord.InvalidArgument, discord.HTTPException):
+                    except (discord.NotFound, TypeError, ValueError, discord.HTTPException):
                         await ctx.send(
                             f'{config.redTick} That is not a valid emoji, please send a valid unicode or custom emoji'
                         )
@@ -261,11 +261,11 @@ class Splatfest(commands.Cog):
                 raise
 
 
-def setup(bot):
-    bot.add_cog(Splatfest(bot))
+async def setup(bot):
+    await bot.add_cog(Splatfest(bot))
     logging.info('[Extension] Splatfest module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('Splatfest')
+async def teardown(bot):
+    await bot.remove_cog('Splatfest')
     logging.info('[Extension] Splatfest module unloaded')

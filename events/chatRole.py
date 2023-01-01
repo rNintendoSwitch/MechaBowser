@@ -131,11 +131,11 @@ class ChatRoleEvent(commands.Cog):
             return await message.author.add_roles(role)
 
 
-def setup(bot):
-    bot.add_cog(ChatRoleEvent(bot))
+async def setup(bot):
+    await bot.add_cog(ChatRoleEvent(bot))
     logging.info('[Extension] ChatRoleEvent module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('ChatRoleEvent')
+async def teardown(bot):
+    await bot.remove_cog('ChatRoleEvent')
     logging.info('[Extension] ChatRoleEvent module unloaded')

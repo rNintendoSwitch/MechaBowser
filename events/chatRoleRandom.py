@@ -73,11 +73,11 @@ class ChatRoleRandomEvent(commands.Cog):
             return await message.add_reaction('🏷️')
 
 
-def setup(bot):
-    bot.add_cog(ChatRoleRandomEvent(bot))
+async def setup(bot):
+    await bot.add_cog(ChatRoleRandomEvent(bot))
     logging.info('[Extension] ChatRoleRandomEvent module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('ChatRoleRandomEvent')
+async def teardown(bot):
+    await bot.remove_cog('ChatRoleRandomEvent')
     logging.info('[Extension] ChatRoleRandomEvent module unloaded')
