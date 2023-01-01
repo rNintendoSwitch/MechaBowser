@@ -37,6 +37,8 @@ class MainEvents(commands.Cog):
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
 
+        # self.sanitize_eud.start()  # pylint: disable=no-member
+
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
         self.debugChannel = self.bot.get_channel(config.debugChannel)
