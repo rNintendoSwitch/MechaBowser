@@ -125,3 +125,7 @@ trivia-sonic:
 trivia-mariokart:
     theme: light
     trophy-bg-opacity: 100
+
+trivia-spongebob:
+    theme: light
+    trophy-bg-opacity: 20
