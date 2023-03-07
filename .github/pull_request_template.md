@@ -1,5 +1,5 @@
 # Pull request template
-Use this template for all contributions made for the repository.
+You can use this template for all contributions made for the repository.
 
 Please indicate all that apply with a checkmark. To make a check, convert brackets below to `[x]`.
 
