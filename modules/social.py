@@ -139,7 +139,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if ctx.message.channel.id not in [config.commandsChannel, config.debugChannel]:
             channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
             if channel_being_rate_limited:
-
                 #  Moderators consume a ratelimit token but are not limited
                 if not ctx.guild.get_role(config.moderator) in ctx.author.roles:
                     await ctx.send(
@@ -262,7 +261,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         SHADOW_OFFSET = 2
 
         if not name in self.flagImgCache:
-
             regionImg = Image.open(self.twemojiPath + name + '.png').convert('RGBA')
 
             # Drop Shadow
@@ -437,7 +435,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 505), joinDateF, theme["primary"], fonts['medium'])
 
         if not dbUser['timezone']:
-
             self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:

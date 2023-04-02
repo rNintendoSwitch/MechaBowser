@@ -188,7 +188,6 @@ class MainEvents(commands.Cog):
 
         punDB = mclient.bowser.puns
         if needsRestore or punDB.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-
             punTypes = {
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',

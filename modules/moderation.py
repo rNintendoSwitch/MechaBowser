@@ -494,7 +494,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             try:
                 await member.kick(reason='Kick action performed by moderator')
-            except (discord.Forbidden):
+            except discord.Forbidden:
                 failedKicks += 1
                 continue
 
@@ -891,7 +891,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     self.schedule_task(retryTime, _id, guild)
                     return
 
-            except KeyError:  # This is a rare edge case, but if a pun is manually created the user may not have the flag yet. More a dev handler than not
+            except (
+                KeyError
+            ):  # This is a rare edge case, but if a pun is manually created the user may not have the flag yet. More a dev handler than not
                 logging.error(
                     f'[Moderation] Expiry failed. Could not get strike_check from db.users resolving for pun {_id}, was it manually added?'
                 )
