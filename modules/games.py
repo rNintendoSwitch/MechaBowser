@@ -468,7 +468,7 @@ class Games(commands.Cog, name='Games'):
 
                 # Build release date line
                 date_strs = {}
-                for (key, release) in dates.items():
+                for key, release in dates.items():
                     if release:
                         if self.parse_expected_release_date(release):
                             date_strs[key] = self.parse_expected_release_date(release, True)

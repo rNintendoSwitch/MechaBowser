@@ -637,7 +637,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
 
                 if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
-
                     strings = []
                     offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
 
@@ -766,7 +765,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         # Called from the !tag command instead of !tag list, so we print the simple list
         if ctx.invoked_with.lower() in ['tag', 'tags']:
-
             tags = ', '.join([tag['name'] for tag in tagList])
 
             embed = discord.Embed(
