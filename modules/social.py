@@ -837,29 +837,31 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 # Duplicate friend code detection
                 friendcode = db.find_one({'_id': ctx.author.id})['friendcode']
-                query = db.find({"friendcode": friendcode})
 
-                if query.count() > 1:
-                    hasPuns = False
-                    otherUsers = []
-                    for user in query:
-                        if mclient.bowser.puns.find({'user': user["_id"]}).count() > 0:
-                            hasPuns = True
+                if friendcode:
+                    query = db.find({"friendcode": friendcode})
 
-                        if user["_id"] != ctx.author.id:
-                            if len(user["nameHist"]) > 0:
-                                name = user["nameHist"][0]["str"] + '#' + user["nameHist"][0]["discriminator"]
-                                otherUsers.append(f'> **{name}** ({user["_id"]})')
-                            else:
-                                otherUsers.append(f'> {user["_id"]}')
+                    if query.count() > 1:
+                        hasPuns = False
+                        otherUsers = []
+                        for user in query:
+                            if mclient.bowser.puns.find({'user': user["_id"]}).count() > 0:
+                                hasPuns = True
 
-                    if hasPuns:
-                        adminChat = self.bot.get_channel(config.adminChannel)
-                        others = "\n".join(otherUsers)
-                        plural = "that of another user" if (len(others) == 1) else "those of other users"
-                        await adminChat.send(
-                            f'🕵️ **{ctx.author}** ({ctx.author.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
-                        )
+                            if user["_id"] != ctx.author.id:
+                                if len(user["nameHist"]) > 0:
+                                    name = user["nameHist"][0]["str"] + '#' + user["nameHist"][0]["discriminator"]
+                                    otherUsers.append(f'> **{name}** ({user["_id"]})')
+                                else:
+                                    otherUsers.append(f'> {user["_id"]}')
+
+                        if hasPuns:
+                            adminChat = self.bot.get_channel(config.adminChannel)
+                            others = "\n".join(otherUsers)
+                            plural = "that of another user" if (len(others) == 1) else "those of other users"
+                            await adminChat.send(
+                                f'🕵️ **{ctx.author}** ({ctx.author.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
+                            )
 
             # Phase 2
             await botMsg.channel.send(phase2)
