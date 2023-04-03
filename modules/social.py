@@ -858,7 +858,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         if hasPuns:
                             adminChat = self.bot.get_channel(config.adminChannel)
                             others = "\n".join(otherUsers)
-                            plural = "that of another user" if (len(others) == 1) else "those of other users"
+                            plural = "that of another user" if (len(otherUsers) == 1) else "those of other users"
                             await adminChat.send(
                                 f'🕵️ **{ctx.author}** ({ctx.author.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
                             )
