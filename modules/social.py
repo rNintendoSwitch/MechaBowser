@@ -849,10 +849,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                                 hasPuns = True
 
                             if user["_id"] != ctx.author.id:
-                                if len(user["nameHist"]) > 0:
-                                    name = user["nameHist"][0]["str"] + '#' + user["nameHist"][0]["discriminator"]
-                                    otherUsers.append(f'> **{name}** ({user["_id"]})')
-                                else:
+                                try:
+                                    fetchedUser = await self.bot.fetch_user(user["_id"])
+                                    otherUsers.append(f'> **{str(fetchedUser)}** ({user["_id"]})')
+                                except:
                                     otherUsers.append(f'> {user["_id"]}')
 
                         if hasPuns:
