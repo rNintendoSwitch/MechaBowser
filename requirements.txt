@@ -1,5 +1,5 @@
 git+https://github.com/falconry/token-bucket
-discord.py
+discord.py @ git+https://github.com/Rapptz/discord.py@master
 pymongo<=3.12.3
 jishaku
 pylint

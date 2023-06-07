@@ -380,9 +380,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         nameW = 350
 
         # Member name may be rendered in parts, so we want to ensure the font stays the same for the entire thing
-        member_name_font = fonts['user'][self._determine_cjk_font(member.name)]
+        member_name_font = fonts['user'][self._determine_cjk_font(member.display_name)]
 
-        for char in member.name:
+        for char in member.display_name:
             if char not in emoji_data.EmojiSequence:
                 memberName += char
 
@@ -406,7 +406,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if memberName:  # Leftovers, text
             draw.text((nameW, 215), memberName, tuple(theme["primary"]), member_name_font)
 
-        self._draw_text(draw, (350, 275), '#' + member.discriminator, theme["secondary"], fonts['subtext'])
+        self._draw_text(draw, (350, 275), str(member), theme["secondary"], fonts['subtext'])
 
         if dbUser['regionFlag']:
             regionImg = self._cache_flag_image(dbUser['regionFlag'])
