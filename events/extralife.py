@@ -139,12 +139,10 @@ class ExtraLife(commands.Cog):
                 break
 
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
-            match = re.match(r'([\s\S]+)#(\d{4})', donor_name)
+            match = re.match(r'[\s\S]+#\d{4}|[a-z0-9._]+', donor_name)
             if match:
                 # Donor name format matches a Discord username
-                member = discord.utils.find(
-                    lambda m: m.name == match.group(1) and m.discriminator == match.group(2), self.guild.members
-                )
+                member = discord.utils.find(lambda m: str(m) == match.group(0), self.guild.members)
                 if member:
                     if self.donorRole not in member.roles:
                         try:
