@@ -512,7 +512,9 @@ class MainEvents(commands.Cog):
 
             user = await self.bot.fetch_user(dbMessage['author'])
             jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
-            content = dbMessage['content'] or '-No saved copy of message content available-'
+            content = (
+                '-No saved copy of message content is available-' if not dbMessage['content'] else dbMessage['content']
+            )
 
         embed = discord.Embed(
             description=f'[Jump to message]({jump_url})\n{content}',
