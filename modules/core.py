@@ -167,9 +167,9 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':inbox_tray: User joined', embed=embed)
 
         needsRestore = False
+        hierarchyFails = []
         if doc and doc['roles']:
             myTop = member.guild.me.top_role
-            hierarchyFails = []
             for x in doc['roles']:
                 if x == member.guild.id:
                     continue
