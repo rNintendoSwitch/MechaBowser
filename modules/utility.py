@@ -45,9 +45,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             "tigerdirect.com": ["affiliateid", "srccode"],
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
         }
-        self.inviteRe = re.compile(
-            r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/+[\da-z-]+)', re.I
-        )
 
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
@@ -83,43 +80,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             # No longer pinned, remove slowmode.
             elif message.channel.slowmode_delay == UNIQUE_SLOWMODE:
                 await message.channel.edit(slowmode_delay=0)
-
-        # Filter invite links
-        msgInvites = re.findall(self.inviteRe, message.content)
-        if msgInvites and config.moderator not in [x.id for x in message.author.roles]:
-            guildWhitelist = mclient.bowser.guilds.find_one({'_id': message.guild.id})['inviteWhitelist']
-            fetchedInvites = []
-            inviteInfos = []
-            for x in msgInvites:
-                try:
-                    if x not in fetchedInvites:
-                        fetchedInvites.append(x)
-                        invite = await self.bot.fetch_invite(x)
-                        if not invite.guild:
-                            pass
-
-                        else:
-                            feature_whitelist = ['VERIFIED', 'PARTNERED', 'DISCOVERABLE']
-
-                            if invite.guild.id in guildWhitelist:
-                                continue
-                            if any([(f in feature_whitelist) for f in invite.guild.features]):
-                                continue
-
-                        inviteInfos.append(invite)
-
-                except (discord.NotFound, discord.HTTPException):
-                    inviteInfos.append(x)
-
-            if inviteInfos:
-                await message.delete()
-                await message.channel.send(
-                    f':bangbang: {message.author.mention} please do not post invite links to other Discord servers or groups. If you believe the linked server(s) should be whitelisted, contact a moderator',
-                    delete_after=10,
-                )
-                await self.adminChannel.send(
-                    f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}'
-                )
 
         # Filter and clean affiliate links
         # We want to call this last to ensure all above items are complete.
