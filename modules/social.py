@@ -1,4 +1,5 @@
 import asyncio
+import glob
 import io
 import logging
 import math
@@ -7,7 +8,6 @@ import random
 import re
 import time
 import typing
-import glob
 from datetime import datetime, timezone
 from pathlib import Path
 
