@@ -164,7 +164,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 delete_after=15,
             )
 
-        card = await self._generate_profile_card(member)
+        card = await self._generate_profile_card_from_member(member)
         await ctx.send(file=card)
 
     def _load_fonts(self, fonts_defs):
@@ -343,7 +343,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         canvas.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='preview.png')
 
-    async def _generate_profile_card(self, member: discord.Member) -> discord.File:
+    async def _generate_profile_card_from_member(self, member: discord.Member) -> discord.File:
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -360,18 +360,90 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             dbUser = db.find_one({'_id': member.id})
 
-        background = self.backgrounds[dbUser['background']]
+        ## Get avatar ##
+        pfpBytes = io.BytesIO(await member.display_avatar.with_format('png').with_size(256).read())
+
+        ## Get message count, games ##
+        if member.id in self.easter_egg_games:
+            setGames = [self.easter_egg_games[member.id]]
+            message_count = random.choice(self.easter_egg_text)
+        else:
+            setGames = dbUser['favgames']
+            setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
+            setGames = setGames[:3]  # Limit to 3 results, just in case
+
+            message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
+
+        ## Get join date ##
+        joins = dbUser['joins']
+        joins.sort()
+        joinDate = datetime.fromtimestamp(joins[0], tz=timezone.utc)
+        try:  # -d doesn't work on all platforms, such as Windows
+            joinDateF = joinDate.strftime('%b. %-d, %Y')
+        except:
+            joinDateF = joinDate.strftime('%b. %d, %Y')
+
+        ## Get current time ##
+        if not dbUser['timezone']:
+            usertime = 'Not specified'
+
+        else:
+            tznow = datetime.now(pytz.timezone(dbUser['timezone']))
+            localtime = tznow.strftime('%H:%M')
+            tzOffset = tznow.strftime('%z')
+
+            if tzOffset[-2:] == '00':  # Remove 00 at end, if present
+                tzOffset = tzOffset[:-2]
+            if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
+                tzOffset = tzOffset[0] + tzOffset[2:]
+
+            usertime = f'{localtime} (UTC{tzOffset})'
+
+        ## Get Trophies ##
+        trophies = []
+        if dbUser['trophyPreference']:
+            for x in dbUser:
+                trophies.append(x)
+
+        for trophy, lambda_function in self.special_trophies.items():
+            if lambda_function(member, member.guild):
+                trophies.append(trophy)
+
+        if len(trophies) < 15:  # Check for additional non-prefered trophies
+            for x in dbUser['trophies']:
+                if x not in trophies:
+                    trophies.append(x)
+
+        while len(trophies) < 15:
+            trophies.append(None)
+
+        profile = {
+            'background': dbUser['background'],
+            'pfp': Image.open(pfpBytes),
+            'display_name': member.display_name,
+            'username': str(member),
+            'regionFlag': dbUser['regionFlag'],
+            'friendcode': dbUser['friendcode'],
+            'message_count': message_count,
+            'joindate': joinDateF,
+            'usertime': usertime,
+            'trophies': trophies,
+            'games': setGames,
+        }
+
+        return await self._generate_profile_card(profile)
+
+    async def _generate_profile_card(self, profile: dict) -> discord.File:
+        background = self.backgrounds[profile['background']]
         theme = self.themes[background["theme"]]
 
-        pfpBytes = io.BytesIO(await member.display_avatar.with_format('png').with_size(256).read())
-        pfp = Image.open(pfpBytes).convert("RGBA").resize((250, 250))
+        pfp = profile['pfp'].convert("RGBA").resize((250, 250))
 
         card = theme['pfpBackground'].copy()
         card.paste(pfp, (50, 170), pfp)
         card.paste(background["image"], mask=background["image"])
         card.paste(theme['profileStatic'], mask=theme['profileStatic'])
 
-        guild = member.guild
         draw = ImageDraw.Draw(card)
         fonts = self.profileFonts
 
@@ -380,9 +452,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         nameW = 350
 
         # Member name may be rendered in parts, so we want to ensure the font stays the same for the entire thing
-        member_name_font = fonts['user'][self._determine_cjk_font(member.display_name)]
+        member_name_font = fonts['user'][self._determine_cjk_font(profile['display_name'])]
 
-        for char in member.display_name:
+        for char in profile['display_name']:
             if char not in emoji_data.EmojiSequence:
                 memberName += char
 
@@ -406,48 +478,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if memberName:  # Leftovers, text
             draw.text((nameW, 215), memberName, tuple(theme["primary"]), member_name_font)
 
-        self._draw_text(draw, (350, 275), str(member), theme["secondary"], fonts['subtext'])
+        self._draw_text(draw, (350, 275), profile['username'], theme["secondary"], fonts['subtext'])
 
-        if dbUser['regionFlag']:
-            regionImg = self._cache_flag_image(dbUser['regionFlag'])
+        if profile['regionFlag']:
+            regionImg = self._cache_flag_image(profile['regionFlag'])
             card.paste(regionImg, (976, 50), regionImg)
 
         # Friend code
-        if dbUser['friendcode']:
-            self._draw_text(draw, (350, 330), dbUser['friendcode'], theme["friend_code"], fonts['subtext'])
+        if profile['friendcode']:
+            self._draw_text(draw, (350, 330), profile['friendcode'], theme["friend_code"], fonts['subtext'])
 
-        # Start customized content -- stats
-        if member.id in self.easter_egg_games:
-            dbUser['favgames'] = self.easter_egg_games[member.id]
-            self._draw_text(draw, (435, 505), random.choice(self.easter_egg_text), theme["secondary"], fonts['medium'])
-
-        else:
-            message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
-            self._draw_text(draw, (435, 505), message_count, theme["primary"], fonts['medium'])
-
-        joins = dbUser['joins']
-        joins.sort()
-        joinDate = datetime.fromtimestamp(joins[0], tz=timezone.utc)
-        try:  # -d doesn't work on all platforms, such as Windows
-            joinDateF = joinDate.strftime('%b. %-d, %Y')
-        except:
-            joinDateF = joinDate.strftime('%b. %d, %Y')
-        self._draw_text(draw, (60, 505), joinDateF, theme["primary"], fonts['medium'])
-
-        if not dbUser['timezone']:
-            self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
-
-        else:
-            tznow = datetime.now(pytz.timezone(dbUser['timezone']))
-            localtime = tznow.strftime('%H:%M')
-            tzOffset = tznow.strftime('%z')
-
-            if tzOffset[-2:] == '00':  # Remove 00 at end, if present
-                tzOffset = tzOffset[:-2]
-            if tzOffset[1] == '0':  # Remove 0 at start of ±0X, if present
-                tzOffset = tzOffset[0] + tzOffset[2:]
-
-            self._draw_text(draw, (790, 505), f'{localtime} (UTC{tzOffset})', theme["primary"], fonts['medium'])
+        self._draw_text(draw, (435, 505), profile['message_count'], theme["primary"], fonts['medium'])
+        self._draw_text(draw, (60, 505), profile['joindate'], theme["primary"], fonts['medium'])
+        self._draw_text(draw, (790, 505), profile['usertime'], theme["primary"], fonts['medium'])
 
         # Start trophies
         trophyLocations = {
@@ -467,26 +510,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             13: (1300, 750),
             14: (1450, 750),
         }
-        trophies = []
-        if dbUser['trophyPreference']:
-            for x in dbUser:
-                trophies.append(x)
-
-        for trophy, lambda_function in self.special_trophies.items():
-            if lambda_function(member, guild):
-                trophies.append(trophy)
-
-        if len(trophies) < 15:  # Check for additional non-prefered trophies
-            for x in dbUser['trophies']:
-                if x not in trophies:
-                    trophies.append(x)
-
-        while len(trophies) < 15:
-            trophies.append(None)
-
         trophyNum = 0
         useBorder = None
-        for x in trophies:
+        for x in profile['trophies']:
             if useBorder is None and x in self.borders['trophy_borders']:
                 useBorder = self.borders['trophy_borders'][x]
 
@@ -500,12 +526,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.paste(border, (0, 0), border)
 
         # Start favorite games
-        setGames = dbUser['favgames']
+        gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
+        gameTextLocations = {0: 660, 1: 725, 2: 791}
+
+        setGames = profile['games']
         gameCount = 0
         Games = self.bot.get_cog('Games')
         if setGames:
-            gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
-            gameTextLocations = {0: 660, 1: 725, 2: 791}
             gamesDb = mclient.bowser.games
 
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
@@ -909,7 +936,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             del self.inprogressEdits[ctx.author.id]
 
             loading_message = await mainMsg.channel.send('Just a moment...')
-            card = await self._generate_profile_card(ctx.author)
+            card = await self._generate_profile_card_from_member(ctx.author)
 
             await mainMsg.channel.send('You are all set! Your profile has been edited:', file=card)
             await loading_message.delete()
