@@ -7,6 +7,7 @@ import random
 import re
 import time
 import typing
+import glob
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -70,7 +71,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.backgrounds = yaml.safe_load(stream)
 
             for bg_name in self.backgrounds.keys():
-                self.backgrounds[bg_name]["image"] = self._render_background_image(bg_name)
+                self.backgrounds[bg_name]["image"] = self._render_background_image_from_slug(bg_name)
 
         for theme in self.themes.keys():
             self.themes[theme]['pfpBackground'] = Image.open(
@@ -229,12 +230,32 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return img
 
-    def _render_background_image(self, name: str) -> Image:
+    def _render_background_image_from_slug(self, name: str) -> Image:
         bg = self.backgrounds[name]
 
         img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
 
-        trophy_bg_path = f'resources/profiles/layout/{bg["theme"]}/trophy-bg/{bg["trophy-bg-opacity"]}.png'
+        return self._render_background_image(img, bg['theme'], bg['trophy-bg-opacity'])
+
+    def _render_background_image(self, img, theme, trophy_bg_opacity):
+        tbg_opacity = str(trophy_bg_opacity)
+
+        ## Check theme ##
+        valid_themes = next(os.walk('resources/profiles/layout/'))[1]
+
+        if theme not in valid_themes:
+            raise ValueError(f'Invalid theme {theme}, must be one of: {", ".join(valid_themes)}')
+
+        ## Check opacity ##
+        tpath = f'resources/profiles/layout/{theme}/trophy-bg/'
+        valid_opacities = [u.split('.')[0] for u in [t.split('/')[-1] for t in glob.glob(os.path.join(tpath, '*.png'))]]
+
+        if tbg_opacity not in valid_opacities:
+            v = ", ".join(valid_opacities)
+            raise ValueError(f'Invalid trophy background opacity {tbg_opacity} for theme {theme}, must be one of: {v}')
+
+        ## Render ##
+        trophy_bg_path = f'resources/profiles/layout/{theme}/trophy-bg/{tbg_opacity}.png'
         trophy_bg = Image.open(trophy_bg_path).convert("RGBA")
 
         final = Image.alpha_composite(img, trophy_bg.resize(img.size))
