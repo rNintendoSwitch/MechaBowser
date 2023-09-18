@@ -111,10 +111,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
         self.easter_egg_games = {
-            # Super Mario 3D All-Stars (Sunshine)
-            self.bot.user.id: ["3030-80463"],
-            # Paper Mario: The Origami King (closest we have to Paper Mario 1 as of Jan 2022)
-            config.parakarry: ["3030-78447"],
+            self.bot.user.id: ["3030-80463"],  # Super Mario 3D All-Stars
+            config.parakarry: ["3030-89844"],  # Paper Mario: The Thousand-Year Door
         }
 
         self.easter_egg_text = [  # Message text for bot easter egg, keep under 12 chars
@@ -128,6 +126,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'Yes',
             'No',
             'Not specified',
+            '???',
+            'Reply hazy',
+            'Most likely',
         ]
 
     @commands.group(name='profile', invoke_without_command=True)
