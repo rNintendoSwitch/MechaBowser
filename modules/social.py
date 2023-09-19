@@ -385,7 +385,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         ## Get message count, games ##
         if member.id in self.easter_egg_games:
-            setGames = [self.easter_egg_games[member.id]]
+            setGames = self.easter_egg_games[member.id]
             message_count = random.choice(self.easter_egg_text)
         else:
             setGames = dbUser['favgames']
