@@ -129,3 +129,47 @@ trivia-mariokart:
 trivia-spongebob:
     theme: light
     trophy-bg-opacity: 20
+
+everybody-votes:
+    theme: light
+    trophy-bg-opacity: 30
+
+trivia-smrpg:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-smbwonder:
+    theme: light
+    trophy-bg-opacity: 70
+
+trivia-mortalkombat:
+    theme: light
+    trophy-bg-opacity: 10
+
+trivia-vampiresurvivors:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-pikmin:
+    theme: light
+    trophy-bg-opacity: 50
+
+trivia-raincode:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-advancewars:
+    theme: light
+    trophy-bg-opacity: 20
+
+trivia-gameboy:
+    theme: light
+    trophy-bg-opacity: 10
+
+trivia-octopath:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-zelda:
+    theme: dark
+    trophy-bg-opacity: 50
