@@ -232,9 +232,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     def _render_background_image_from_slug(self, name: str) -> Image:
         bg = self.backgrounds[name]
-
         img = Image.open(f'resources/profiles/backgrounds/{name}.png').convert("RGBA")
-
         return self._render_background_image(img, bg['theme'], bg['trophy-bg-opacity'])
 
     def _render_background_image(self, img, theme, trophy_bg_opacity):
@@ -247,11 +245,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             raise ValueError(f'Invalid theme {theme}, must be one of: {", ".join(valid_themes)}')
 
         ## Check opacity ##
-        tpath = f'resources/profiles/layout/{theme}/trophy-bg/'
-        valid_opacities = [u.split('.')[0] for u in [t.split('/')[-1] for t in glob.glob(os.path.join(tpath, '*.png'))]]
+        tcp = f'resources/profiles/layout/{theme}/trophy-bg/'
+        valid_opac = [os.path.splitext(u)[0] for u in [t.split('/')[-1] for t in glob.glob(os.path.join(tcp, '*.png'))]]
 
-        if tbg_opacity not in valid_opacities:
-            v = ", ".join(valid_opacities)
+        if tbg_opacity not in valid_opac:
+            v = ", ".join(valid_opac)
             raise ValueError(f'Invalid trophy background opacity {tbg_opacity} for theme {theme}, must be one of: {v}')
 
         ## Render ##
@@ -440,7 +438,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             trophies.append(None)
 
         profile = {
-            'background': dbUser['background'],
             'pfp': Image.open(pfpBytes),
             'display_name': member.display_name,
             'username': str(member),
@@ -453,10 +450,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'games': setGames,
         }
 
-        return await self._generate_profile_card(profile)
+        return await self._generate_profile_card(profile, self.backgrounds[dbUser['background']])
 
-    async def _generate_profile_card(self, profile: dict) -> discord.File:
-        background = self.backgrounds[profile['background']]
+    async def _generate_profile_card(self, profile: dict, background: dict) -> discord.File:
         theme = self.themes[background["theme"]]
 
         pfp = profile['pfp'].convert("RGBA").resize((250, 250))
@@ -970,6 +966,51 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await botMsg.edit(
                 content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again'
             )
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @_profile.command(name='validate')
+    async def _profile_validate(self, ctx: commands.Context, theme, trophy_bg_opacity):
+        if not ctx.message.attachments:
+            return await ctx.message.reply(':x: Missing attachment')
+
+        attach = ctx.message.attachments[0]
+        if not attach.content_type == 'image/png' or attach.height != 900 or attach.width != 1600:
+            return await ctx.message.reply(':x: Attachment must be a 1600x900 PNG file')
+
+        filename = os.path.splitext(attach.filename)[0]
+        safefilename = re.sub('\W|^(?=\d)', '_', filename)
+
+        if filename != safefilename:
+            return await ctx.message.reply(
+                ':x: Filenames cannot start with a number or contain non-alphanumeric characters except for an underscore'
+            )
+
+        bg_raw_img = Image.open(io.BytesIO(await attach.read())).convert("RGBA")
+
+        try:
+            bg_rendered = self._render_background_image(bg_raw_img, theme, trophy_bg_opacity)
+        except ValueError as e:
+            return await ctx.message.reply(f':x: {e}')
+
+        background = {'image': bg_rendered, 'theme': theme}
+
+        profile = {
+            'pfp': Image.new('RGB', (250, 250)),
+            'display_name': "Lorem Ipsum Dolor Sit Amet, Esq",
+            'username': "lorem_ipsum_dolor_sit_amet_esq",
+            'regionFlag': "1f3f4-200d-2620-fe0f",  # Pirate flag
+            'friendcode': "SW-0000-0000-0000",
+            'message_count': "8,675,309",
+            'joindate': "Jan. 01, 1970",
+            'usertime': "Not specified",
+            'trophies': [None] * 15,
+            'games': ['3030-88442', '3030-87348', '3030-89546'],  # Games with really long titles
+        }
+
+        card = await self._generate_profile_card(profile, background)
+        cfgstr = f"```yml\n{safefilename}:\n    theme: {theme}\n    trophy-bg-opacity: {trophy_bg_opacity}```"
+
+        await ctx.send(cfgstr, file=card)
 
     @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='grant')
