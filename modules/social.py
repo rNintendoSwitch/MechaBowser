@@ -1019,6 +1019,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         item = item.lower()
         name = name.lower()
 
+        if not members:
+            return await ctx.send(
+                f'{config.redTick} Invalid formatting of members in command: please check your syntax and ensure you are providing at least one valid member then try again. Member(s) should be provided at the end of the command'
+            )
+
         if item not in ['background', 'trophy']:
             return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
 
