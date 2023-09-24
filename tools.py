@@ -338,7 +338,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
 
         else:
             dmMsg += "Here's what your profile looks like with it:"
-            generated_background = await socialCog._generate_profile_card(user)
+            generated_background = await socialCog._generate_profile_card_from_member(user)
 
         try:
             await user.send(dmMsg, file=generated_background)
