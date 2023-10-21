@@ -651,7 +651,7 @@ async def send_paginated_embed(
     ended_by = None
     message = None
 
-    single_page = len(pages) == 1
+    single_page = len(pages) <= 1
     dm_channel = not isinstance(channel, discord.TextChannel) and not isinstance(channel, discord.Thread)
 
     if not (single_page or dm_channel):
@@ -671,12 +671,13 @@ async def send_paginated_embed(
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
         # Add Fields
         embed.clear_fields()
-        for field in pages[current_page - 1]:
-            embed.add_field(
-                name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
-            )
+        if len(fields) != 0:
+            for field in pages[current_page - 1]:
+                embed.add_field(
+                    name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
+                )
 
-        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+        page_text = PAGE_TEMPLATE.format(current_page, max(len(pages), 1))
         embed.title = f'{title} {page_text}'
 
         if single_page or dm_channel:
