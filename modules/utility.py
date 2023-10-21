@@ -525,7 +525,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         puns = db.find({'user': user.id, 'type': {'$ne': 'note'}}) if self_check else db.find({'user': user.id})
 
         deictic_language = {
-            'no_punishments': ('User has no punishments on record', 'You have no available punishments on record'),
+            'no_punishments': ('User has no punishments on record.', 'You have no available punishments on record.'),
             'single_inf': (
                 'There is **1** infraction record for this user:',
                 'You have **1** available infraction record:',
@@ -540,86 +540,84 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             ),
         }
 
-        if not puns.count():
-            return await ctx.channel.send(f'{config.redTick} {deictic_language["no_punishments"][self_check]}')
+        punNames = {
+            'strike': '{} Strike{}',
+            'destrike': 'Removed {} Strike{}',
+            'tier1': 'T1 Warn',
+            'tier2': 'T2 Warn',
+            'tier3': 'T3 Warn',
+            'clear': 'Warn Clear',
+            'mute': 'Mute',
+            'unmute': 'Unmute',
+            'kick': 'Kick',
+            'ban': 'Ban',
+            'unban': 'Unban',
+            'blacklist': 'Blacklist ({})',
+            'unblacklist': 'Unblacklist ({})',
+            'appealdeny': 'Denied ban appeal (until {})',
+            'note': 'User note',
+        }
 
+        if puns.count() == 0:
+            desc = deictic_language["no_punishments"][self_check]
+        elif puns.count() == 1:
+            desc = deictic_language['single_inf'][self_check]
         else:
-            punNames = {
-                'strike': '{} Strike{}',
-                'destrike': 'Removed {} Strike{}',
-                'tier1': 'T1 Warn',
-                'tier2': 'T2 Warn',
-                'tier3': 'T3 Warn',
-                'clear': 'Warn Clear',
-                'mute': 'Mute',
-                'unmute': 'Unmute',
-                'kick': 'Kick',
-                'ban': 'Ban',
-                'unban': 'Unban',
-                'blacklist': 'Blacklist ({})',
-                'unblacklist': 'Unblacklist ({})',
-                'appealdeny': 'Denied ban appeal (until {})',
-                'note': 'User note',
-            }
+            desc = deictic_language['multiple_infs'][self_check].format(puns.count())
 
-            desc = (
-                deictic_language['single_inf'][self_check]
-                if puns.count() == 1
-                else deictic_language['multiple_infs'][self_check].format(puns.count())
-            )
-            fields = []
-            activeStrikes = 0
-            totalStrikes = 0
-            for pun in puns.sort('timestamp', pymongo.DESCENDING):
-                datestamp = f'<t:{int(pun["timestamp"])}:f>'
-                moderator = ctx.guild.get_member(pun['moderator'])
-                if not moderator:
-                    moderator = await self.bot.fetch_user(pun['moderator'])
+        fields = []
+        activeStrikes = 0
+        totalStrikes = 0
+        for pun in puns.sort('timestamp', pymongo.DESCENDING):
+            datestamp = f'<t:{int(pun["timestamp"])}:f>'
+            moderator = ctx.guild.get_member(pun['moderator'])
+            if not moderator:
+                moderator = await self.bot.fetch_user(pun['moderator'])
 
-                if pun['type'] == 'strike':
-                    activeStrikes += pun['active_strike_count']
-                    totalStrikes += pun['strike_count']
-                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
+            if pun['type'] == 'strike':
+                activeStrikes += pun['active_strike_count']
+                totalStrikes += pun['strike_count']
+                inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
-                elif pun['type'] == 'destrike':
-                    totalStrikes -= pun['strike_count']
-                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
+            elif pun['type'] == 'destrike':
+                totalStrikes -= pun['strike_count']
+                inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
-                elif pun['type'] in ['blacklist', 'unblacklist']:
-                    inf = punNames[pun['type']].format(pun['context'])
+            elif pun['type'] in ['blacklist', 'unblacklist']:
+                inf = punNames[pun['type']].format(pun['context'])
 
-                elif pun['type'] == 'appealdeny':
-                    inf = punNames[pun['type']].format(f'<t:{int(pun["expiry"])}:D>')
+            elif pun['type'] == 'appealdeny':
+                inf = punNames[pun['type']].format(f'<t:{int(pun["expiry"])}:D>')
 
-                else:
-                    inf = punNames[pun['type']]
+            else:
+                inf = punNames[pun['type']]
 
-                value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
+            value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
 
-                if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
-                    strings = []
-                    offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
+            if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
+                strings = []
+                offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
 
-                    for i, o in enumerate(offsets):
-                        segment = value[o : (o + 1018)]
+                for i, o in enumerate(offsets):
+                    segment = value[o : (o + 1018)]
 
-                        if i == 0:  # First segment
-                            segment = f'{segment}...'
-                        elif i == len(offsets) - 1:  # Last segment
-                            segment = f'...{segment}'
-                        else:
-                            segment = f'...{segment}...'
+                    if i == 0:  # First segment
+                        segment = f'{segment}...'
+                    elif i == len(offsets) - 1:  # Last segment
+                        segment = f'...{segment}'
+                    else:
+                        segment = f'...{segment}...'
 
-                        strings.append(segment)
+                    strings.append(segment)
 
-                    for i, string in enumerate(strings):
-                        fields.append({'name': f'{datestamp} ({i+1}/{len(strings)})', 'value': string})
+                for i, string in enumerate(strings):
+                    fields.append({'name': f'{datestamp} ({i+1}/{len(strings)})', 'value': string})
 
-                else:
-                    fields.append({'name': datestamp, 'value': value})
+            else:
+                fields.append({'name': datestamp, 'value': value})
 
-            if totalStrikes:
-                desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
+        if totalStrikes:
+            desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
 
         try:
             channel = ctx.author if self_check else ctx.channel
