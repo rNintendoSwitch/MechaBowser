@@ -671,7 +671,7 @@ async def send_paginated_embed(
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
         # Add Fields
         embed.clear_fields()
-        if len(fields) != 0:
+        if len(pages) != 0:
             for field in pages[current_page - 1]:
                 embed.add_field(
                     name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
