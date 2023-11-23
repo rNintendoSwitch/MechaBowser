@@ -4,8 +4,8 @@ import os
 import re
 import time
 import typing
-import uuid
 import urllib.parse
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import config
