@@ -19,7 +19,14 @@ linkRe = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-
 reasonFilterLinkRe = re.compile(
     r'http[s]?://[a-zA-Z0-9#-_!*\(\),]+|(?<=\b)[a-zA-Z0-9.-]*\.[a-zA-Z0-9.-]+\/[a-zA-Z0-9#-_!*\(\),]*', re.I
 )
-reasonFilterWhitelistedDomains = ['discord.gg', 'discord.me', 'discord.com', 'discordapp.com', 'tenor.com']
+reasonFilterWhitelistedDomains = [
+    'rnintendoswitch.com',
+    'discord.gg',
+    'discord.me',
+    'discord.com',
+    'discordapp.com',
+    'tenor.com',
+]
 
 archiveHeader = '# Message archive for guild "{0.name}" ({0.id})\nIncluded channels: {1}\n# Format:\n[date + time] Member ID/Message ID/Channel/Username - Message content\n----------------\n'
 timeUnits = {
