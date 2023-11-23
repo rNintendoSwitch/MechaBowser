@@ -553,7 +553,7 @@ def filter_links_from_reason(reason):
                 url = url[20:]
 
             if original_link != url:
-                reason = reason.replace(original_link, url)
+                reason = reason.replace(original_link, f'`{url}`')
 
     return reason
 
