@@ -36,6 +36,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
+        self.validate_allowed_users = []
 
         # !profile ratelimits
         self.bucket_storage = token_bucket.MemoryStorage()
@@ -967,9 +968,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again'
             )
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_profile.command(name='validate')
+    @_profile.group(name='validate', invoke_without_command=True)
     async def _profile_validate(self, ctx: commands.Context, theme, trophy_bg_opacity):
+        if (ctx.guild.get_role(config.moderator) not in ctx.author.roles) and (
+            ctx.author.id not in self.validate_allowed_users
+        ):
+            return await ctx.message.reply(':x: You do not have permission to run this command.', delete_after=15)
+
         if not ctx.message.attachments:
             return await ctx.message.reply(':x: Missing attachment')
 
@@ -993,8 +998,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         mask_data = np.array(alpha_test_mask)
         img_data = np.array(bg_raw_img)
 
-        expected_alpha = mask_data[..., -1] == 255
-        really_alpha = img_data[..., -1] == 0
+        expected_alpha = mask_data[..., -1] > 127
+        really_alpha = img_data[..., -1] < 128
 
         CORRECT_THRESHOLD = 0.999
         TOTAL_PIXELS = 1600 * 900
@@ -1003,10 +1008,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if percent_correct < CORRECT_THRESHOLD:
             return await ctx.message.reply(
-                ':x: Too many pixels that are expected to be blank are not! Did you cut out the profile picture and '
-                f'corners? Expected at least {CORRECT_THRESHOLD*100:0.3f}% correct, got {percent_correct*100:0.3f}%'
+                ':x: Too many pixels have the incorrect transparency! '
+                f'Expected at least {CORRECT_THRESHOLD*100:0.3f}% correct, actually {percent_correct*100:0.3f}%'
             )
-
         # end check mask
 
         try:
@@ -1032,7 +1036,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card = await self._generate_profile_card(profile, background)
         cfgstr = f"```yml\n{safefilename}:\n    theme: {theme}\n    trophy-bg-opacity: {trophy_bg_opacity}```"
 
-        await ctx.send(cfgstr, file=card)
+        await ctx.message.reply(cfgstr, file=card)
+
+    @_profile_validate.command(name='allow')
+    async def _profile_validate_allow(self, ctx, member: tools.ResolveUser):
+        self.validate_allowed_users.append(member.id)
+        return await ctx.message.reply(f'{config.greenTick} {member} temporarily added to allowlist')
 
     @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='grant')
