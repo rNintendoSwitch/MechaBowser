@@ -80,7 +80,10 @@ class TGAPool(commands.Cog):
     def cog_unload(self):
         self.response_check.cancel()  # pylint: disable=no-member
 
+
 logging.info('')
+
+
 async def setup(bot):
     await bot.add_cog(TGAPool(bot))
     logging.info('[Extension] TGAPool module loaded')
