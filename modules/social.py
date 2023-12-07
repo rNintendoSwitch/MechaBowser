@@ -978,7 +978,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await ctx.message.reply(':x: Attachment must be a 1600x900 PNG file')
 
         filename = os.path.splitext(attach.filename)[0]
-        safefilename = re.sub('\W|^(?=\d)', '_', filename)
+        safefilename = re.sub('[^A-Za-z0-9_-]|^(?=\d)', '_', filename)
 
         if filename != safefilename:
             return await ctx.message.reply(
@@ -986,6 +986,28 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         bg_raw_img = Image.open(io.BytesIO(await attach.read())).convert("RGBA")
+
+        # Check mask
+        alpha_test_mask = Image.open("resources/profiles/background-test-mask.png").convert("RGBA")
+
+        mask_data = np.array(alpha_test_mask)
+        img_data = np.array(bg_raw_img)
+
+        expected_alpha = mask_data[..., -1] == 255
+        really_alpha = img_data[..., -1] == 0
+
+        CORRECT_THRESHOLD = 0.999
+        TOTAL_PIXELS = 1600 * 900
+        correct_alpha_pixels = np.count_nonzero(expected_alpha == really_alpha)
+        percent_correct = correct_alpha_pixels / TOTAL_PIXELS
+
+        if percent_correct < CORRECT_THRESHOLD:
+            return await ctx.message.reply(
+                ':x: Too many pixels that are expected to be blank are not! Did you cut out the profile picture and '
+                f'corners? Expected at least {CORRECT_THRESHOLD*100:0.3f}% correct, got {percent_correct*100:0.3f}%'
+            )
+
+        # end check mask
 
         try:
             bg_rendered = self._render_background_image(bg_raw_img, theme, trophy_bg_opacity)
