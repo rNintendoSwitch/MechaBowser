@@ -139,8 +139,8 @@ everybody-votes:
     trophy-bg-opacity: 30
 
 trivia-anothercode:
-    theme: light
-    trophy-bg-opacity: 30
+    theme: dark
+    trophy-bg-opacity: 50
 
 trivia-pokemonviolet:
     theme: dark
