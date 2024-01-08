@@ -139,7 +139,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             6: 'trivia-silver-3',
             7: 'trivia-gold-1',
             8: 'trivia-gold-2',
-            9: 'trivia-gold-3'
+            9: 'trivia-gold-3',
         }
         self.triviaTrophyEmotes = {
             1: '<:triviabronze1:1194031669498351656>',
@@ -150,7 +150,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             6: '<:triviasilver3:1194031688792154234>',
             7: '<:triviagold1:1194031674053382216>',
             8: '<:triviagold2:1194031676649652305>',
-            9: '<:triviagold3:1194031677715005490>'
+            9: '<:triviagold3:1194031677715005490>',
         }
 
     @commands.group(name='profile', invoke_without_command=True)
@@ -162,7 +162,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if ctx.message.channel.id not in [config.commandsChannel, config.debugChannel]:
             channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
             if channel_being_rate_limited:
-
                 #  Moderators consume a ratelimit token but are not limited
                 if not ctx.guild.get_role(config.moderator) in ctx.author.roles:
                     await ctx.send(
@@ -285,7 +284,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         SHADOW_OFFSET = 2
 
         if not name in self.flagImgCache:
-
             regionImg = Image.open(self.twemojiPath + name + '.png').convert('RGBA')
 
             # Drop Shadow
@@ -460,7 +458,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 505), joinDateF, theme["primary"], fonts['medium'])
 
         if not dbUser['timezone']:
-
             self._draw_text(draw, (790, 505), 'Not specified', theme["secondary"], fonts['medium'])
 
         else:
@@ -587,7 +584,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             raise IndexError(f'New trivia level is out of range: {currentLevel} attempting to update to {newLevel}')
 
         if currentLevel > 0 and newLevel != 0:
-            await tools.commit_profile_change(member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True, silent=True)
+            await tools.commit_profile_change(
+                member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True, silent=True
+            )
 
         elif newLevel == 0:
             await tools.commit_profile_change(member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True)
@@ -952,18 +951,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @commands.has_any_role(config.moderator, config.eh)
     @_trivia.command(name='award')
     async def _trivia_award(self, ctx, members: commands.Greedy[tools.ResolveUser]):
-        stats = {
-            0: 0,
-            1: 0,
-            2: 0,
-            3: 0,
-            4: 0,
-            5: 0,
-            6: 0,
-            7: 0,
-            8: 0,
-            9: 0
-        }
+        stats = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0}
         failed = []
         msg = await ctx.send(f'{config.loading} Processing awards to {len(members)} member(s)...')
         for m in members:
@@ -975,32 +963,26 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 failed.append(f'{m.mention} ({m.id})')
 
         embed = discord.Embed(title='Command Completion Stats')
-        embed.description = f'Trivia awards granted to **{len(members) - len(failed)}**. List of trophies user(s) now have:\n\n'
+        embed.description = (
+            f'Trivia awards granted to **{len(members) - len(failed)}**. List of trophies user(s) now have:\n\n'
+        )
 
         successList = [(key, value) for key, value in stats.keys() if value != 0]
         for item in successList:
             embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", "" "").title()}: {item[1]}\n'
 
         if failed:
-            embed.add_field(title='Failed to award some trophies', value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".split()}')
+            embed.add_field(
+                title='Failed to award some trophies',
+                value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".split()}',
+            )
 
         await msg.edit(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
 
     @commands.has_any_role(config.moderator, config.eh)
     @_trivia.command(name='revoke')
     async def _trivia_revoke(self, ctx, members: commands.Greedy[tools.ResolveUser]):
-        stats = {
-            0: 0,
-            1: 0,
-            2: 0,
-            3: 0,
-            4: 0,
-            5: 0,
-            6: 0,
-            7: 0,
-            8: 0,
-            9: 0
-        }
+        stats = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0}
         failed = []
         msg = await ctx.send(f'{config.loading} Revoking awards from {len(members)} member(s)...')
         for m in members:
@@ -1012,14 +994,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 failed.append(f'{m.mention} ({m.id})')
 
         embed = discord.Embed(title='Command Completion Stats')
-        embed.description = f'Trivia awards revoked from **{len(members) - len(failed)}**. List of trophies user(s) now have:\n\n'
+        embed.description = (
+            f'Trivia awards revoked from **{len(members) - len(failed)}**. List of trophies user(s) now have:\n\n'
+        )
 
         successList = [(key, value) for key, value in stats.keys() if value != 0]
         for item in successList:
             embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", "" "").title()}: {item[1]}\n'
 
         if failed:
-            embed.add_field(title='Failed to revoke some trophies', value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".split()}')
+            embed.add_field(
+                title='Failed to revoke some trophies',
+                value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".split()}',
+            )
 
         await msg.edit(content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed)
 
