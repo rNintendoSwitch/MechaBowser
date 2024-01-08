@@ -45,9 +45,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             "tigerdirect.com": ["affiliateid", "srccode"],
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
         }
-        self.inviteRe = re.compile(
-            r'((?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li)|discord(?:app)?\.com\/invite)\/+[\da-z-]+)', re.I
-        )
 
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
@@ -61,65 +58,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if message.author.bot or message.type not in [discord.MessageType.default, discord.MessageType.reply]:
             logging.debug(f'on_automod_finished discarding non-normal-message: {message.type=}, {message.id=}')
             return
-
-        # Auto delete messages in pinned threads in forum channels
-        if issubclass(message.channel.__class__, discord.Thread):
-            # Unique slowmode time that is not quite 6h so we can test for & remove it
-            UNIQUE_SLOWMODE = (6 * 60 * 60) - 60
-
-            if message.channel.flags.pinned:
-                if message.channel.slowmode_delay != UNIQUE_SLOWMODE:
-                    await message.channel.edit(slowmode_delay=UNIQUE_SLOWMODE)
-
-                perms = message.channel.permissions_for(message.author)
-                if not (perms.manage_channels or perms.manage_messages):
-                    await message.channel.send(
-                        f':bangbang: {message.author.mention} Messages are not permitted in pinned threads',
-                        delete_after=10,
-                    )
-                    await message.delete()
-                    return
-
-            # No longer pinned, remove slowmode.
-            elif message.channel.slowmode_delay == UNIQUE_SLOWMODE:
-                await message.channel.edit(slowmode_delay=0)
-
-        # Filter invite links
-        msgInvites = re.findall(self.inviteRe, message.content)
-        if msgInvites and config.moderator not in [x.id for x in message.author.roles]:
-            guildWhitelist = mclient.bowser.guilds.find_one({'_id': message.guild.id})['inviteWhitelist']
-            fetchedInvites = []
-            inviteInfos = []
-            for x in msgInvites:
-                try:
-                    if x not in fetchedInvites:
-                        fetchedInvites.append(x)
-                        invite = await self.bot.fetch_invite(x)
-                        if not invite.guild:
-                            pass
-
-                        else:
-                            feature_whitelist = ['VERIFIED', 'PARTNERED', 'DISCOVERABLE']
-
-                            if invite.guild.id in guildWhitelist:
-                                continue
-                            if any([(f in feature_whitelist) for f in invite.guild.features]):
-                                continue
-
-                        inviteInfos.append(invite)
-
-                except (discord.NotFound, discord.HTTPException):
-                    inviteInfos.append(x)
-
-            if inviteInfos:
-                await message.delete()
-                await message.channel.send(
-                    f':bangbang: {message.author.mention} please do not post invite links to other Discord servers or groups. If you believe the linked server(s) should be whitelisted, contact a moderator',
-                    delete_after=10,
-                )
-                await self.adminChannel.send(
-                    f'⚠️ {message.author.mention} has posted a message with one or more invite links in {message.channel.mention} and has been deleted.\nInvite(s): {" | ".join(msgInvites)}'
-                )
 
         # Filter and clean affiliate links
         # We want to call this last to ensure all above items are complete.
@@ -565,7 +503,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         puns = db.find({'user': user.id, 'type': {'$ne': 'note'}}) if self_check else db.find({'user': user.id})
 
         deictic_language = {
-            'no_punishments': ('User has no punishments on record', 'You have no available punishments on record'),
+            'no_punishments': ('User has no punishments on record.', 'You have no available punishments on record.'),
             'single_inf': (
                 'There is **1** infraction record for this user:',
                 'You have **1** available infraction record:',
@@ -580,87 +518,84 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             ),
         }
 
-        if not puns.count():
-            return await ctx.channel.send(f'{config.redTick} {deictic_language["no_punishments"][self_check]}')
+        punNames = {
+            'strike': '{} Strike{}',
+            'destrike': 'Removed {} Strike{}',
+            'tier1': 'T1 Warn',
+            'tier2': 'T2 Warn',
+            'tier3': 'T3 Warn',
+            'clear': 'Warn Clear',
+            'mute': 'Mute',
+            'unmute': 'Unmute',
+            'kick': 'Kick',
+            'ban': 'Ban',
+            'unban': 'Unban',
+            'blacklist': 'Blacklist ({})',
+            'unblacklist': 'Unblacklist ({})',
+            'appealdeny': 'Denied ban appeal (until {})',
+            'note': 'User note',
+        }
 
+        if puns.count() == 0:
+            desc = deictic_language["no_punishments"][self_check]
+        elif puns.count() == 1:
+            desc = deictic_language['single_inf'][self_check]
         else:
-            punNames = {
-                'strike': '{} Strike{}',
-                'destrike': 'Removed {} Strike{}',
-                'tier1': 'T1 Warn',
-                'tier2': 'T2 Warn',
-                'tier3': 'T3 Warn',
-                'clear': 'Warn Clear',
-                'mute': 'Mute',
-                'unmute': 'Unmute',
-                'kick': 'Kick',
-                'ban': 'Ban',
-                'unban': 'Unban',
-                'blacklist': 'Blacklist ({})',
-                'unblacklist': 'Unblacklist ({})',
-                'appealdeny': 'Denied ban appeal (until {})',
-                'note': 'User note',
-            }
+            desc = deictic_language['multiple_infs'][self_check].format(puns.count())
 
-            desc = (
-                deictic_language['single_inf'][self_check]
-                if puns.count() == 1
-                else deictic_language['multiple_infs'][self_check].format(puns.count())
-            )
-            fields = []
-            activeStrikes = 0
-            totalStrikes = 0
-            for pun in puns.sort('timestamp', pymongo.DESCENDING):
-                datestamp = f'<t:{int(pun["timestamp"])}:f>'
-                moderator = ctx.guild.get_member(pun['moderator'])
-                if not moderator:
-                    moderator = await self.bot.fetch_user(pun['moderator'])
+        fields = []
+        activeStrikes = 0
+        totalStrikes = 0
+        for pun in puns.sort('timestamp', pymongo.DESCENDING):
+            datestamp = f'<t:{int(pun["timestamp"])}:f>'
+            moderator = ctx.guild.get_member(pun['moderator'])
+            if not moderator:
+                moderator = await self.bot.fetch_user(pun['moderator'])
 
-                if pun['type'] == 'strike':
-                    activeStrikes += pun['active_strike_count']
-                    totalStrikes += pun['strike_count']
-                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
+            if pun['type'] == 'strike':
+                activeStrikes += pun['active_strike_count']
+                totalStrikes += pun['strike_count']
+                inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
-                elif pun['type'] == 'destrike':
-                    totalStrikes -= pun['strike_count']
-                    inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
+            elif pun['type'] == 'destrike':
+                totalStrikes -= pun['strike_count']
+                inf = punNames[pun['type']].format(pun['strike_count'], "s" if pun['strike_count'] > 1 else "")
 
-                elif pun['type'] in ['blacklist', 'unblacklist']:
-                    inf = punNames[pun['type']].format(pun['context'])
+            elif pun['type'] in ['blacklist', 'unblacklist']:
+                inf = punNames[pun['type']].format(pun['context'])
 
-                elif pun['type'] == 'appealdeny':
-                    inf = punNames[pun['type']].format(f'<t:{int(pun["expiry"])}:D>')
+            elif pun['type'] == 'appealdeny':
+                inf = punNames[pun['type']].format(f'<t:{int(pun["expiry"])}:D>')
 
-                else:
-                    inf = punNames[pun['type']]
+            else:
+                inf = punNames[pun['type']]
 
-                value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
+            value = f'**Moderator:** {moderator}\n**Details:** [{inf}] {pun["reason"]}'
 
-                if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
+            if len(value) > 1024:  # This shouldn't happen, but it does -- split long values up
+                strings = []
+                offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
 
-                    strings = []
-                    offsets = list(range(0, len(value), 1018))  # 1024 - 6 = 1018
+                for i, o in enumerate(offsets):
+                    segment = value[o : (o + 1018)]
 
-                    for i, o in enumerate(offsets):
-                        segment = value[o : (o + 1018)]
+                    if i == 0:  # First segment
+                        segment = f'{segment}...'
+                    elif i == len(offsets) - 1:  # Last segment
+                        segment = f'...{segment}'
+                    else:
+                        segment = f'...{segment}...'
 
-                        if i == 0:  # First segment
-                            segment = f'{segment}...'
-                        elif i == len(offsets) - 1:  # Last segment
-                            segment = f'...{segment}'
-                        else:
-                            segment = f'...{segment}...'
+                    strings.append(segment)
 
-                        strings.append(segment)
+                for i, string in enumerate(strings):
+                    fields.append({'name': f'{datestamp} ({i+1}/{len(strings)})', 'value': string})
 
-                    for i, string in enumerate(strings):
-                        fields.append({'name': f'{datestamp} ({i+1}/{len(strings)})', 'value': string})
+            else:
+                fields.append({'name': datestamp, 'value': value})
 
-                else:
-                    fields.append({'name': datestamp, 'value': value})
-
-            if totalStrikes:
-                desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
+        if totalStrikes:
+            desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
 
         try:
             channel = ctx.author if self_check else ctx.channel
@@ -766,7 +701,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         # Called from the !tag command instead of !tag list, so we print the simple list
         if ctx.invoked_with.lower() in ['tag', 'tags']:
-
             tags = ', '.join([tag['name'] for tag in tagList])
 
             embed = discord.Embed(

@@ -10,6 +10,10 @@ default-light:
     theme: light
     trophy-bg-opacity: 100
 
+switch-red:
+    theme: dark
+    trophy-bg-opacity: 30
+    
 animalcrossing:
     theme: light
     trophy-bg-opacity: 70
@@ -118,6 +122,10 @@ the-game-awards-2022:
     theme: dark
     trophy-bg-opacity: 30
 
+the-game-awards-2023:
+    theme: dark
+    trophy-bg-opacity: 10
+
 trivia-sonic:
     theme: dark
     trophy-bg-opacity: 30
@@ -125,3 +133,63 @@ trivia-sonic:
 trivia-mariokart:
     theme: light
     trophy-bg-opacity: 100
+
+trivia-spongebob:
+    theme: light
+    trophy-bg-opacity: 20
+
+everybody-votes:
+    theme: light
+    trophy-bg-opacity: 30
+
+trivia-anothercode:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-pokemonviolet:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-pokemonscarlet:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-smrpg:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-smbwonder:
+    theme: light
+    trophy-bg-opacity: 70
+
+trivia-mortalkombat:
+    theme: light
+    trophy-bg-opacity: 10
+
+trivia-vampiresurvivors:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-pikmin:
+    theme: light
+    trophy-bg-opacity: 50
+
+trivia-raincode:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-advancewars:
+    theme: light
+    trophy-bg-opacity: 20
+
+trivia-gameboy:
+    theme: light
+    trophy-bg-opacity: 10
+
+trivia-octopath:
+    theme: dark
+    trophy-bg-opacity: 50
+
+trivia-zelda:
+    theme: dark
+    trophy-bg-opacity: 50

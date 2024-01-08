@@ -4,10 +4,10 @@ pymongo<=3.12.3
 jishaku
 pylint
 fuzzywuzzy[speedup]
-pillow
+pillow<=9.5.0
 pytz
 codepoints
-emoji_data
+emoji_data==0.1.6.1
 sentry-sdk
 discord-sentry-reporting
 aiohttp

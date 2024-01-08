@@ -167,9 +167,9 @@ class MainEvents(commands.Cog):
         await self.serverLogs.send(':inbox_tray: User joined', embed=embed)
 
         needsRestore = False
+        hierarchyFails = []
         if doc and doc['roles']:
             myTop = member.guild.me.top_role
-            hierarchyFails = []
             for x in doc['roles']:
                 if x == member.guild.id:
                     continue
@@ -188,7 +188,6 @@ class MainEvents(commands.Cog):
 
         punDB = mclient.bowser.puns
         if needsRestore or punDB.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-
             punTypes = {
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',
@@ -513,7 +512,9 @@ class MainEvents(commands.Cog):
 
             user = await self.bot.fetch_user(dbMessage['author'])
             jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
-            content = dbMessage['content'] or '-No saved copy of message content available-'
+            content = (
+                '-No saved copy of message content is available-' if not dbMessage['content'] else dbMessage['content']
+            )
 
         embed = discord.Embed(
             description=f'[Jump to message]({jump_url})\n{content}',
@@ -577,13 +578,13 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
         userCol = mclient.bowser.users
-        if before.nick != after.nick:
+        if before.display_name != after.display_name:
             userCol.update_one(
                 {'_id': before.id},
                 {
                     '$push': {
                         'nameHist': {
-                            'str': after.nick,  # Not escaped. Can be None if nickname removed
+                            'str': after.display_name,  # Not escaped. Can be None if nickname removed
                             'type': 'nick',
                             'discriminator': after.discriminator,
                             'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
@@ -591,17 +592,17 @@ class MainEvents(commands.Cog):
                     }
                 },
             )
-            if not before.nick:
+            if not before.display_name:
                 before_name = before.name
 
             else:
-                before_name = discord.utils.escape_markdown(before.nick)
+                before_name = discord.utils.escape_markdown(before.display_name)
 
-            if not after.nick:
+            if not after.display_name:
                 after_name = after.name
 
             else:
-                after_name = discord.utils.escape_markdown(after.nick)
+                after_name = discord.utils.escape_markdown(after.display_name)
 
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
             embed.set_author(name=f'{before} ({before.id})', icon_url=before.display_avatar.url)
@@ -609,7 +610,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
-            await self.serverLogs.send(':label: User\'s nickname updated', embed=embed)
+            await self.serverLogs.send(':label: User\'s display name updated', embed=embed)
 
         if before.roles != after.roles:
             roleList = []
@@ -681,7 +682,7 @@ class MainEvents(commands.Cog):
             embed.add_field(name='After', value=after_name, inline=False)
             embed.add_field(name='Mention', value=f'<@{before.id}>')
 
-            await self.serverLogs.send(':label: User\'s name updated', embed=embed)
+            await self.serverLogs.send(':label: User\'s username updated', embed=embed)
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role):

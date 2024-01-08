@@ -4,6 +4,7 @@ import os
 import re
 import time
 import typing
+import urllib.parse
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -15,6 +16,17 @@ import pymongo
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 linkRe = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', re.I)
+reasonFilterLinkRe = re.compile(
+    r'http[s]?://[a-zA-Z0-9#-_!*\(\),]+|(?<=\b)[a-zA-Z0-9.-]*\.[a-zA-Z0-9.-]+\/[a-zA-Z0-9#-_!*\(\),]*', re.I
+)
+reasonFilterWhitelistedDomains = [
+    'rnintendoswitch.com',
+    'discord.gg',
+    'discord.me',
+    'discord.com',
+    'discordapp.com',
+    'tenor.com',
+]
 
 archiveHeader = '# Message archive for guild "{0.name}" ({0.id})\nIncluded channels: {1}\n# Format:\n[date + time] Member ID/Message ID/Channel/Username - Message content\n----------------\n'
 timeUnits = {
@@ -338,7 +350,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
 
         else:
             dmMsg += "Here's what your profile looks like with it:"
-            generated_background = await socialCog._generate_profile_card(user)
+            generated_background = await socialCog._generate_profile_card_from_member(user)
 
         try:
             if not silent:
@@ -492,7 +504,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
     elif doc['context'] == 'vote':  # Warning review
         embed.add_field(name='Reason', value='A moderator has reviewed a previous warning and reduced it by one level')
     else:
-        embed.add_field(name='Reason', value=doc['reason'])
+        embed.add_field(name='Reason', value=filter_links_from_reason(doc['reason']))
 
     if doc['moderator'] == bot.user.id:
         embed.description = 'This is an automatic action'
@@ -506,6 +518,53 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
     if id:
         db.update_one({'_id': id}, {'$set': {'public_log_message': message.id, 'public_log_channel': channel.id}})
+
+
+def filter_links_from_reason(reason):
+    links = reasonFilterLinkRe.finditer(reason)
+    if links:
+        for l in links:
+            original_link = l[0]
+            link = l[0]
+
+            # Add a scheme per RFC 1808 if one does not exist
+            if not link.lower().startswith('http'):
+                link = 'no-proto-sentinel://' + link
+
+            try:
+                urlParts = urllib.parse.urlsplit(link)
+            except ValueError:  # Invalid URL edge case
+                print('ValueError')
+                continue
+
+            urlPartsList = list(urlParts)
+
+            # We can now modify the link
+            # For each domain level of hostname, eg. foo.bar.example => foo.bar.example, bar.example, example
+            labels = urlPartsList[1].split(".")
+            whitelisted = False
+            for i in range(0, len(labels)):
+                domain = ".".join(labels[i - len(labels) :])
+                if domain.lower() in reasonFilterWhitelistedDomains:
+                    whitelisted = True
+                    break
+
+            # Not in whitelist
+            if not whitelisted:
+                urlPartsList[1] = ''.join(['•' if c != '.' else '.' for c in urlPartsList[1]])
+
+            urlPartsList[2] = ''.join(['•' if c != '/' else '/' for c in urlPartsList[2]])
+
+            # We now pack up this link
+            url = urllib.parse.urlunsplit(urlPartsList)
+
+            if link.lower().startswith('no-proto-sentinel://'):
+                url = url[20:]
+
+            if original_link != url:
+                reason = reason.replace(original_link, f'`{url}`')
+
+    return reason
 
 
 def format_pundm(_type, reason, moderator=None, details=None, auto=False):
@@ -653,7 +712,7 @@ async def send_paginated_embed(
     ended_by = None
     message = None
 
-    single_page = len(pages) == 1
+    single_page = len(pages) <= 1
     dm_channel = not isinstance(channel, discord.TextChannel) and not isinstance(channel, discord.Thread)
 
     if not (single_page or dm_channel):
@@ -673,12 +732,13 @@ async def send_paginated_embed(
     while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
         # Add Fields
         embed.clear_fields()
-        for field in pages[current_page - 1]:
-            embed.add_field(
-                name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
-            )
+        if len(pages) != 0:
+            for field in pages[current_page - 1]:
+                embed.add_field(
+                    name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
+                )
 
-        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
+        page_text = PAGE_TEMPLATE.format(current_page, max(len(pages), 1))
         embed.title = f'{title} {page_text}'
 
         if single_page or dm_channel:

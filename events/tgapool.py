@@ -7,6 +7,8 @@ import discord
 import pymongo
 from discord.ext import commands, tasks
 
+from tools import commit_profile_change
+
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
@@ -15,8 +17,8 @@ class TGAPool(commands.Cog):
     def __init__(self, bot):
         self.GUILD = 238080556708003851
         self.EVENT_CHANNEL = 672550040979636244
-        self.ENDPOINT = 'https://switchcord.net/rewards'
-        self.BACKGROUND = 'the-game-awards'
+        self.ENDPOINT = 'https://switchcord.net/api/rewards'
+        self.BACKGROUND = 'the-game-awards-2023'
         self.TROPHIES_PREFIX = 'tga-'
         self.TROPHIES = ['tga-gold', 'tga-silver', 'tga-bronze']
 
@@ -68,8 +70,8 @@ class TGAPool(commands.Cog):
                         continue
 
                     if user['earnedBackground'] and self.BACKGROUND not in dbUser['backgrounds']:
-                        self.db.update_one({'_id': int(user['id'])}, {'$push': {'backgrounds': self.BACKGROUND}})
-
+                        member = await self.bot.fetch_user(int(user['id']))
+                        await commit_profile_change(self.bot, member, 'background', self.BACKGROUND)
                         await self.event_channel.send(
                             f':information_source: Assigned TGA background to <@{user["id"]}>',
                             allowed_mentions=discord.AllowedMentions.none(),
@@ -79,11 +81,14 @@ class TGAPool(commands.Cog):
         self.response_check.cancel()  # pylint: disable=no-member
 
 
-def setup(bot):
-    bot.add_cog(TGAPool(bot))
+logging.info('')
+
+
+async def setup(bot):
+    await bot.add_cog(TGAPool(bot))
     logging.info('[Extension] TGAPool module loaded')
 
 
-def teardown(bot):
-    bot.remove_cog('TGAPool')
+async def teardown(bot):
+    await bot.remove_cog('TGAPool')
     logging.info('[Extension] TGAPool module unloaded')
