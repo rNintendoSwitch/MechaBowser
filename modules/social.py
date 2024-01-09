@@ -145,6 +145,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             9: 'trivia-gold-3',
         }
         self.triviaTrophyEmotes = {
+            0: '',
             1: '<:triviabronze1:1194031669498351656>',
             2: '<:triviabronze2:1194031670421110945>',
             3: '<:triviabronze3:1194031672690229338>',
@@ -622,7 +623,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         for t in dbUser['trophies']:
             if t.startswith('trivia-'):
-                currentLevel = [key for key, value in self.triviaTrophyIndex.items() if value == t]
+                currentLevel = [key for key, value in self.triviaTrophyIndex.items() if value == t][0]
                 break
 
         newLevel = currentLevel - 1 if regress else currentLevel + 1
@@ -631,14 +632,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if currentLevel > 0 and newLevel != 0:
             await tools.commit_profile_change(
-                member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True, silent=True
+                self.bot, member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True, silent=True
             )
 
         elif newLevel == 0:
-            await tools.commit_profile_change(member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True)
+            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True)
 
         if newLevel > 0:
-            await tools.commit_profile_change(member, 'trophy', self.triviaTrophyIndex[newLevel])
+            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyIndex[newLevel])
 
         return newLevel
 
@@ -1113,18 +1114,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 failed.append(f'{m.mention} ({m.id})')
 
         embed = discord.Embed(title='Command Completion Stats')
-        embed.description = (
-            f'Trivia awards granted to **{len(members) - len(failed)}**. List of trophies user(s) now have:\n\n'
-        )
 
-        successList = [(key, value) for key, value in stats.keys() if value != 0]
+        successList = [(key, value) for key, value in stats.items() if value != 0]
+        embed.description = (
+            f'Trivia awards granted to **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
+        )
         for item in successList:
-            embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", "" "").title()}: {item[1]}\n'
+            embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", " ").title()}: {item[1]}\n'
 
         if failed:
             embed.add_field(
-                title='Failed to award some trophies',
-                value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".split()}',
+                name='Failed to award some trophies',
+                value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".join(failed)}',
             )
 
         await msg.edit(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
@@ -1144,18 +1145,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 failed.append(f'{m.mention} ({m.id})')
 
         embed = discord.Embed(title='Command Completion Stats')
-        embed.description = (
-            f'Trivia awards revoked from **{len(members) - len(failed)}**. List of trophies user(s) now have:\n\n'
-        )
 
-        successList = [(key, value) for key, value in stats.keys() if value != 0]
+        successList = [(key, value) for key, value in stats.items() if value != 0]
+        embed.description = (
+            f'Trivia awards revoked from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
+        )
         for item in successList:
-            embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", "" "").title()}: {item[1]}\n'
+            embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", " ").title()}: {item[1]}\n'
 
         if failed:
             embed.add_field(
-                title='Failed to revoke some trophies',
-                value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".split()}',
+                name='Failed to revoke some trophies',
+                value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".join(failed)}',
             )
 
         await msg.edit(content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed)
