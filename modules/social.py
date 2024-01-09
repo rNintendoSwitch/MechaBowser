@@ -636,7 +636,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         elif newLevel == 0:
-            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True)
+            await tools.commit_profile_change(
+                self.bot, member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True
+            )
 
         if newLevel > 0:
             await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyIndex[newLevel])
@@ -1116,9 +1118,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed = discord.Embed(title='Command Completion Stats')
 
         successList = [(key, value) for key, value in stats.items() if value != 0]
-        embed.description = (
-            f'Trivia awards granted to **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
-        )
+        embed.description = f'Trivia awards granted to **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
         for item in successList:
             embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", " ").title()}: {item[1]}\n'
 
@@ -1147,9 +1147,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed = discord.Embed(title='Command Completion Stats')
 
         successList = [(key, value) for key, value in stats.items() if value != 0]
-        embed.description = (
-            f'Trivia awards revoked from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
-        )
+        embed.description = f'Trivia awards revoked from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
         for item in successList:
             embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", " ").title()}: {item[1]}\n'
 
