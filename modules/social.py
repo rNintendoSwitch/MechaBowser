@@ -1151,9 +1151,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed = discord.Embed(title='Command Completion Stats')
 
         successList = [(key, value) for key, value in stats.items() if value != 0]
-        embed.description = (
-            f'Trivia awards reduced from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
-        )
+        embed.description = f'Trivia awards reduced from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
         for item in successList:
             embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", " ").title()}: {item[1]}\n'
 
