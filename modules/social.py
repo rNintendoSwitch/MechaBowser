@@ -134,6 +134,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         ]
 
         self.triviaTrophyIndex = {
+            0: 'no-active-trophies',
             1: 'trivia-bronze-1',
             2: 'trivia-bronze-2',
             3: 'trivia-bronze-3',
@@ -627,7 +628,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 break
 
         newLevel = currentLevel - 1 if regress else currentLevel + 1
-        if newLevel < 0 or newLevel > len(self.triviaTrophyIndex):
+        if newLevel < 0 or newLevel > (len(self.triviaTrophyIndex) - 1):
+            # Subtract 1 from the length as we have a 0 index value that doesn't contribute
             raise IndexError(f'New trivia level is out of range: {currentLevel} attempting to update to {newLevel}')
 
         if currentLevel > 0 and newLevel != 0:
@@ -1102,6 +1104,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @commands.has_any_role(config.moderator, config.eh)
     @_trivia.command(name='award')
     async def _trivia_award(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+        '''Increase the trivia award trophy by one tier for one or more users'''
         stats = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0}
         failed = []
         msg = await ctx.send(f'{config.loading} Processing awards to {len(members)} member(s)...')
@@ -1131,11 +1134,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await msg.edit(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
 
     @commands.has_any_role(config.moderator, config.eh)
-    @_trivia.command(name='revoke')
-    async def _trivia_revoke(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+    @_trivia.command(name='reduce')
+    async def _trivia_reduce(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+        '''Reduce the trivia award trophy tier by 1 for one or more users. If you are trying to take away the trophy entirely, consider using the "profile revoke" command instead'''
         stats = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0}
         failed = []
-        msg = await ctx.send(f'{config.loading} Revoking awards from {len(members)} member(s)...')
+        msg = await ctx.send(f'{config.loading} Reducing awards from {len(members)} member(s)...')
         for m in members:
             try:
                 newLevel = await self.modify_trivia_level(m, regress=True)
@@ -1148,7 +1152,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         successList = [(key, value) for key, value in stats.items() if value != 0]
         embed.description = (
-            f'Trivia awards revoked from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
+            f'Trivia awards reduced from **{len(members) - len(failed)}**.{" List of trophies user(s) now have:" if successList else ""}\n\n'
         )
         for item in successList:
             embed.description += f'{self.triviaTrophyEmotes[item[0]]} {self.triviaTrophyIndex[item[0]].replace("-", " ").title()}: {item[1]}\n'
