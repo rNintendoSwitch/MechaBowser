@@ -1185,7 +1185,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             try:
                 await tools.commit_profile_change(self.bot, m, item, name)
 
-            except ValueError:
+            except (ValueError, AttributeError):
                 failCount += 1
 
         if not failCount:
@@ -1221,7 +1221,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             try:
                 await tools.commit_profile_change(self.bot, m, item, name, revoke=True)
 
-            except ValueError:
+            except (ValueError, AttributeError):
                 failCount += 1
 
         if not failCount:
