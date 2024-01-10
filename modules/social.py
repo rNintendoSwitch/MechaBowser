@@ -133,29 +133,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'Most likely',
         ]
 
-        self.triviaTrophyIndex = [
-            'no-active-trophies',
-            'trivia-bronze-1',
-            'trivia-bronze-2',
-            'trivia-bronze-3',
-            'trivia-silver-1',
-            'trivia-silver-2',
-            'trivia-silver-3',
-            'trivia-gold-1',
-            'trivia-gold-2',
-            'trivia-gold-3',
-        ]
-        self.triviaTrophyEmotes = [
-            '',
-            '<:triviabronze1:1194031669498351656>',
-            '<:triviabronze2:1194031670421110945>',
-            '<:triviabronze3:1194031672690229338>',
-            '<:triviasilver1:1194031683251482696>',
-            '<:triviasilver2:1194031687810699366>',
-            '<:triviasilver3:1194031688792154234>',
-            '<:triviagold1:1194031674053382216>',
-            '<:triviagold2:1194031676649652305>',
-            '<:triviagold3:1194031677715005490>',
+        self.INDEX, self.EMOTES = (0, 1)
+        self.triviaTrophyData = [
+            ('no-active-trophies', ''),
+            ('trivia-bronze-1', '<:triviabronze1:1194031669498351656>'),
+            ('trivia-bronze-2', '<:triviabronze2:1194031670421110945>'),
+            ('trivia-bronze-3', '<:triviabronze3:1194031672690229338>'),
+            ('trivia-silver-1', '<:triviasilver1:1194031683251482696>'),
+            ('trivia-silver-2', '<:triviasilver2:1194031687810699366>'),
+            ('trivia-silver-3', '<:triviasilver3:1194031688792154234>'),
+            ('trivia-gold-1', '<:triviagold1:1194031674053382216>'),
+            ('trivia-gold-2', '<:triviagold2:1194031676649652305>'),
+            ('trivia-gold-3', '<:triviagold3:1194031677715005490>')
         ]
 
     @commands.group(name='profile', invoke_without_command=True)
@@ -624,26 +613,26 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         for t in dbUser['trophies']:
             if t.startswith('trivia-'):
-                currentLevel = self.triviaTrophyIndex.index(t)
+                currentLevel = [n for (n, _) in self.triviaTrophyData].index(t)
                 break
 
         newLevel = currentLevel - 1 if regress else currentLevel + 1
-        if newLevel < 0 or newLevel > (len(self.triviaTrophyIndex) - 1):
+        if newLevel < 0 or newLevel > (len(self.triviaTrophyData) - 1):
             # Subtract 1 from the length as we have a 0 index value that doesn't contribute
             raise IndexError(f'New trivia level is out of range: {currentLevel} attempting to update to {newLevel}')
 
         if currentLevel > 0 and newLevel != 0:
             await tools.commit_profile_change(
-                self.bot, member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True, silent=True
+                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True, silent=True
             )
 
         elif newLevel == 0:
             await tools.commit_profile_change(
-                self.bot, member, 'trophy', self.triviaTrophyIndex[currentLevel], revoke=True
+                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True
             )
 
         if newLevel > 0:
-            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyIndex[newLevel])
+            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyData[newLevel][self.INDEX])
 
         return newLevel
 
@@ -1107,7 +1096,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @_trivia.command(name='award')
     async def _trivia_award(self, ctx, members: commands.Greedy[tools.ResolveUser]):
         '''Increase the trivia award trophy by one tier for one or more users'''
-        stats = [0] * len(self.triviaTrophyIndex)
+        stats = [0] * len(self.triviaTrophyData)
         failed = []
         msg = await ctx.send(f'{config.loading} Processing awards to {len(members)} member(s)...')
         for m in members:
@@ -1124,7 +1113,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed.description = f'Trivia awards granted to **{successful}**.{" List of trophies the user(s) now have:" if successful else ""}\n\n'
         for index, count in enumerate(stats):
             if count != 0:
-                embed.description += f'{self.triviaTrophyEmotes[index]} {self.triviaTrophyIndex[index].replace("-", " ").title()}: {count}\n'
+                embed.description += f'{self.triviaTrophyData[index][self.EMOTES]} {self.triviaTrophyData[index][self.INDEX].replace("-", " ").title()}: {count}\n'
 
         if failed:
             embed.add_field(
@@ -1138,7 +1127,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @_trivia.command(name='reduce')
     async def _trivia_reduce(self, ctx, members: commands.Greedy[tools.ResolveUser]):
         '''Reduce the trivia award trophy tier by 1 for one or more users. If you are trying to take away the trophy entirely, consider using the "profile revoke" command instead'''
-        stats = [0] * len(self.triviaTrophyIndex)
+        stats = [0] * len(self.triviaTrophyData)
         failed = []
         msg = await ctx.send(f'{config.loading} Reducing awards from {len(members)} member(s)...')
         for m in members:
@@ -1155,7 +1144,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed.description = f'Trivia awards reduced from **{successful}**.{" List of trophies the user(s) now have:" if successful else ""}\n\n'
         for index, count in enumerate(stats):
             if count != 0:
-                embed.description += f'{self.triviaTrophyEmotes[index]} {self.triviaTrophyIndex[index].replace("-", " ").title()}: {count}\n'
+                embed.description += f'{self.triviaTrophyData[index][self.EMOTES]} {self.triviaTrophyData[index][self.INDEX].replace("-", " ").title()}: {count}\n'
 
         if failed:
             embed.add_field(
