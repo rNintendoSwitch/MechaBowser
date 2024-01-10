@@ -133,6 +133,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'Most likely',
         ]
 
+        self.INDEX, self.EMOTES = (0, 1)
+        self.triviaTrophyData = [
+            ('no-active-trophies', ''),
+            ('trivia-bronze-1', '<:triviabronze1:1194031669498351656>'),
+            ('trivia-bronze-2', '<:triviabronze2:1194031670421110945>'),
+            ('trivia-bronze-3', '<:triviabronze3:1194031672690229338>'),
+            ('trivia-silver-1', '<:triviasilver1:1194031683251482696>'),
+            ('trivia-silver-2', '<:triviasilver2:1194031687810699366>'),
+            ('trivia-silver-3', '<:triviasilver3:1194031688792154234>'),
+            ('trivia-gold-1', '<:triviagold1:1194031674053382216>'),
+            ('trivia-gold-2', '<:triviagold2:1194031676649652305>'),
+            ('trivia-gold-3', '<:triviagold3:1194031677715005490>'),
+        ]
+
     @commands.group(name='profile', invoke_without_command=True)
     async def _profile(self, ctx, member: typing.Optional[discord.Member]):
         if not member:
@@ -592,6 +606,36 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
+    async def modify_trivia_level(self, member: discord.Member, regress=False):
+        db = mclient.bowser.users
+        dbUser = db.find_one({'_id': member.id})
+        currentLevel = 0
+
+        for t in dbUser['trophies']:
+            if t.startswith('trivia-'):
+                currentLevel = [n for (n, _) in self.triviaTrophyData].index(t)
+                break
+
+        newLevel = currentLevel - 1 if regress else currentLevel + 1
+        if newLevel < 0 or newLevel > (len(self.triviaTrophyData) - 1):
+            # Subtract 1 from the length as we have a 0 index value that doesn't contribute
+            raise IndexError(f'New trivia level is out of range: {currentLevel} attempting to update to {newLevel}')
+
+        if currentLevel > 0 and newLevel != 0:
+            await tools.commit_profile_change(
+                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True, silent=True
+            )
+
+        elif newLevel == 0:
+            await tools.commit_profile_change(
+                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True
+            )
+
+        if newLevel > 0:
+            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyData[newLevel][self.INDEX])
+
+        return newLevel
+
     def check_flag(self, emoji: str) -> typing.Optional[typing.Iterable[int]]:
         # For some reason emoji emoji_data.is_emoji_tag_sequence() does not return correctly, so we have to write our own function
         def is_valid_tag_flag(sequence: emoji_data.EmojiSequence) -> bool:
@@ -1042,6 +1086,73 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_validate_allow(self, ctx, member: tools.ResolveUser):
         self.validate_allowed_users.append(member.id)
         return await ctx.message.reply(f'{config.greenTick} {member} temporarily added to allowlist')
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @commands.group(name='trivia')
+    async def _trivia(self, ctx):
+        return
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @_trivia.command(name='award')
+    async def _trivia_award(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+        '''Increase the trivia award trophy by one tier for one or more users'''
+        stats = [0] * len(self.triviaTrophyData)
+        failed = []
+        msg = await ctx.send(f'{config.loading} Processing awards to {len(members)} member(s)...')
+        for m in members:
+            try:
+                newLevel = await self.modify_trivia_level(m)
+                stats[newLevel] += 1
+
+            except IndexError:
+                failed.append(f'{m.mention} ({m.id})')
+
+        embed = discord.Embed(title='Command Completion Stats')
+
+        successful = len(members) - len(failed)
+        embed.description = f'Trivia awards granted to **{successful}**.{" List of trophies the user(s) now have:" if successful else ""}\n\n'
+        for index, count in enumerate(stats):
+            if count != 0:
+                embed.description += f'{self.triviaTrophyData[index][self.EMOTES]} {self.triviaTrophyData[index][self.INDEX].replace("-", " ").title()}: {count}\n'
+
+        if failed:
+            embed.add_field(
+                name='Failed to award some trophies',
+                value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".join(failed)}',
+            )
+
+        await msg.edit(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
+
+    @commands.has_any_role(config.moderator, config.eh)
+    @_trivia.command(name='reduce')
+    async def _trivia_reduce(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+        '''Reduce the trivia award trophy tier by 1 for one or more users. If you are trying to take away the trophy entirely, consider using the "profile revoke" command instead'''
+        stats = [0] * len(self.triviaTrophyData)
+        failed = []
+        msg = await ctx.send(f'{config.loading} Reducing awards from {len(members)} member(s)...')
+        for m in members:
+            try:
+                newLevel = await self.modify_trivia_level(m, regress=True)
+                stats[newLevel] += 1
+
+            except IndexError:
+                failed.append(f'{m.mention} ({m.id})')
+
+        embed = discord.Embed(title='Command Completion Stats')
+
+        successful = len(members) - len(failed)
+        embed.description = f'Trivia awards reduced from **{successful}**.{" List of trophies the user(s) now have:" if successful else ""}\n\n'
+        for index, count in enumerate(stats):
+            if count != 0:
+                embed.description += f'{self.triviaTrophyData[index][self.EMOTES]} {self.triviaTrophyData[index][self.INDEX].replace("-", " ").title()}: {count}\n'
+
+        if failed:
+            embed.add_field(
+                name='Failed to revoke some trophies',
+                value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".join(failed)}',
+            )
+
+        await msg.edit(content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed)
 
     @commands.has_any_role(config.moderator, config.eh)
     @_profile.command(name='grant')
