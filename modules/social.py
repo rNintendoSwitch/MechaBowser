@@ -144,7 +144,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             ('trivia-silver-3', '<:triviasilver3:1194031688792154234>'),
             ('trivia-gold-1', '<:triviagold1:1194031674053382216>'),
             ('trivia-gold-2', '<:triviagold2:1194031676649652305>'),
-            ('trivia-gold-3', '<:triviagold3:1194031677715005490>')
+            ('trivia-gold-3', '<:triviagold3:1194031677715005490>'),
         ]
 
     @commands.group(name='profile', invoke_without_command=True)
