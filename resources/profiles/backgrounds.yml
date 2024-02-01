@@ -138,6 +138,10 @@ everybody-votes:
     theme: light
     trophy-bg-opacity: 30
 
+trivia-mariovsdk:
+    theme: light
+    trophy-bg-opacity: 50
+
 trivia-anothercode:
     theme: dark
     trophy-bg-opacity: 50
