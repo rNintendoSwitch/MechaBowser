@@ -565,7 +565,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 inf = punNames[pun['type']].format(pun['context'])
 
             elif pun['type'] == 'appealdeny':
-                inf = punNames[pun['type']].format(f'until <t:{int(pun["expiry"])}:D>' if pun["expiry"] else "permanently")
+                inf = punNames[pun['type']].format(
+                    f'until <t:{int(pun["expiry"])}:D>' if pun["expiry"] else "permanently"
+                )
 
             else:
                 inf = punNames[pun['type']]
