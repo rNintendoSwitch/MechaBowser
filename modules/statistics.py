@@ -13,7 +13,7 @@ from discord.ext import commands
 import tools
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class StatCommands(commands.Cog, name='Statistic Commands'):

@@ -12,7 +12,7 @@ import pytz
 from discord.ext import commands, tasks
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class AnimalGame(commands.Cog):

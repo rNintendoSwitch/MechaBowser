@@ -41,7 +41,7 @@ class ExtraLife(commands.Cog):
 
         ################################################################################################################################
 
-        self.mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+        self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
         self.guild = self.bot.get_guild(self.GUILD)
         self.extra_life_admin = self.guild.get_channel(self.EXTRA_LIFE_ADMIN)

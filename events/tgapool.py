@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 from tools import commit_profile_change
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class TGAPool(commands.Cog):

@@ -32,7 +32,7 @@ import tools
 from events.resources.lm3 import qte
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class Mansion(commands.Cog):

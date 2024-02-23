@@ -18,7 +18,7 @@ from fuzzywuzzy import fuzz
 import tools  # type: ignore
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 GIANTBOMB_NSW_ID = 157
 AUTO_SYNC = True

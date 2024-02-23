@@ -14,7 +14,7 @@ import tools  # type: ignore
 
 
 startTime = int(time.time())
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class MainEvents(commands.Cog):

@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFont
 import tools  # type: ignore
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class SocialFeatures(commands.Cog, name='Social Commands'):

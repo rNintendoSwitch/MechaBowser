@@ -18,7 +18,7 @@ from discord.ext import commands, tasks
 import tools
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 serverLogs = None
 modLogs = None
