@@ -20,5 +20,5 @@ dark:
     primary: [255, 255, 255]
     secondary: [119, 119, 119]
     primary_heading: [255, 255, 255]
-    secondary_heading: [119, 119, 119]
+    secondary_heading: [153, 153, 153]
     friend_code: [0, 254, 197]
