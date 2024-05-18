@@ -210,7 +210,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
     @commands.command(name='clean')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _clean(self, ctx, messages: int, members: commands.Greedy[discord.Member]):
+    async def _clean(self, ctx, messages: int, users: commands.Greedy[discord.User], extra: typing.Optional[str]):
+        if extra:
+            # This var will contain data if the greedy fails, such as if a non-ID or message ID are provided instead of a user
+            return await ctx.send(f'{config.redTick} Some user(s) passed are invalid. Please check the ID(s) and ensure they are correct')
+
         if messages > 2000 or messages <= 0:
             return await ctx.send(
                 f'{config.redTick} Invalid message count {messages}. Must be greater than 0 and not more than 2000'
@@ -221,7 +225,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             def confirm_check(reaction, member):
                 return member == ctx.author and str(reaction.emoji) in [config.redTick, config.greenTick]
 
-            confirmMsg = await ctx.send(f'This action will delete up to {messages}, are you sure you want to proceed?')
+            confirmMsg = await ctx.send(f'This action will scan and delete up to {messages}, are you sure you want to proceed?')
             await confirmMsg.add_reaction(config.greenTick)
             await confirmMsg.add_reaction(config.redTick)
             try:
@@ -237,10 +241,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             else:
                 await confirmMsg.delete()
 
-        memberList = None if not members else [x.id for x in members]
+        userList = None if not users else [x.id for x in users]
 
         def message_filter(message):
-            return True if not memberList or message.author.id in memberList else False
+            return True if not userList or message.author.id in userList else False
 
         await ctx.message.delete()
         deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
