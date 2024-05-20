@@ -605,7 +605,10 @@ def format_pundm(_type, reason, moderator=None, details=None, auto=False):
     elif _type == 'ban':
         punDM += f'If you would like to appeal this ban, you may join our ban appeal server to dispute it with the moderation team: {config.banAppealInvite}\n'
 
-    else:
+    elif _type in ('strike', 'destrike'):
+        punDM += f'You can have a maximum of 16 active strikes, any infraction that would put you over this amount will lead to a ban. Strikes are not permanent and will decay at a rate of 1 per week. If you are struck again before all have expired, your count will be increased and the 1 week decay timer is reset.\n'
+
+    if _type != 'ban' and details != 'modmail':
         punDM += f'If you have questions concerning this matter you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>).\n'
 
     punDM += 'Please do not respond to this message, I cannot reply.'
