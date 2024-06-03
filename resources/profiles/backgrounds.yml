@@ -142,6 +142,10 @@ everybody-votes:
     theme: light
     trophy-bg-opacity: 30
 
+trivia-darkmoon:
+    theme: dark
+    trophy-bg-opacity: 50
+
 trivia-ttyd:
     theme: dark
     trophy-bg-opacity: 50
