@@ -22,6 +22,7 @@ class MainEvents(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
+        guildObj = discord.Object(id=config.nintendoswitch)
         try:
             await self.bot.load_extension('tools')
             await self.bot.load_extension('modules.moderation')
@@ -36,6 +37,9 @@ class MainEvents(commands.Cog):
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
+
+        self.bot.tree.copy_global_to(guild=guildObj)
+        await self.bot.tree.sync(guild=guildObj)
 
         # self.sanitize_eud.start()  # pylint: disable=no-member
 
