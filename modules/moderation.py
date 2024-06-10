@@ -352,17 +352,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     failedBans.append(user)
                     continue
 
-            member = interaction.guild.get_member(user) or user
-            userid = member if (type(member) is int) else member.id
-            username = userid if (type(member) is int) else f'{str(member)}'
+            member = interaction.guild.get_member(user)
+            userid = user
+            username = userid if (type(member) is int) else str(member)
 
             # If not a user, manually contruct a user object
             user = discord.Object(id=userid) if (type(user) is int) else user
 
-            try:
-                member = await interaction.guild.fetch_member(userid) if not member else member
+            if member:
                 usr_role_pos = member.top_role.position
-            except:
+
+            else:
                 usr_role_pos = -1
 
             if (usr_role_pos >= interaction.guild.me.top_role.position) or (
@@ -373,7 +373,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         f'{config.redTick} Insufficent permissions to ban {username}'
                     )
                 else:
-                    failedBans.append(user)
+                    failedBans.append(str(userid))
                     continue
 
             try:
@@ -387,7 +387,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
                 else:
                     # If a many-user ban, don't exit if a user is already banned
-                    failedBans.append(user)
+                    failedBans.append(str(userid))
                     continue
 
             except discord.NotFound:
@@ -402,15 +402,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 couldNotDM = True
                 pass
 
+            member = discord.Object(id=userid) if not member else member
+
             try:
-                await interaction.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
+                await interaction.guild.ban(member, reason=f'Ban action performed by moderator', delete_message_days=3)
 
             except discord.NotFound:
                 # User does not exist
                 if len(users) == 1:
                     return await interaction.followup.send(f'{config.redTick} User {userid} does not exist')
 
-                failedBans.append(user)
+                failedBans.append(str(userid))
                 continue
 
             docID = await tools.issue_pun(userid, interaction.user.id, 'ban', reason=reason)
@@ -524,24 +526,22 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     f'{config.redTick} An argument provided in users is invalid: `{user}`'
                 )
 
-            member = interaction.guild.get_member(user) or user
-            userid = member if (type(member) is int) else member.id
-            username = userid if (type(member) is int) else f'{str(member)}'
+            member = interaction.guild.get_member(user)
+            userid = user
+            username = userid if (type(member) is int) else str(member)
 
-            user = (
-                discord.Object(id=userid) if (type(member) is int) else member
-            )  # If not a user, manually contruct a user object
 
-            try:
-                member = await interaction.guild.fetch_member(userid)
-            except discord.HTTPException:  # Member not in guild
-                if len(users) == 1:
-                    return await interaction.followup.send(f'{config.redTick} {username} is not the server!')
+            if not member:
+                try:
+                    member = await interaction.guild.fetch_member(userid)
+                except discord.HTTPException:  # Member not in guild
+                    if len(users) == 1:
+                        return await interaction.followup.send(f'{config.redTick} {username} is not the server')
 
-                else:
-                    # If a many-user kick, don't exit if a user is already gone
-                    failedKicks.append(user)
-                    continue
+                    else:
+                        # If a many-user kick, don't exit if a user is already gone
+                        failedKicks.append(str(userid))
+                        continue
 
             usr_role_pos = member.top_role.position
 
@@ -553,7 +553,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         f'{config.redTick} Insufficent permissions to kick {username}'
                     )
                 else:
-                    failedKicks.append(user)
+                    failedKicks.append(str(userid))
                     continue
 
             try:
@@ -565,7 +565,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             try:
                 await member.kick(reason='Kick action performed by moderator')
             except discord.Forbidden:
-                failedKicks.append(user)
+                failedKicks.append(str(userid))
                 continue
 
             docID = await tools.issue_pun(member.id, interaction.user.id, 'kick', reason, active=False)
