@@ -13,6 +13,7 @@ import pymongo
 import token_bucket
 from dateutil import parser
 from discord.ext import commands, tasks
+from discord import app_commands
 from fuzzywuzzy import fuzz
 
 import tools  # type: ignore
@@ -352,15 +353,18 @@ class Games(commands.Cog, name='Games'):
 
         return developers, publishers
 
-    @commands.group(name='games', aliases=['game'], invoke_without_command=True)
-    async def _games(self, ctx):
-        '''Search for games or check search database status'''
-        return await ctx.send_help(self._games)
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    class GamesCommand(app_commands.Group):
+        pass
 
-    @commands.cooldown(2, 60, type=commands.BucketType.user)
-    @_games.command(name='search')
-    async def _games_search(self, ctx, *, query: str):
+    games_group = GamesCommand(name='games', description='Find out information about games for the Nintendo Switch!')
+
+    @games_group.command(name='search')
+    @app_commands.describe(query='The term you want to search for a game')
+    @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
+    async def _games_search(self, interaction: discord.Interaction, query: str):
         '''Search for Nintendo Switch games'''
+        await interaction.response.defer()
         result = self.search(query)
 
         if result and result['guid']:
@@ -493,14 +497,16 @@ class Games(commands.Cog, name='Games'):
 
                 embed.add_field(name=f'Nintendo Switch Releases', value=switch_desc, inline=False)
 
-            return await ctx.send(embed=embed)
+            return await interaction.followup.send(embed=embed)
 
         else:
-            return await ctx.send(f'{config.redTick} No results found.')
+            return await interaction.followup.send(f'{config.redTick} No results found.')
 
-    @_games.command(name='info', aliases=['information'])
-    async def _games_info(self, ctx):
+    @games_group.command(name='info', description='Check the status of the games search database')
+    @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
+    async def _games_info(self, interaction: discord.Interaction):
         '''Check search database status'''
+        await interaction.response.defer()
         releases_url = f'https://www.giantbomb.com/games?game_filter[platform]={GIANTBOMB_NSW_ID}'
         embed = discord.Embed(
             title='Game Search Database Status',
@@ -528,52 +534,22 @@ class Games(commands.Cog, name='Games'):
 
             embed.add_field(name=f'Last {string} Sync', value=value, inline=False)
 
-        return await ctx.send(embed=embed)
+        return await interaction.followup.send(embed=embed)
 
-    @_games.command(name='sync', aliases=['synchronize'])
-    @commands.is_owner()
-    async def _games_sync(self, ctx, full: bool = False):
+    @games_group.command(name='sync', description='Manually force a database games sync')
+    @app_commands.describe(full='Determines if it should be a full sync, or a partial')
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _games_sync(self, interaction: discord.Interaction, full: bool):
         '''Force a database sync'''
-        await ctx.reply('Running sync...')
+        await interaction.response.send_message('Running sync...')
         try:
             c, detail = await self.sync_db(full)
             message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
-            return await ctx.reply(message)
+            return await interaction.edit_original_message(content=message)
 
         except RatelimitException:
-            return await ctx.reply(f'{config.redTick} Unable to complete sync, ratelimiting')
-
-    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if not ctx.command:
-            return
-
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(
-                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.BadArgument):
-            return await ctx.send(
-                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.CommandOnCooldown):
-            return await ctx.send(
-                f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=15
-            )
-
-        elif isinstance(error, commands.CheckFailure):
-            return await ctx.send(f'{config.redTick} You do not have permission to run this command', delete_after=15)
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+            return await interaction.edit_original_message(content=f'{config.redTick} Unable to complete sync, ratelimiting')
 
 
 async def setup(bot):
