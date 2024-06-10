@@ -2,14 +2,14 @@ import asyncio
 import logging
 import time
 import typing
-from datetime import datetime, date, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import config
 import discord
 import pymongo
 import pytz
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
 
 import tools
 
@@ -29,7 +29,9 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
 
     stats_group = StatsCommand(name='stats', description='View various statistics about the server and it\'s members')
 
-    async def _stats_server_autocomplete(self, interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
+    async def _stats_server_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> typing.List[app_commands.Choice[str]]:
         if not current:
             # Blank, suggest today's date
             isodate = date.today().isoformat()
@@ -38,12 +40,15 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         else:
             return []
 
-
     @stats_group.command(name='server')
     @app_commands.autocomplete(start=_stats_server_autocomplete)
     @app_commands.autocomplete(end=_stats_server_autocomplete)
-    @app_commands.describe(start='The start date to search, in YYYY-MM-DD format', end='The end date to search, in YYYY-MM-DD format')
-    async def _stats_server(self, interaction: discord.Interaction, start: typing.Optional[str]=None, end: typing.Optional[str]=None):
+    @app_commands.describe(
+        start='The start date to search, in YYYY-MM-DD format', end='The end date to search, in YYYY-MM-DD format'
+    )
+    async def _stats_server(
+        self, interaction: discord.Interaction, start: typing.Optional[str] = None, end: typing.Optional[str] = None
+    ):
         '''Returns server activity statistics'''
         await interaction.response.send_message('One moment, crunching message and channel data...')
 
