@@ -64,20 +64,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         for task in self.taskHandles.values():
             task.cancel()
 
-    def is_dev(self, interaction):
-        if self.bot.application.team:
-            devs = [teamMember.id for teamMember in self.bot.application.team]
-
-        else:
-            devs = [self.bot.application.owner.id]
-
-        return interaction.user.id in devs
-
-    async def send_interaction_message_safe(self, interaction: discord.Interaction, content=None, embeds=[]):
-        return await interaction.followup.send(
-            content=content, embeds=embeds, ephemeral=tools.mod_cmd_invoke_delete(interaction.channel)
-        )
-
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
@@ -94,10 +80,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': uuid})
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not doc:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} No infraction with that UUID exists'
+            return await interaction.followup.send(f'{config.redTick} No infraction with that UUID exists'
             )
 
         sensitive = True if not doc['sensitive'] else False  # Toggle sensitive value
@@ -105,9 +90,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if not doc['public_log_message']:
             # Public log has not been posted yet
             db.update_one({'_id': uuid}, {'$set': {'sensitive': sensitive}})
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.greenTick} Successfully {"" if sensitive else "un"}marked modlog as sensitive',
+            return await interaction.followup.send(f'{config.greenTick} Successfully {"" if sensitive else "un"}marked modlog as sensitive',
             )
 
         else:
@@ -120,9 +103,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     raise ValueError
 
             except (ValueError, discord.NotFound, discord.Forbidden):
-                return await self.send_interaction_message_safe(
-                    interaction,
-                    f'{config.redTick} There was an issue toggling that log\'s sensitive status; the message may have been deleted or I do not have permission to view the public log channel',
+                return await interaction.followup.send(f'{config.redTick} There was an issue toggling that log\'s sensitive status; the message may have been deleted or I do not have permission to view the public log channel',
                 )
 
             embed = message.embeds[0]
@@ -153,8 +134,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             newEmbed = discord.Embed.from_dict(newEmbedDict)
             await message.edit(embed=newEmbed)
 
-        await self.send_interaction_message_safe(
-            interaction, f'{config.greenTick} Successfully toggled the sensitive status for that infraction'
+        await interaction.followup.send(f'{config.greenTick} Successfully toggled the sensitive status for that infraction'
         )
 
     infraction_group = GuildGroupCommand(name='infraction', description='Tools to update an existing infraction')
@@ -167,11 +147,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         reason='The new reason text for the infraction',
     )
     async def _infraction_reason(self, interaction, uuid: str, reason: str):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} The new reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} The new reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         await self._infraction_editing(interaction, uuid, reason)
@@ -183,26 +161,22 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         reason='The reason you are updating this mute duration',
     )
     async def _infraction_duration(self, interaction: discord.Interaction, uuid: str, duration: str, reason: str):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         await self._infraction_editing(interaction, uuid, reason, duration)
 
     async def _infraction_editing(self, interaction: discord.Interaction, uuid: str, reason: str, duration: str = None):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': uuid})
         if not doc:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} An invalid infraction id was provided'
+            return await interaction.followup.send(f'{config.redTick} An invalid infraction id was provided'
             )
 
         if not doc['active'] and duration:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} That infraction has already expired and the duration cannot be edited',
+            return await interaction.followup.send(f'{config.redTick} That infraction has already expired and the duration cannot be edited',
             )
 
         if duration and doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
-            return self.send_interaction_message_safe(
-                interaction, f'{config.redTick} Setting durations is not supported for {doc["type"]}'
+            return await interaction.followup.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}'
             )
 
         user = await self.bot.fetch_user(doc['user'])
@@ -225,13 +199,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     pass
 
             except (KeyError, TypeError):
-                return await self.send_interaction_message_safe(
-                    interaction, f'{config.redTick} Invalid duration passed'
+                return await interaction.followup.send(f'{config.redTick} Invalid duration passed'
                 )
 
             if stamp - time.time() < 60:  # Less than a minute
-                return await self.send_interaction_message_safe(
-                    interaction, f'{config.redTick} Cannot set the new duration to be less than one minute'
+                return await interaction.followup.send(f'{config.redTick} Cannot set the new duration to be less than one minute'
                 )
 
             twelveHr = 60 * 60 * 12
@@ -320,31 +292,26 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (discord.NotFound, discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'
 
-        await self.send_interaction_message_safe(
-            interaction,
-            f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}',
+        await interaction.followup.send(f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}',
         )
 
     @infraction_group.command(name='remove', description='Permanently delete an infraction. Dev-only')
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
-    @app_commands.check(is_dev)
     async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         db = mclient.bowser.puns
         doc = db.find_one_and_delete({'_id': uuid})
         if not doc:  # Delete did nothing if doc is None
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} No matching infraction found'
+            return await interaction.followup.send(f'{config.redTick} No matching infraction found'
             )
 
-        await self.send_interaction_message_safe(
-            interaction, f'{config.greenTick} removed {uuid}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}'
+        await interaction.followup.send(f'{config.greenTick} removed {uuid}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}'
         )
 
     @app_commands.command(name='ban', description='Ban a user from the guild')
     @app_commands.describe(
         users='The user or users you wish to ban. Must be user ids separated by a space',
-        reason='The reason for issuing the ban. Optional',
+        reason='The reason for issuing the ban',
     )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
@@ -354,13 +321,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         users: str,
-        reason: typing.Optional[str] = '-No reason specified-',
+        reason: str,
     ):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         banCount = 0
@@ -373,9 +338,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 user = int(user)
 
             except ValueError:
-                return await self.send_interaction_message_safe(
-                    interaction, f'{config.redTick} An argument provided in users is invalid: `{user}`'
-                )
+                if len(users) == 1:
+                    return await interaction.followup.send(f'{config.redTick} An argument provided in users is invalid: `{user}`'
+                    )
+                else:
+                    failedBans.append(user)
+                    continue
 
             member = interaction.guild.get_member(user) or user
             userid = member if (type(member) is int) else member.id
@@ -394,8 +362,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 usr_role_pos >= interaction.user.top_role.position
             ):
                 if len(users) == 1:
-                    return await self.send_interaction_message_safe(
-                        interaction, f'{config.redTick} Insufficent permissions to ban {username}'
+                    return await interaction.followup.send(f'{config.redTick} Insufficent permissions to ban {username}'
                     )
                 else:
                     failedBans.append(user)
@@ -408,8 +375,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         # We could do custom exception types, but the whole "automod context" is already a hack anyway.
                         raise ValueError
                     else:
-                        return await self.send_interaction_message_safe(
-                            interaction, f'{config.redTick} {username} is already banned'
+                        return await interaction.followup.send(f'{config.redTick} {username} is already banned'
                         )
 
                 else:
@@ -435,8 +401,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             except discord.NotFound:
                 # User does not exist
                 if len(users) == 1:
-                    return await self.send_interaction_message_safe(
-                        interaction, f'{config.redTick} User {userid} does not exist'
+                    return await interaction.followup.send(f'{config.redTick} User {userid} does not exist'
                     )
 
                 failedBans.append(user)
@@ -469,10 +434,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                         f'. Failed to ban **{len(failedBans)}** from the provided list:\n```{" ".join(failedBans)}```'
                     )
 
-            return await self.send_interaction_message_safe(interaction, resp)
+            return await interaction.followup.send(resp)
 
     @app_commands.command(name='unban', description='Unban a specified user from the server')
-    @app_commands.describe(user='The user id to unban', reason='The reason for unbanning the user. Optional')
+    @app_commands.describe(user='The user id to unban', reason='The reason for unbanning the user')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
@@ -481,35 +446,29 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         user: discord.User,
-        reason: typing.Optional[str] = '-No reason specified-',
+        reason: str,
     ):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} Unban reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} Unban reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         db = mclient.bowser.puns
-        userObj = discord.Object(id=user)
         try:
-            await interaction.guild.fetch_ban(userObj)
+            await interaction.guild.fetch_ban(user)
 
         except discord.NotFound:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} {user} is not currently banned'
+            return await interaction.followup.send(f'{config.redTick} {user} is not currently banned'
             )
 
-        openAppeal = mclient.modmail.logs.find_one({'open': True, 'ban_appeal': True, 'recipient.id': str(user)})
+        openAppeal = mclient.modmail.logs.find_one({'open': True, 'ban_appeal': True, 'recipient.id': user.id})
         if openAppeal:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} You cannot use the unban command on {user} while a ban appeal is in-progress. You can accept the appeal in <#{int(openAppeal["channel_id"])}> with `/appeal accept [reason]`',
+            return await interaction.followup.send(f'{config.redTick} You cannot use the unban command on {user} while a ban appeal is in-progress. You can accept the appeal in <#{int(openAppeal["channel_id"])}> with `/appeal accept [reason]`',
             )
 
-        db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
-        docID = await tools.issue_pun(user, interaction.user.id, 'unban', reason, active=False)
-        await interaction.guild.unban(userObj, reason='Unban action performed by moderator')
+        db.find_one_and_update({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
+        docID = await tools.issue_pun(user.id, interaction.user.id, 'unban', reason, active=False)
+        await interaction.guild.unban(user, reason='Unban action performed by moderator')
         await tools.send_modlog(
             self.bot,
             self.modLogs,
@@ -517,11 +476,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             docID,
             reason,
             username=str(user),
-            userid=user,
+            userid=user.id,
             moderator=interaction.user,
             public=True,
         )
-        await self.send_interaction_message_safe(interaction, f'{config.greenTick} {user} has been unbanned')
+        await interaction.followup.send(f'{config.greenTick} {user} has been unbanned')
 
     @app_commands.command(name='kick', description='Kick a user from the guild')
     @app_commands.describe(
@@ -537,15 +496,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         users: str,
         reason: typing.Optional[str] = '-No reason specified-',
     ):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
         if not users:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} An invalid user was provided'
+            return await interaction.followup.send(f'{config.redTick} An invalid user was provided'
             )
 
         kickCount = 0
@@ -557,8 +513,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 user = int(user)
 
             except ValueError:
-                return await self.send_interaction_message_safe(
-                    interaction, f'{config.redTick} An argument provided in users is invalid: `{user}`'
+                return await interaction.followup.send(f'{config.redTick} An argument provided in users is invalid: `{user}`'
                 )
 
             member = interaction.guild.get_member(user) or user
@@ -573,8 +528,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 member = await interaction.guild.fetch_member(userid)
             except discord.HTTPException:  # Member not in guild
                 if len(users) == 1:
-                    return await self.send_interaction_message_safe(
-                        interaction, f'{config.redTick} {username} is not the server!'
+                    return await interaction.followup.send(f'{config.redTick} {username} is not the server!'
                     )
 
                 else:
@@ -588,8 +542,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 usr_role_pos >= interaction.user.top_role.position
             ):
                 if len(users) == 1:
-                    return await self.send_interaction_message_safe(
-                        interaction, f'{config.redTick} Insufficent permissions to kick {username}'
+                    return await interaction.followup.send(f'{config.redTick} Insufficent permissions to kick {username}'
                     )
                 else:
                     failedKicks.append(user)
@@ -624,7 +577,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 if failedKicks:
                     resp += f'. Failed to kick **{len(failedKicks)}** from the provided list:\n```{" ".join(failedKicks)}```'
 
-            return await self.send_interaction_message_safe(interaction, resp)
+            return await interaction.followup.send(resp)
 
     @app_commands.command(
         name='mute',
@@ -646,17 +599,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         duration: str,
         reason: typing.Optional[str] = '-No reason specified-',
     ):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         db = mclient.bowser.puns
         if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} {member} ({member.id}) is already muted'
+            return await interaction.followup.send(f'{config.redTick} {member} ({member.id}) is already muted'
             )
 
         try:
@@ -669,13 +619,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
         except (KeyError, TypeError):
-            return await self.send_interaction_message_safe(interaction, f'{config.redTick} Invalid duration passed')
+            return await interaction.followup.send(f'{config.redTick} Invalid duration passed')
 
         durDiff = (_duration - datetime.now(tz=timezone.utc)).total_seconds()
         if durDiff - 1 > 60 * 60 * 24 * 28:
             # Discord Timeouts cannot exceed 28 days, so we must check this
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} Mutes cannot be longer than 28 days'
+            return await interaction.followup.send(f'{config.redTick} Mutes cannot be longer than 28 days'
             )
 
         try:
@@ -687,8 +636,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if (usr_role_pos >= interaction.guild.me.top_role.position) or (
             usr_role_pos >= interaction.user.top_role.position
         ):
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} Insufficent permissions to mute {member.name}'
+            return await interaction.followup.send(f'{config.redTick} Insufficent permissions to mute {member.name}'
             )
 
         await member.edit(timed_out_until=_duration, reason='Mute action performed by moderator')
@@ -704,8 +652,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             error = '. I was not able to DM them about this action'
             public_notify = True
 
-        await self.send_interaction_message_safe(
-            interaction, f'{config.greenTick} {member} ({member.id}) has been successfully muted{error}'
+        await interaction.followup.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted{error}'
         )
 
         docID = await tools.issue_pun(
@@ -740,11 +687,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         member: discord.Member,
         reason: typing.Optional[str] = '-No reason specified-',
     ):  # TODO: Allow IDs to be unmuted (in the case of not being in the guild)
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         db = mclient.bowser.puns
@@ -752,8 +697,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             {'user': member.id, 'type': 'mute', 'active': True}, {'$set': {'active': False}}
         )
         if not action:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted'
+            return await interaction.followup.send(f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted'
             )
 
         await member.edit(timed_out_until=None, reason='Unmute action performed by moderator')
@@ -767,8 +711,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             error = '. I was not able to DM them about this action'
             public_notify = True
 
-        await self.send_interaction_message_safe(
-            interaction, f'{config.greenTick} {member} ({member.id}) has been successfully unmuted{error}'
+        await interaction.followup.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted{error}'
         )
 
         docID = await tools.issue_pun(
@@ -797,63 +740,55 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _note(self, interaction: discord.Interaction, user: discord.User, content: str):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         userid = user if (type(user) is int) else user.id
 
         if len(content) > 990:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters'
+            return await interaction.followup.send(f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters'
             )
 
         await tools.issue_pun(userid, interaction.user.id, 'note', content, active=False, public=False)
 
-        return await self.send_interaction_message_safe(
-            interaction, f'{config.greenTick} Note successfully added to {user} ({user.id})'
+        return await interaction.followup.send(f'{config.greenTick} Note successfully added to {user} ({user.id})'
         )
 
     @app_commands.command(name='strike', description='Issue 1 to 16 strikes to a user')
     @app_commands.describe(
         user='The user id you wish to strike',
-        reason='The reason for issuing the strike(s)',
         count='The number of strikes you want to issue. Must be between 1 and 16; total active strikes cannot exceed 16',
+        reason='The reason for issuing the strike(s)',
         mode='Determines if strikes are being added or set to a level. Valid options: \'add\' or \'set\'. Defaults to add',
     )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _strike(
-        self, interaction: discord.Interaction, user: discord.User, reason: str, count: int, mode: str = 'add'
+        self, interaction: discord.Interaction, user: discord.User, count: int, reason: str, mode: typing.Literal['add', 'set'] = 'add'
     ):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if count <= 0:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `/strike set`',
+            return await interaction.followup.send(f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `/strike set`',
             )
 
         elif count > 16:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} You cannot issue more than sixteen strikes to a user at once'
+            return await interaction.followup.send(f'{config.redTick} You cannot issue more than sixteen strikes to a user at once'
             )
 
         mode = mode.lower()
         if mode not in ['add', 'set']:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} The strike mode must be either \'add\' or \'set\''
+            # A typing.Literal should prevent this, but the case is handled should it fail
+            return await interaction.followup.send(f'{config.redTick} The strike mode must be either \'add\' or \'set\''
             )
 
         if len(reason) > 990:
-            return await self.send_interaction_message_safe(
-                interaction,
-                f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters',
+            return await interaction.followup.send(f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
         userDoc = userDB.find_one({'_id': user.id})
         if not userDoc:
-            return await self.send_interaction_message_safe(
-                interaction, f'{config.redTick} Unable strike user who has never joined the server'
+            return await interaction.followup.send(f'{config.redTick} Unable strike user who has never joined the server'
             )
 
         activeStrikes = 0
@@ -866,8 +801,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         if mode == 'set':
             if activeStrikes == count:
                 # Mod trying to set strikes to existing amount
-                return await self.send_interaction_message_safe(
-                    interaction, f'{config.redTick} That user already has {activeStrikes} active strikes'
+                return await interaction.followup.send(f'{config.redTick} That user already has {activeStrikes} active strikes'
                 )
 
             if count > activeStrikes:
@@ -940,9 +874,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     public=True,
                 )
 
-                await self.send_interaction_message_safe(
-                    interaction,
-                    f'{config.greenTick} {user} ({user.id}) has had {removedStrikes} strikes removed, '
+                await interaction.followup.send(f'{config.greenTick} {user} ({user.id}) has had {removedStrikes} strikes removed, '
                     f'they now have {count} strike{"s" if count > 1 else ""} '
                     f'({activeStrikes} - {removedStrikes}) {error}',
                 )
@@ -951,9 +883,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             # Separate statement because a strike set can resolve to an 'add' if the set would be additive
             activeStrikes += count
             if activeStrikes > 16:  # Max of 16 active strikes
-                return await self.send_interaction_message_safe(
-                    interaction,
-                    f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead',
+                return await interaction.followup.send(f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead',
                 )
 
             try:
@@ -991,9 +921,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
             self.schedule_task(60 * 60 * 12, docID, interaction.guild.id)
 
-            await self.send_interaction_message_safe(
-                interaction,
-                f'{config.greenTick} {user} ({user.id}) has been successfully struck, they now have '
+            await interaction.followup.send(f'{config.greenTick} {user} ({user.id}) has been successfully struck, they now have '
                 f'{activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count}){error}',
             )
 
