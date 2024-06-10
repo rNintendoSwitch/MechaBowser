@@ -129,7 +129,29 @@ class MechaBowser(commands.Bot):
     async def on_message(self, message):
         return  # Return so commands will not process, and main extension can process instead
 
+bot = MechaBowser()
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, exception):
+    if isinstance(exception, discord.app_commands.MissingRole) or isinstance(exception, discord.app_commands.MissingAnyRole):
+        return await interaction.response.send_message(f'{config.redTick} You do not have permission to run this command', ephemeral=True)
+
+    elif isinstance(exception, discord.app_commands.CommandOnCooldown):
+        return await interaction.response.send_message(f'{config.redTick} This command is on cooldown, please wait {exception.retry_after} seconds and try again', ephemeral=True)
+
+    elif isinstance(exception, discord.app_commands.CommandSignatureMismatch):
+        await interaction.response.send_message(f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again', ephemeral=True)
+        logging.error(f'A command signature mismatch has occured, we will attempt to resync. Raising triggering exception')
+
+        guildObj = discord.Object(id=config.nintendoswitch)
+        await interaction.client.tree.sync(guild=guildObj)
+        raise exception
+
+    else:
+        # Unhandled, error to user and raise
+        await interaction.response.send_message(f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again', ephemeral=True)
+        raise exception
+
 
 if __name__ == '__main__':
     print('\033[94mMechaBowser by MattBSG#8888 2019\033[0m')
-    asyncio.run(MechaBowser().start(config.token))
+    asyncio.run(bot.start(config.token))
