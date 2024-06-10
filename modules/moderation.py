@@ -530,7 +530,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             userid = user
             username = userid if (type(member) is int) else str(member)
 
-
             if not member:
                 try:
                     member = await interaction.guild.fetch_member(userid)
