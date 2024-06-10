@@ -143,7 +143,10 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
         )
 
     elif isinstance(exception, discord.app_commands.CommandOnCooldown):
-        return await interaction.response.send_message(f'{config.redTick} This command is on cooldown, please wait {int(exception.retry_after)} seconds and try again', ephemeral=True)
+        return await interaction.response.send_message(
+            f'{config.redTick} This command is on cooldown, please wait {int(exception.retry_after)} seconds and try again',
+            ephemeral=True,
+        )
 
     elif isinstance(exception, discord.app_commands.CommandSignatureMismatch):
         await interaction.response.send_message(

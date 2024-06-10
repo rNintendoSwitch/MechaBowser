@@ -6,8 +6,8 @@ import typing
 from datetime import datetime, timezone
 
 import config  # type: ignore
-import pymongo
 import discord
+import pymongo
 from discord import app_commands
 from discord.ext import commands, tasks
 
@@ -81,7 +81,9 @@ class MainEvents(commands.Cog):
 
         logging.info('[Core] Finished sanitzation of old EUD')
 
-    @app_commands.command(name='ping', description='Checks that the bot is responding normally and shows various latency values')
+    @app_commands.command(
+        name='ping', description='Checks that the bot is responding normally and shows various latency values'
+    )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     async def _ping(self, interaction):
@@ -726,7 +728,9 @@ class MainEvents(commands.Cog):
         await self.bot.user.edit(username=name)
         return await interaction.followup.send('Done.')
 
-    @update_group.command(name='cache', description='Update the database message cache for the entire server. API and resource intensive')
+    @update_group.command(
+        name='cache', description='Update the database message cache for the entire server. API and resource intensive'
+    )
     async def _update_cache(self, interaction: discord.Interaction):
         funcStart = time.time()
         logging.info('[Core] Starting db message sync')
@@ -751,7 +755,9 @@ class MainEvents(commands.Cog):
                 await interaction.channel.send(f'Failed to syncronize <#{channel.id}>')
 
         timeToComplete = tools.humanize_duration(tools.resolve_duration(f'{int(time.time() - funcStart)}s'))
-        return await interaction.channel.send(f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}')
+        return await interaction.channel.send(
+            f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
+        )
 
     @app_commands.command(name='shutdown', description='Shutdown the bot and all modules')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))

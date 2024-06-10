@@ -12,8 +12,8 @@ import discord
 import pymongo
 import token_bucket
 from dateutil import parser
-from discord.ext import commands, tasks
 from discord import app_commands
+from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
 
 import tools  # type: ignore
@@ -549,7 +549,9 @@ class Games(commands.Cog, name='Games'):
             return await interaction.edit_original_message(content=message)
 
         except RatelimitException:
-            return await interaction.edit_original_message(content=f'{config.redTick} Unable to complete sync, ratelimiting')
+            return await interaction.edit_original_message(
+                content=f'{config.redTick} Unable to complete sync, ratelimiting'
+            )
 
 
 async def setup(bot):
