@@ -40,6 +40,39 @@ timeUnits = {
 # Most NintenDeals code (decommissioned 4/25/2020) was removed on 12/09/2020
 # https://github.com/rNintendoSwitch/MechaBowser/commit/d1550f1f4951c35ca953e1ceacaae054fc9d4963
 
+class RiskyConfirmation(discord.ui.View):
+    message: discord.Message | None = None
+
+    def __init__(self, timeout=120):
+        super().__init__(timeout=timeout)
+        self.value = None
+        self.timedout = False
+
+    @discord.ui.button(label='Yes', style=discord.ButtonStyle.danger)
+    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.disable_buttons()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label='No', style=discord.ButtonStyle.primary)
+    async def no(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.disable_buttons()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    def disable_buttons(self):
+        for c in self.children:
+            c.disabled = True
+
+    async def on_timeout(self):
+        # TODO: on_timeout not being called back
+        self.timedout = True
+        self.disable_buttons()
+        if self.message:
+            await self.message.edit(view=self)
+            
 
 async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
     db = mclient.modmail.logs

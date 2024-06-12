@@ -148,13 +148,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         uuid='The infraction UUID, found in the footer of the mod log message embeds',
         reason='The new reason text for the infraction',
     )
-    async def _infraction_reason(self, interaction, uuid: str, reason: str):
+    async def _infraction_reason(self, interaction, uuid: str, reason: app_commands.Range[str, None, 990]):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} The new reason is too long, reduce it by at least {len(reason) - 990} characters',
-            )
-
         await self._infraction_editing(interaction, uuid, reason)
 
     @infraction_group.command(name='duration', description='Update when an active mute will expire')
@@ -163,11 +158,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         duration='The new formatted duration for this mute -- measured from now',
         reason='The reason you are updating this mute duration',
     )
-    async def _infraction_duration(self, interaction: discord.Interaction, uuid: str, duration: str, reason: str):
+    async def _infraction_duration(self, interaction: discord.Interaction, uuid: str, duration: str, reason: app_commands.Range[str, None, 990]):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         await self._infraction_editing(interaction, uuid, reason, duration)
 
-    async def _infraction_editing(self, interaction: discord.Interaction, uuid: str, reason: str, duration: str = None):
+    async def _infraction_editing(self, interaction: discord.Interaction, uuid: str, reason: app_commands.Range[str, None, 990], duration: str = None):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': uuid})
         if not doc:
@@ -326,13 +321,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         users: str,
-        reason: str,
+        reason: app_commands.Range[str, None, 990],
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters',
-            )
 
         banCount = 0
         failedBans = []
@@ -454,13 +445,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         user: discord.User,
-        reason: str,
+        reason: app_commands.Range[str, None, 990],
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Unban reason is too long, reduce it by at least {len(reason) - 990} characters',
-            )
 
         db = mclient.bowser.puns
         try:
@@ -503,13 +490,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         users: str,
-        reason: typing.Optional[str] = '-No reason specified-',
+        reason: typing.Optional[app_commands.Range[str, None, 990]] = '-No reason specified-',
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters',
-            )
         if not users:
             return await interaction.followup.send(f'{config.redTick} An invalid user was provided')
 
@@ -604,13 +587,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         interaction: discord.Interaction,
         member: discord.Member,
         duration: str,
-        reason: typing.Optional[str] = '-No reason specified-',
+        reason: typing.Optional[app_commands.Range[str, None, 990]] = '-No reason specified-',
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters',
-            )
 
         db = mclient.bowser.puns
         if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
@@ -689,13 +668,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         member: discord.Member,
-        reason: typing.Optional[str] = '-No reason specified-',
+        reason: typing.Optional[app_commands.Range[str, None, 990]] = '-No reason specified-',
     ):  # TODO: Allow IDs to be unmuted (in the case of not being in the guild)
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters',
-            )
 
         db = mclient.bowser.puns
         action = db.find_one_and_update(
@@ -746,14 +721,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _note(self, interaction: discord.Interaction, user: discord.User, content: str):
+    async def _note(self, interaction: discord.Interaction, user: discord.User, content: app_commands.Range[str, None, 990]):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         userid = user if (type(user) is int) else user.id
-
-        if len(content) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters'
-            )
 
         await tools.issue_pun(userid, interaction.user.id, 'note', content, active=False, public=False)
 
@@ -773,8 +743,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         user: discord.User,
-        count: int,
-        reason: str,
+        count: app_commands.Range[int, 1, 16],
+        reason: app_commands.Range[str, None, 990],
         mode: typing.Literal['add', 'set'] = 'add',
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
@@ -793,11 +763,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             # A typing.Literal should prevent this, but the case is handled should it fail
             return await interaction.followup.send(
                 f'{config.redTick} The strike mode must be either \'add\' or \'set\''
-            )
-
-        if len(reason) > 990:
-            return await interaction.followup.send(
-                f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters',
             )
 
         punDB = mclient.bowser.puns
