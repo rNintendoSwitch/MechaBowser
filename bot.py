@@ -44,8 +44,12 @@ class BotCache(commands.Cog):
         logging.info('[Bot] on_ready')
         if not self.READY:
             await self.bot.load_extension('modules.core')
-            # self.READY = True
-            # return
+
+            logging.info('[Bot] Syncronizing command tree')
+            guildObj = discord.Object(id=config.nintendoswitch)
+            self.bot.tree.copy_global_to(guild=guildObj)
+            await self.bot.tree.sync(guild=guildObj)
+
             logging.info('[Cache] Performing initial database synchronization')
             db = mclient.bowser.users
             NS = self.bot.get_guild(config.nintendoswitch)
@@ -135,39 +139,37 @@ bot = MechaBowser()
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, exception):
+    async def send_followup(content):
+        if interaction.is_expired():
+            return
+
+        elif interaction.response.is_done():
+            return await interaction.followup.send(content, ephemeral=True)
+
+        else:
+            return await interaction.response.send_message(content, ephemeral=True)
+
     if isinstance(exception, discord.app_commands.MissingRole) or isinstance(
         exception, discord.app_commands.MissingAnyRole
     ):
-        return await interaction.response.send_message(
-            f'{config.redTick} You do not have permission to run this command', ephemeral=True
-        )
+        return await send_followup(f'{config.redTick} You do not have permission to run this command')
 
     elif isinstance(exception, discord.app_commands.CommandOnCooldown):
-        return await interaction.response.send_message(
-            f'{config.redTick} This command is on cooldown, please wait {int(exception.retry_after)} seconds and try again',
-            ephemeral=True,
-        )
+        return await send_followup(f'{config.redTick} This command is on cooldown, please wait {int(exception.retry_after)} seconds and try again')
 
     elif isinstance(exception, discord.app_commands.CommandSignatureMismatch):
-        await interaction.response.send_message(
-            f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again',
-            ephemeral=True,
-        )
+        await send_followup(f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again')
         logging.error(
             f'A command signature mismatch has occured, we will attempt to resync. Raising triggering exception'
         )
 
         guildObj = discord.Object(id=config.nintendoswitch)
         await interaction.client.tree.sync(guild=guildObj)
-        raise exception
 
     else:
         # Unhandled, error to user and raise
-        await interaction.response.send_message(
-            f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again',
-            ephemeral=True,
-        )
-        raise exception
+        await send_followup(f'{config.redTick} An error occured when running that command. Please wait a bit, then try again')
+        logging.error(f'[Bot] Unhandled exception in {interaction.command}: {exception}')
 
 
 if __name__ == '__main__':

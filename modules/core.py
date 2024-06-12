@@ -23,7 +23,6 @@ class MainEvents(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        guildObj = discord.Object(id=config.nintendoswitch)
         try:
             await self.bot.load_extension('tools')
             await self.bot.load_extension('modules.moderation')
@@ -38,9 +37,6 @@ class MainEvents(commands.Cog):
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
-
-        self.bot.tree.copy_global_to(guild=guildObj)
-        await self.bot.tree.sync(guild=guildObj)
 
         # self.sanitize_eud.start()  # pylint: disable=no-member
 
@@ -86,9 +82,10 @@ class MainEvents(commands.Cog):
     )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
-    async def _ping(self, interaction):
+    async def _ping(self, interaction: discord.Interaction):
         initiated = interaction.created_at
-        msg = await interaction.response.send_message('Evaluating...')
+        await interaction.response.send_message('Evaluating...')
+        msg = await interaction.original_message() # response.send_message does not return a discord.Message
         roundtrip = (msg.created_at - initiated).total_seconds() * 1000
 
         database_start = time.time()
