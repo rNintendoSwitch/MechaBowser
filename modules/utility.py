@@ -12,9 +12,9 @@ import aiohttp
 import config
 import discord
 import pymongo
-from fuzzywuzzy import process
-from discord import app_commands, Webhook, WebhookType
+from discord import Webhook, WebhookType, app_commands
 from discord.ext import commands, tasks
+from fuzzywuzzy import process
 
 import tools
 
@@ -210,11 +210,19 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     #        pass
 
     @app_commands.command(name='clean', description='Delete upto 2000 messages, optionally only from 1 or more users')
-    @app_commands.describe(count='The number of messages to search for and delete that match the user filter', users='One or more space separated user IDs that are the target of the clean')
+    @app_commands.describe(
+        count='The number of messages to search for and delete that match the user filter',
+        users='One or more space separated user IDs that are the target of the clean',
+    )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _clean(self, interaction: discord.Interaction, count: app_commands.Range[int, 1, 2000], users: typing.Optional[str] = ''):
+    async def _clean(
+        self,
+        interaction: discord.Interaction,
+        count: app_commands.Range[int, 1, 2000],
+        users: typing.Optional[str] = '',
+    ):
         await interaction.response.defer()
         users = users.split()
         deleteUsers = []
@@ -241,14 +249,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if len(invalidUsers) == len(users) and len(users) > 0:
             # All provided users are invalid, raise to user
-            return await interaction.followup.send(f'{config.redTick} All users provided are invalid. Please check your input and try again', ephemeral=True)
+            return await interaction.followup.send(
+                f'{config.redTick} All users provided are invalid. Please check your input and try again',
+                ephemeral=True,
+            )
 
         if count >= 100:
             view = tools.RiskyConfirmation(timeout=15)
             view.message = await interaction.followup.send(
                 f'This action will scan and delete up to {count} messages, are you sure you want to proceed?',
                 view=view,
-                wait=True
+                wait=True,
             )
             await view.wait()
 
@@ -271,7 +282,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         deleted = await interaction.channel.purge(limit=count, check=message_filter, bulk=True)
 
-
         try:
             await interaction.delete_original_response()
 
@@ -289,7 +299,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         return await m.delete(delay=5)
 
-
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
@@ -299,8 +308,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     slowmode_group = SlowmodeCommand(name='slowmode', description='Change slowmode settings for a channel')
 
     @slowmode_group.command(name='set', description='Enable a slowmode in a channel for a given duration')
-    @app_commands.describe(duration='The slowmode message duration', channel='The channel to set in slowmode. If left blank, defaults to the channel the command is run in')
-    async def _slowmode(self, interaction: discord.Interaction, duration: str, channel: typing.Optional[discord.TextChannel]):
+    @app_commands.describe(
+        duration='The slowmode message duration',
+        channel='The channel to set in slowmode. If left blank, defaults to the channel the command is run in',
+    )
+    async def _slowmode(
+        self, interaction: discord.Interaction, duration: str, channel: typing.Optional[discord.TextChannel]
+    ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not channel:
             channel = interaction.channel
@@ -374,7 +388,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
 
             return await interaction.followup.send(embed=embed)
-
 
         # Member object, loads of info to work with
         messages = mclient.bowser.messages.find({'author': user.id})
@@ -525,7 +538,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             #  If they are not mod and not running on themselves, they do not have permssion.
             if user != interaction.user:
                 return await interaction.followup.send(
-                    f'{config.redTick} You do not have permission to run this command on other users')
+                    f'{config.redTick} You do not have permission to run this command on other users'
+                )
 
         else:
             self_check = False
@@ -631,7 +645,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
 
         try:
-            #TODO: paginate via interaction
+            # TODO: paginate via interaction
             channel = interaction.user if self_check else interaction.channel
 
             if self_check:
@@ -649,24 +663,42 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         except discord.Forbidden:
             if self_check:
                 await interaction.response.send_message(
-                    f'{config.redTick} I was unable to DM you. Please make sure your DMs are open and try again', ephemeral=True)
+                    f'{config.redTick} I was unable to DM you. Please make sure your DMs are open and try again',
+                    ephemeral=True,
+                )
             else:
                 raise
 
-    @app_commands.command(name='echoreply', description='Use the bot to reply to a message. Must provide either text, attachment, or both')
-    @app_commands.describe(message='The message link that you want to reply to', text='The text to use in the reply', attachment='An attachment to reply with')
+    @app_commands.command(
+        name='echoreply', description='Use the bot to reply to a message. Must provide either text, attachment, or both'
+    )
+    @app_commands.describe(
+        message='The message link that you want to reply to',
+        text='The text to use in the reply',
+        attachment='An attachment to reply with',
+    )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _reply(self, interaction: discord.Interaction, message: str, text: typing.Optional[str], attachment: typing.Optional[discord.Attachment]):
+    async def _reply(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+        text: typing.Optional[str],
+        attachment: typing.Optional[discord.Attachment],
+    ):
         if not text and not attachment:
             # User didn't provide anything
-            await interaction.response.send_message(f'{config.redTick} No attributes were provided. You must provide either `text`, `attachment`, or both in the command')
+            await interaction.response.send_message(
+                f'{config.redTick} No attributes were provided. You must provide either `text`, `attachment`, or both in the command'
+            )
 
         await interaction.response.defer()
         elements = message.split('/')
         try:
-            message = await self.bot.get_guild(int(elements[4])).get_channel(int(elements[5])).fetch_message(int(elements[6]))
+            message = (
+                await self.bot.get_guild(int(elements[4])).get_channel(int(elements[5])).fetch_message(int(elements[6]))
+            )
 
         except (discord.NotFound, discord.Forbidden):
             return await interaction.followup.send(f'{config.redTick} The provided message link to reply to is invalid')
@@ -680,15 +712,29 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         return await interaction.followup.send('Done')
 
-    @app_commands.command(name='echo', description='Use the bot to send a message. Must provide either text, attachment, or both')
-    @app_commands.describe(channel='The channel to send a message in', text='The text to use in the reply', attachment='An attachment to reply with')
+    @app_commands.command(
+        name='echo', description='Use the bot to send a message. Must provide either text, attachment, or both'
+    )
+    @app_commands.describe(
+        channel='The channel to send a message in',
+        text='The text to use in the reply',
+        attachment='An attachment to reply with',
+    )
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _echo(self, interaction: discord.Interaction, channel: discord.TextChannel, text: typing.Optional[str], attachment: typing.Optional[discord.Attachment]):
+    async def _echo(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+        text: typing.Optional[str],
+        attachment: typing.Optional[discord.Attachment],
+    ):
         if not text and not attachment:
             # User didn't provide anything
-            await interaction.response.send_message(f'{config.redTick} No attributes were provided. You must provide either `text`, `attachment`, or both in the command')
+            await interaction.response.send_message(
+                f'{config.redTick} No attributes were provided. You must provide either `text`, `attachment`, or both in the command'
+            )
 
         await interaction.response.defer()
         files = []
@@ -719,7 +765,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         )
 
     async def _tag_autocomplete(
-            self, interaction: discord.Interaction, current: str
+        self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:
         db = mclient.bowser.tags
         tags = db.find({'active': True})
@@ -730,12 +776,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         extraction = process.extract(current.lower(), tagList, limit=10)
         return [app_commands.Choice(name=e[0], value=e[0]) for e in extraction] or []
 
-
     class TagCommand(app_commands.Group):
         pass
 
     tag_group = TagCommand(name='tag', description='View and update text tags!')
-
 
     @tag_group.command(name='show', description='Show a stored tag')
     @app_commands.describe(query='The name of the tag you wish to pull up')
@@ -747,7 +791,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         tag = db.find_one({'_id': query, 'active': True})
 
         if not tag:
-            return await interaction.response.send_message(f'{config.redTick} A tag with that name does not exist', ephemeral=True)
+            return await interaction.response.send_message(
+                f'{config.redTick} A tag with that name does not exist', ephemeral=True
+            )
 
         embed = discord.Embed(title=tag['_id'], description=tag['content'])
         embed.set_footer(text=f'Requested by {interaction.user}', icon_url=interaction.user.display_avatar.url)
@@ -758,7 +804,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             embed.set_thumbnail(url=tag['img_thumb'])
 
         return await interaction.response.send_message(embed=embed)
-
 
     @tag_group.command(name='list', description='Get a list of all available tags')
     @app_commands.describe(search='A query to narrow down tags by')
@@ -775,7 +820,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         if not tagList:
             return await interaction.response.send_message(f'{config.redTick} This server has no tags', ephemeral=True)
-
 
         # If the command is being not being run in commands channel and not a mod or helpful user, use ephemeral
         if interaction.channel.id != config.commandsChannel:
@@ -849,7 +893,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             style=discord.TextStyle.long,
             required=True,
             min_length=1,
-            max_length=4000
+            max_length=4000,
         )
 
         def __init__(self, tag):
@@ -867,17 +911,27 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 self.db.update_one(
                     {'_id': self.tag},
                     {
-                        '$push': {'revisions': {str(int(time.time())): {'content': self.doc['content'], 'user': interaction.user.id}}},
+                        '$push': {
+                            'revisions': {
+                                str(int(time.time())): {'content': self.doc['content'], 'user': interaction.user.id}
+                            }
+                        },
                         '$set': {'content': self.textbox.value, 'active': True},
                     },
                 )
 
-                msg = f'{config.greenTick} The **{self.tag}** tag has been ' + 'updated' if self.doc['active'] else 'created'
+                msg = (
+                    f'{config.greenTick} The **{self.tag}** tag has been ' + 'updated'
+                    if self.doc['active']
+                    else 'created'
+                )
                 await interaction.response.send_message(msg)
 
             else:
                 self.db.insert_one({'_id': self.tag, 'content': self.textbox.value, 'revisions': [], 'active': True})
-                return await interaction.response.send_message(f'{config.greenTick} The **{self.tag}** tag has been created')
+                return await interaction.response.send_message(
+                    f'{config.greenTick} The **{self.tag}** tag has been created'
+                )
 
     @tag_group.command(name='edit', description='Edit an existing tag, or create a new one with a given name')
     @app_commands.describe(name='Name of the tag to modify or create')
@@ -900,7 +954,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         tag = db.find_one({'_id': name})
         if tag:
             view = tools.RiskyConfirmation(timeout=20)
-            await interaction.response.send_message(f'This action will delete the tag "{name}", are you sure you want to proceed?', view=view)
+            await interaction.response.send_message(
+                f'This action will delete the tag "{name}", are you sure you want to proceed?', view=view
+            )
             view.message = await interaction.original_response()
             await view.wait()
 
@@ -918,7 +974,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
     @tag_group.command(name='description', description='Change the description flavor text of a tag')
-    @app_commands.describe(name='Name of the tag which to update the description for', content='The new description for the tag. Leave blank to clear the existing description')
+    @app_commands.describe(
+        name='Name of the tag which to update the description for',
+        content='The new description for the tag. Leave blank to clear the existing description',
+    )
     @app_commands.autocomplete(name=_tag_autocomplete)
     @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_setdesc(self, interaction: discord.Interaction, name: str, content: typing.Optional[str] = ''):
@@ -932,23 +991,35 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one({'_id': tag['_id']}, {'$set': {'desc': content}})
 
             status = 'updated' if content else 'cleared'
-            return await interaction.response.send_message(f'{config.greenTick} The **{name}** tag description has been {status}')
+            return await interaction.response.send_message(
+                f'{config.greenTick} The **{name}** tag description has been {status}'
+            )
 
         else:
             return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
     @tag_group.command(name='image', description='Change the active images displayed on tags')
-    @app_commands.describe(name='The name of the tag which to update an image', option='Which image should be changed', url='The URL of the image to use. Leave blank to clear it')
+    @app_commands.describe(
+        name='The name of the tag which to update an image',
+        option='Which image should be changed',
+        url='The URL of the image to use. Leave blank to clear it',
+    )
     @app_commands.autocomplete(name=_tag_autocomplete)
     @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
-    async def _tag_setimg(self, interaction: discord.Interaction, name: str, option: typing.Literal['main', 'thumbnail'], url: typing.Optional[str] = ''):
+    async def _tag_setimg(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        option: typing.Literal['main', 'thumbnail'],
+        url: typing.Optional[str] = '',
+    ):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
 
         IMG_TYPES = {
             'main': {'key': 'img_main', 'name': 'main'},
-            'thumbnail': {'key': 'img_thumb', 'name': 'thumbnail'}
+            'thumbnail': {'key': 'img_thumb', 'name': 'thumbnail'},
         }
 
         img_type = IMG_TYPES[option]
@@ -964,7 +1035,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: url}})
 
             status = 'updated' if url else 'cleared'
-            return await interaction.response.send_message(f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}')
+            return await interaction.response.send_message(
+                f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}'
+            )
         else:
             return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
@@ -1001,9 +1074,19 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     class BlacklistCommand(app_commands.Group):
         pass
 
-    blacklist_group = BlacklistCommand(name='blacklist', description='Toggle permissions to allow or disallow a user to interact in some way')
+    blacklist_group = BlacklistCommand(
+        name='blacklist', description='Toggle permissions to allow or disallow a user to interact in some way'
+    )
 
-    async def _blacklist_execute(self, interaction: discord.Interaction, status: str, member: discord.Member, reason: str, context: str, feature: str):
+    async def _blacklist_execute(
+        self,
+        interaction: discord.Interaction,
+        status: str,
+        member: discord.Member,
+        reason: str,
+        context: str,
+        feature: str,
+    ):
         db = mclient.bowser.puns
 
         public_notify = False
@@ -1047,14 +1130,20 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         await interaction.followup.send(f'{config.greenTick} {member} has been {status.lower()} from {feature}')
 
-    @blacklist_group.command(name='feature', description='Toggle permissions to allow or disallow a user to interact in some way')
-    @app_commands.describe(member='The member you wish to toggle features on', feature='The unique feature to toggle access to', reason='The reason you are toggling the blacklist status for this user')
+    @blacklist_group.command(
+        name='feature', description='Toggle permissions to allow or disallow a user to interact in some way'
+    )
+    @app_commands.describe(
+        member='The member you wish to toggle features on',
+        feature='The unique feature to toggle access to',
+        reason='The reason you are toggling the blacklist status for this user',
+    )
     async def _blacklist_feature(
         self,
         interaction,
         member: discord.Member,
         feature: typing.Literal['modmail', 'reactions', 'attachments/embeds'],
-        reason: app_commands.Range[str, 1, 990]
+        reason: app_commands.Range[str, 1, 990],
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         statusText = ''
@@ -1095,15 +1184,31 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         await self._blacklist_execute(interaction, statusText, member, reason, context, feature)
 
-    @blacklist_group.command(name='channel', description='Toggle permissions to allow or disallow a user to interact with a channel or category')
-    @app_commands.describe(member='The member you wish to toggle features on', channel='The channel or category to toggle access to', reason='The reason you are toggling the blacklist status for this user')
-    async def _blacklist_channel(self, interaction: discord.Interaction, member: discord.Member, channel: typing.Literal['suggestions', 'spoilers', 'server events'], reason: app_commands.Range[str, 1, 990]):
+    @blacklist_group.command(
+        name='channel',
+        description='Toggle permissions to allow or disallow a user to interact with a channel or category',
+    )
+    @app_commands.describe(
+        member='The member you wish to toggle features on',
+        channel='The channel or category to toggle access to',
+        reason='The reason you are toggling the blacklist status for this user',
+    )
+    async def _blacklist_channel(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        channel: typing.Literal['suggestions', 'spoilers', 'server events'],
+        reason: app_commands.Range[str, 1, 990],
+    ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
 
         channels = {
-            'suggestions': (interaction.guild.get_role(config.noSuggestions), interaction.guild.get_channel(config.suggestions)),
+            'suggestions': (
+                interaction.guild.get_role(config.noSuggestions),
+                interaction.guild.get_channel(config.suggestions),
+            ),
             'spoilers': (interaction.guild.get_role(config.noSpoilers), interaction.guild.get_channel(config.spoilers)),
-            'server events': [interaction.guild.get_role(config.noEvents)] # List for compat
+            'server events': [interaction.guild.get_role(config.noEvents)],  # List for compat
         }
         statusText = ''
 
@@ -1115,11 +1220,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             context = channels[channel][1].name
             mention = channels[channel][1].mention + ' channel'
 
-        if channels[channel][0] in member.roles: # Toggle role off
+        if channels[channel][0] in member.roles:  # Toggle role off
             await member.remove_roles(channels[channel][0])
             statusText = 'Unblacklisted'
 
-        else: # Toggle role on
+        else:  # Toggle role on
             await member.add_roles(channels[channel][0])
             statusText = 'Blacklisted'
 

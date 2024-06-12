@@ -155,10 +155,14 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
         return await send_followup(f'{config.redTick} You do not have permission to run this command')
 
     elif isinstance(exception, discord.app_commands.CommandOnCooldown):
-        return await send_followup(f'{config.redTick} This command is on cooldown, please wait {int(exception.retry_after)} seconds and try again')
+        return await send_followup(
+            f'{config.redTick} This command is on cooldown, please wait {int(exception.retry_after)} seconds and try again'
+        )
 
     elif isinstance(exception, discord.app_commands.CommandSignatureMismatch):
-        await send_followup(f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again')
+        await send_followup(
+            f'{config.redTick} A temporary error occured when running that command. Please wait a bit, then try again'
+        )
         logging.error(
             f'A command signature mismatch has occured, we will attempt to resync. Raising triggering exception'
         )
@@ -168,7 +172,9 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
 
     else:
         # Unhandled, error to user and raise
-        await send_followup(f'{config.redTick} An error occured when running that command. Please wait a bit, then try again')
+        await send_followup(
+            f'{config.redTick} An error occured when running that command. Please wait a bit, then try again'
+        )
         logging.error(f'[Bot] Unhandled exception in {interaction.command}: {exception}')
 
 

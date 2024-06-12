@@ -40,6 +40,7 @@ timeUnits = {
 # Most NintenDeals code (decommissioned 4/25/2020) was removed on 12/09/2020
 # https://github.com/rNintendoSwitch/MechaBowser/commit/d1550f1f4951c35ca953e1ceacaae054fc9d4963
 
+
 class RiskyConfirmation(discord.ui.View):
     message: discord.Message | None = None
 
@@ -72,7 +73,7 @@ class RiskyConfirmation(discord.ui.View):
         self.disable_buttons()
         if self.message:
             await self.message.edit(view=self)
-            
+
 
 async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
     db = mclient.modmail.logs

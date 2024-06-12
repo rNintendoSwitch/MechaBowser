@@ -158,11 +158,19 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         duration='The new formatted duration for this mute -- measured from now',
         reason='The reason you are updating this mute duration',
     )
-    async def _infraction_duration(self, interaction: discord.Interaction, uuid: str, duration: str, reason: app_commands.Range[str, None, 990]):
+    async def _infraction_duration(
+        self, interaction: discord.Interaction, uuid: str, duration: str, reason: app_commands.Range[str, None, 990]
+    ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         await self._infraction_editing(interaction, uuid, reason, duration)
 
-    async def _infraction_editing(self, interaction: discord.Interaction, uuid: str, reason: app_commands.Range[str, None, 990], duration: str = None):
+    async def _infraction_editing(
+        self,
+        interaction: discord.Interaction,
+        uuid: str,
+        reason: app_commands.Range[str, None, 990],
+        duration: str = None,
+    ):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': uuid})
         if not doc:
@@ -721,7 +729,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _note(self, interaction: discord.Interaction, user: discord.User, content: app_commands.Range[str, None, 990]):
+    async def _note(
+        self, interaction: discord.Interaction, user: discord.User, content: app_commands.Range[str, None, 990]
+    ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         userid = user if (type(user) is int) else user.id
 
