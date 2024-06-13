@@ -670,7 +670,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             title='Infraction History',
             description=desc,
             color=0x18EE1C,
-            author=author
+            author=author,
         )
 
         await interaction.edit_original_response(content='Here is the requested user history:', view=view)
@@ -767,7 +767,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             fields=fields,
             title='List of roles in guild:',
             description='',
-            page_character_limit=1500
+            page_character_limit=1500,
         )
 
         await interaction.edit_original_response(content='Here is the requested role list:', view=view)
@@ -886,11 +886,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         fields = tools.convert_list_to_fields(lines, codeblock=False)
         view = tools.PaginatedEmbed(
-            interaction=interaction,
-            fields=fields,
-            title='Tag List',
-            description=embed_desc,
-            page_character_limit=1500
+            interaction=interaction, fields=fields, title='Tag List', description=embed_desc, page_character_limit=1500
         )
 
         await interaction.edit_original_response(content='Here is the requested list of tags:', view=view)

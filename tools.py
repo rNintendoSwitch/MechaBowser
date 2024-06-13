@@ -707,48 +707,56 @@ class PaginatedEmbed(discord.ui.View):
     MESSAGE: discord.WebhookMessage | None = None
 
     def __init__(
-            self, 
-            interaction: discord.Interaction,
-            fields: typing.List[typing.Dict],  # name: str , value: str, inline: optional bool
-            *,
-            title: typing.Optional[str] = '', 
-            description: typing.Optional[str] = None, 
-            color: typing.Union[discord.Colour, int, None] = None, 
-            author: typing.Optional[typing.Dict] = None,
-            page_character_limit: typing.Optional[int] = 6000,
-            timeout: float = 120.0
-        ):
-            super().__init__(timeout=timeout)
+        self,
+        interaction: discord.Interaction,
+        fields: typing.List[typing.Dict],  # name: str , value: str, inline: optional bool
+        *,
+        title: typing.Optional[str] = '',
+        description: typing.Optional[str] = None,
+        color: typing.Union[discord.Colour, int, None] = None,
+        author: typing.Optional[typing.Dict] = None,
+        page_character_limit: typing.Optional[int] = 6000,
+        timeout: float = 120.0,
+    ):
+        super().__init__(timeout=timeout)
 
-            self.initial_interaction = interaction
-            self.bot = interaction.client
-            self.owner = interaction.user
-            self.title = title
+        self.initial_interaction = interaction
+        self.bot = interaction.client
+        self.owner = interaction.user
+        self.title = title
 
-            # Find the page character cap
-            footer_max_length = (
-                len(self.PAGE_TEMPLATE) + max(len(self.FOOTER_INSTRUCTION), len(self.FOOTER_ENDED_BY.format('-' * 37))) + 4
-            )  # 37 = max len(discordtag...#0000)
-            title_max_length = len(title) + len(self.FOOTER_INSTRUCTION) + 1
-            description_length = 0 if not description else len(description)
-            author_length = 0 if not author else len(author['name'])
+        # Find the page character cap
+        footer_max_length = (
+            len(self.PAGE_TEMPLATE) + max(len(self.FOOTER_INSTRUCTION), len(self.FOOTER_ENDED_BY.format('-' * 37))) + 4
+        )  # 37 = max len(discordtag...#0000)
+        title_max_length = len(title) + len(self.FOOTER_INSTRUCTION) + 1
+        description_length = 0 if not description else len(description)
+        author_length = 0 if not author else len(author['name'])
 
-            self.page_char_cap = page_character_limit - footer_max_length - title_max_length - description_length - author_length
+        self.page_char_cap = (
+            page_character_limit - footer_max_length - title_max_length - description_length - author_length
+        )
 
-            self.embed = discord.Embed(description=None if not description else description, color=color)
-            if author:
-                self.embed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
-            self.embed.set_footer(icon_url=None if not self.owner else self.owner.display_avatar.url)
+        self.embed = discord.Embed(description=None if not description else description, color=color)
+        if author:
+            self.embed.set_author(
+                name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url']
+            )
+        self.embed.set_footer(icon_url=None if not self.owner else self.owner.display_avatar.url)
 
-            self.build_pages(interaction, fields)
-            embed = self.generate_new_embed()
-            if self.single_page:
-                asyncio.run_coroutine_threadsafe(self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop)
-                self.stop() # If one page is required, exit the view
+        self.build_pages(interaction, fields)
+        embed = self.generate_new_embed()
+        if self.single_page:
+            asyncio.run_coroutine_threadsafe(
+                self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop
+            )
+            self.stop()  # If one page is required, exit the view
 
-            else:
-                self.ui_setup() # Create our UI elements
-                asyncio.run_coroutine_threadsafe(self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop)
+        else:
+            self.ui_setup()  # Create our UI elements
+            asyncio.run_coroutine_threadsafe(
+                self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop
+            )
 
     def ui_setup(self):
         # Create components and assign them callbacks
@@ -756,15 +764,10 @@ class PaginatedEmbed(discord.ui.View):
         self.add_item(discord.ui.Button(label='⏹️', style=discord.ButtonStyle.secondary))
         self.add_item(discord.ui.Button(label='Next ➡️', style=discord.ButtonStyle.success))
 
-        callbacks = [
-            self.regress_page,
-            self.end_pagination,
-            self.progress_page
-        ]
+        callbacks = [self.regress_page, self.end_pagination, self.progress_page]
 
         for index, child in enumerate(self.children):
             child.callback = callbacks[index]
-
 
     async def regress_page(self, interaction: discord.Interaction):
         if self.current_page - 1 <= 1:
@@ -781,13 +784,13 @@ class PaginatedEmbed(discord.ui.View):
         footer_text = 'Timed out' if not interaction else self.FOOTER_ENDED_BY.format(str(interaction.user))
         self.embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=self.embed.footer.icon_url)
 
-
         button_interact = True if interaction else False
         interaction = self.initial_interaction if not interaction else interaction
 
-        await self.process_response(self.embed, interaction=interaction, button_interact=button_interact, remove_view=True)
+        await self.process_response(
+            self.embed, interaction=interaction, button_interact=button_interact, remove_view=True
+        )
         self.stop()
-
 
     async def progress_page(self, interaction: discord.Interaction):
         if self.current_page + 1 >= len(self.pages):
@@ -802,7 +805,14 @@ class PaginatedEmbed(discord.ui.View):
     async def on_timeout(self):
         await self.end_pagination(None)
 
-    async def process_response(self, embed: discord.Embed, *, interaction: discord.Interaction, button_interact: bool, remove_view: bool = False):
+    async def process_response(
+        self,
+        embed: discord.Embed,
+        *,
+        interaction: discord.Interaction,
+        button_interact: bool,
+        remove_view: bool = False,
+    ):
         if button_interact:
             # Button interactions require us to perform another interaction.response
             if remove_view:
@@ -815,7 +825,7 @@ class PaginatedEmbed(discord.ui.View):
             if not self.MESSAGE:
                 self.MESSAGE = await interaction.original_response()
 
-            if remove_view: 
+            if remove_view:
                 await self.MESSAGE.edit(embed=embed, view=None)
 
             else:
