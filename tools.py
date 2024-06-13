@@ -695,162 +695,176 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     return any(not overlap for overlap in overlaps)
 
 
-async def send_paginated_embed(
-    bot: discord.ext.commands.Bot,
-    channel: discord.TextChannel,
-    fields: typing.List[typing.Dict],  # name: str , value: str, inline: optional bool
-    *,
-    owner: typing.Optional[discord.User] = None,
-    timeout: int = 600,
-    title: typing.Optional[str] = '',
-    description: typing.Optional[str] = None,
-    color: typing.Union[discord.Colour, int, None] = None,
-    author: typing.Optional[typing.Dict] = None,
-    page_character_limit: typing.Optional[int] = 6000,
-) -> discord.Message:  # author = name: str, icon_url: optional str
-    '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
+class PaginatedEmbed(discord.ui.View):
+    '''
+    Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.
+    Interactions should be deferred with `thinking=True` before instantiating.
+    '''
 
     PAGE_TEMPLATE = '(Page {0}/{1})'
     FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
     FOOTER_ENDED_BY = 'Ended by {0}'
+    MESSAGE: discord.WebhookMessage | None = None
 
-    # Find the page character cap
-    footer_max_length = (
-        len(PAGE_TEMPLATE) + max(len(FOOTER_INSTRUCTION), len(FOOTER_ENDED_BY.format('-' * 37))) + 4
-    )  # 37 = max len(discordtag...#0000)
-    title_max_length = len(title) + len(FOOTER_INSTRUCTION) + 1
-    description_length = 0 if not description else len(description)
-    author_length = 0 if not author else len(author['name'])
+    def __init__(
+            self, 
+            interaction: discord.Interaction,
+            fields: typing.List[typing.Dict],  # name: str , value: str, inline: optional bool
+            *,
+            title: typing.Optional[str] = '', 
+            description: typing.Optional[str] = None, 
+            color: typing.Union[discord.Colour, int, None] = None, 
+            author: typing.Optional[typing.Dict] = None,
+            page_character_limit: typing.Optional[int] = 6000,
+            timeout: float = 120.0
+        ):
+            super().__init__(timeout=timeout)
 
-    page_char_cap = page_character_limit - footer_max_length - title_max_length - description_length - author_length
+            self.initial_interaction = interaction
+            self.bot = interaction.client
+            self.owner = interaction.user
+            self.title = title
 
-    # Build pages
-    pages = []
-    while fields:
-        remaining_chars = page_char_cap
-        page = []
+            # Find the page character cap
+            footer_max_length = (
+                len(self.PAGE_TEMPLATE) + max(len(self.FOOTER_INSTRUCTION), len(self.FOOTER_ENDED_BY.format('-' * 37))) + 4
+            )  # 37 = max len(discordtag...#0000)
+            title_max_length = len(title) + len(self.FOOTER_INSTRUCTION) + 1
+            description_length = 0 if not description else len(description)
+            author_length = 0 if not author else len(author['name'])
 
-        # Make sure a field won't max out this page
-        for field in fields.copy():
-            field_length = len(field['name']) + len(field['value'])
+            self.page_char_cap = page_character_limit - footer_max_length - title_max_length - description_length - author_length
 
-            if remaining_chars - field_length < 0:
-                break
-            remaining_chars -= field_length
+            self.embed = discord.Embed(description=None if not description else description, color=color)
+            if author:
+                self.embed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
+            self.embed.set_footer(icon_url=None if not self.owner else self.owner.display_avatar.url)
 
-            page.append(fields.pop(0))
+            self.build_pages(interaction, fields)
+            embed = self.generate_new_embed()
+            if self.single_page:
+                asyncio.run_coroutine_threadsafe(self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop)
+                self.stop() # If one page is required, exit the view
 
-            if len(page) == 25:
-                break
+            else:
+                self.ui_setup() # Create our UI elements
+                asyncio.run_coroutine_threadsafe(self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop)
 
-        pages.append(page)
+    def ui_setup(self):
+        # Create components and assign them callbacks
+        self.add_item(discord.ui.Button(label='⬅️ Previous', disabled=True, style=discord.ButtonStyle.success))
+        self.add_item(discord.ui.Button(label='⏹️', style=discord.ButtonStyle.secondary))
+        self.add_item(discord.ui.Button(label='Next ➡️', style=discord.ButtonStyle.success))
 
-    current_page = 1
-    ended_by = None
-    message = None
+        callbacks = [
+            self.regress_page,
+            self.end_pagination,
+            self.progress_page
+        ]
 
-    single_page = len(pages) <= 1
-    dm_channel = not isinstance(channel, discord.TextChannel) and not isinstance(channel, discord.Thread)
+        for index, child in enumerate(self.children):
+            child.callback = callbacks[index]
 
-    if not (single_page or dm_channel):
-        # Setup messages, we wait to update the embed later so users don't click reactions before we're setup
-        message = await channel.send('Please wait...')
-        await message.add_reaction('⬅')
-        await message.add_reaction('⏹')
-        await message.add_reaction('➡')
 
-    # Init embed
-    embed = discord.Embed(description=None if not description else description, colour=color)
-    if author:
-        embed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
-    embed.set_footer(icon_url=None if not owner else owner.display_avatar.url)
+    async def regress_page(self, interaction: discord.Interaction):
+        if self.current_page - 1 <= 1:
+            self.children[0].disabled = True
 
-    # Main loop
-    while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
-        # Add Fields
-        embed.clear_fields()
-        if len(pages) != 0:
-            for field in pages[current_page - 1]:
-                embed.add_field(
+        if self.children[2].disabled:
+            self.children[2].disabled = False
+
+        self.current_page -= 1
+        await self.process_response(self.generate_new_embed(), interaction=interaction, button_interact=True)
+
+    async def end_pagination(self, interaction: discord.Interaction | None):
+        page_text = self.PAGE_TEMPLATE.format(self.current_page, len(self.pages))
+        footer_text = 'Timed out' if not interaction else self.FOOTER_ENDED_BY.format(str(interaction.user))
+        self.embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=self.embed.footer.icon_url)
+
+
+        button_interact = True if interaction else False
+        interaction = self.initial_interaction if not interaction else interaction
+
+        await self.process_response(self.embed, interaction=interaction, button_interact=button_interact, remove_view=True)
+        self.stop()
+
+
+    async def progress_page(self, interaction: discord.Interaction):
+        if self.current_page + 1 >= len(self.pages):
+            self.children[2].disabled = True
+
+        if self.children[0].disabled:
+            self.children[0].disabled = False
+
+        self.current_page += 1
+        await self.process_response(self.generate_new_embed(), interaction=interaction, button_interact=True)
+
+    async def on_timeout(self):
+        await self.end_pagination(None)
+
+    async def process_response(self, embed: discord.Embed, *, interaction: discord.Interaction, button_interact: bool, remove_view: bool = False):
+        if button_interact:
+            # Button interactions require us to perform another interaction.response
+            if remove_view:
+                await interaction.response.edit_message(embed=embed, view=None)
+
+            else:
+                await interaction.response.edit_message(embed=embed, view=self)
+
+        else:
+            if not self.MESSAGE:
+                self.MESSAGE = await interaction.original_response()
+
+            if remove_view: 
+                await self.MESSAGE.edit(embed=embed, view=None)
+
+            else:
+                await self.MESSAGE.edit(embed=embed)
+
+    def build_pages(self, interaction: discord.Interaction, fields: typing.List[typing.Dict]):
+        self.pages = []
+        while fields:
+            remaining_chars = self.page_char_cap
+            page = []
+
+            # Make sure a field won't max out this page
+            for field in fields.copy():
+                field_length = len(field['name']) + len(field['value'])
+
+                if remaining_chars - field_length < 0:
+                    break
+                remaining_chars -= field_length
+
+                page.append(fields.pop(0))
+
+                if len(page) == 25:
+                    break
+
+            self.pages.append(page)
+
+        self.current_page = 1
+        self.ended_by = None
+
+        self.single_page = len(self.pages) <= 1
+
+    def generate_new_embed(self) -> discord.Embed:
+        self.embed.clear_fields()
+        if len(self.pages) != 0:
+            for field in self.pages[self.current_page - 1]:
+                self.embed.add_field(
                     name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
                 )
 
-        page_text = PAGE_TEMPLATE.format(current_page, max(len(pages), 1))
-        embed.title = f'{title} {page_text}'
+        page_text = self.PAGE_TEMPLATE.format(self.current_page, max(len(self.pages), 1))
+        self.embed.title = f'{self.title} {page_text}'
 
-        if single_page or dm_channel:
-            embed.set_footer(text=page_text)
-            await channel.send(embed=embed)
-
-        if single_page:
-            break
-
-        elif dm_channel:
-            if current_page >= 10:
-                if len(pages) > 10:
-                    await channel.send(
-                        f'Limited to 10 pages in DM channel. {len(pages) - 10} page{"s were" if len(pages) != 1 else " was"} not sent'
-                    )
-                break
-
-            elif current_page == len(pages):
-                break
-
-            else:
-                current_page += 1
-                continue
+        if self.single_page:
+            self.embed.set_footer(text=page_text)
 
         else:
-            embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
-            await message.edit(content='', embed=embed)
+            self.embed.set_footer(text=f'{page_text}    {self.FOOTER_INSTRUCTION}', icon_url=self.embed.footer.icon_url)
 
-        # Check user reaction
-        def check(reaction, user):
-            if user.id == bot.user.id:
-                return False
-            if owner and user.id != owner.id:
-                return False
-
-            if reaction.message.id != message.id:
-                return False
-            if not reaction.emoji in ['⬅', '➡', '⏹']:
-                return False
-
-            return True
-
-        # Catch timeout
-        try:
-            reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
-        except asyncio.TimeoutError:
-            break
-
-        await reaction.remove(user)
-
-        # Change page
-        if reaction.emoji == '⬅':
-            if current_page == 1:
-                continue
-            current_page -= 1
-
-        elif reaction.emoji == '➡':
-            if current_page == len(pages):
-                continue
-            current_page += 1
-
-        else:
-            ended_by = user
-            break
-
-    if not (single_page or dm_channel):
-        # Generate ended footer
-        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
-        footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'
-        embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
-
-        await message.clear_reactions()
-        await message.edit(embed=embed)
-
-    return message
+        return self.embed
 
 
 def convert_list_to_fields(lines: str, codeblock: bool = True) -> typing.List[typing.Dict]:
