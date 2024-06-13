@@ -1,10 +1,11 @@
 import asyncio
 import logging
 import re
-from typing import Union
+import typing
 
 import config
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 
@@ -16,43 +17,44 @@ class ChatRoleEvent(commands.Cog):
         self.notify = None
         self.ids = {'text': [], 'cat': []}
 
-    def embed(self, ctx):
+    def embed(self, interaction):
         if self.ids['text']:
-            channels = ' '.join([ctx.guild.get_channel(id).mention for id in self.ids['text']])
+            channels = ' '.join([interaction.guild.get_channel(id).mention for id in self.ids['text']])
         else:
             channels = '*None*'
 
         if self.ids['cat']:
-            categories = ' '.join([f'`{ctx.guild.get_channel(id)}`' for id in self.ids['cat']])
+            categories = ' '.join([f'`{interaction.guild.get_channel(id)}`' for id in self.ids['cat']])
         else:
             categories = '*None*'
 
         return discord.Embed(
             description=(
                 f'**Notify Users**: {self.notify}\n'
-                f'**Role**: {ctx.guild.get_role(self.role).mention}\n'
+                f'**Role**: {interaction.guild.get_role(self.role).mention}\n'
                 f'**Text Channel{"" if len(self.ids["text"]) == 1 else "s"}:** {channels}\n'
                 f'**Categor{"y" if len(self.ids["cat"]) == 1 else "ies"}:** {categories}'
             ),
         )
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.group(name='chatrole', invoke_without_command=True)
-    async def _chatrole(self, ctx):
-        '''Manages a event where communicating in text channel(s) gives a special role.'''
-        return await ctx.send_help(self._chatrole)
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ChatRoleCommand(app_commands.Group):
+        pass
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_chatrole.command(name='start')
+    chatrole_group = ChatRoleCommand(name='chatrole', description='An event that automatically grants roles to users who participate in a channel or category')
+
+    @chatrole_group.command(name='start', description='Start a new chat role event')
     async def _chatrole_start(
         self,
-        ctx,
-        notify_users: bool,
+        interaction: discord.Interaction,
         role: discord.Role,
-        channel_or_catagories: commands.Greedy[Union[discord.TextChannel, discord.CategoryChannel]],
+        channel_or_catagories: typing.Union[discord.TextChannel, discord.CategoryChannel],
+        notify_users: bool
     ):
         if self.active:
-            return await ctx.send(f'{config.redTick} A chat role event is already running!')
+            return await interaction.response.send_message(f'{config.redTick} A chat role event is already running!')
 
         self.notify = notify_users
         self.role = role.id
@@ -64,55 +66,25 @@ class ChatRoleEvent(commands.Cog):
             elif isinstance(channel, discord.channel.CategoryChannel):
                 self.ids['cat'].append(channel.id)
             else:
-                return await ctx.send(f'{config.redTick} Invalid channel type: {channel}')
+                return await interaction.response.send_message(f'{config.redTick} Invalid channel type: {channel}')
 
         self.active = True
-        return await ctx.send(f'{config.greenTick} Started chat role event:', embed=self.embed(ctx))
+        return await interaction.response.send_message(f'{config.greenTick} Started chat role event:', embed=self.embed(interaction))
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_chatrole.command(name='stop')
-    async def _chatrole_stop(self, ctx):
+    @chatrole_group.command(name='stop', description='End an active role event')
+    async def _chatrole_stop(self, interaction):
         if self.active:
             self.active = False
-            return await ctx.send(f'{config.greenTick} Ended chat role event:', embed=self.embed(ctx))
+            return await interaction.response.send_message(f'{config.greenTick} Ended chat role event:', embed=self.embed(interaction))
         else:
-            return await ctx.send(f'{config.redTick} A chat role event is not currently running!')
+            return await interaction.response.send_message(f'{config.redTick} A chat role event is not currently running!')
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_chatrole.command(name='status')
-    async def _chatrole_status(self, ctx):
+    @chatrole_group.command(name='status', description='Get the current status of the Chat Role module and any event currently running')
+    async def _chatrole_status(self, interaction):
         if self.active:
-            return await ctx.send('A chat role event is currently running:', embed=self.embed(ctx))
+            return await interaction.response.send_message('A chat role event is currently running:', embed=self.embed(interaction))
         else:
-            return await ctx.send('A chat role event is not currently running!')
-
-    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if not ctx.command:
-            return
-
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        ctx.command
-        if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(
-                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.BadArgument):
-            return await ctx.send(
-                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.CheckFailure):
-            return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+            return await interaction.response.send_message('A chat role event is not currently running!')
 
     @commands.Cog.listener()
     async def on_message(self, message):

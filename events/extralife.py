@@ -7,6 +7,7 @@ import config
 import discord
 import pymongo
 import requests
+from discord import app_commands
 from discord.ext import commands, tasks
 
 import tools
@@ -54,57 +55,63 @@ class ExtraLife(commands.Cog):
 
         self.donation_check.start()
 
-    @commands.command(name='ldi')
-    @commands.check_any(commands.is_owner(), commands.has_guild_permissions(administrator=True))
-    async def lastdonorid(self, ctx, string: str = None):
-        if string is None:
-            return await ctx.send(content=f'Last donation id is `{self.lastDonationID}`')
-
-        self.lastDonationID = string
-        return await ctx.send(content=f'Last donation id set to `{string}`')
-
-    @commands.group(name='elperks', invoke_without_command=False)
-    async def _perks(self, ctx):
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ExtralifeCommand(app_commands.Group):
         pass
 
-    @_perks.command(name='grant')
-    @commands.check_any(commands.is_owner(), commands.has_guild_permissions(view_audit_log=True))
-    async def perks_grant(self, ctx, members: commands.Greedy[tools.ResolveUser]):
-        errors = 0
-        msg = await ctx.send(f'{config.loading} Granting Extra Life perks to {len(members)} member(s)...')
-        for member in members:
+    extralife_group = ExtralifeCommand(name='extralife', description='Manage components of the extralife event in the server')
+
+    @extralife_group.command(name='ldi', description='Fetch the last donation id stored, and optionally set one manually')
+    @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
+    async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+        if id is None:
+            return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
+
+        self.lastDonationID = id
+        return await interaction.response.send_message(content=f'Last donation id set to `{id}`')
+
+    @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of users')
+    @app_commands.describe(members='A list of member IDs to grant extra life perks to')
+    async def perks_grant(self, interaction: discord.Interaction, members: str):
+        errors = []
+        await interaction.response.send_message(f'{config.loading} Granting Extra Life perks to {len(members)} member(s)...')
+        for member in members.split():
             try:
-                await self._assign_properties(member)
+                obj = interaction.guild.get_member(int(member))
+                await self._assign_properties(obj)
 
-            except ValueError:
-                errors += 1
+            except (ValueError, AttributeError):
+                errors.append(member)
 
-        if errors == len(members):
-            return await msg.edit(content=f'{config.redTick} Extra Life perks granted to 0 members')
+        if len(errors) == len(members):
+            return await interaction.edit_original_response(content=f'{config.redTick} Failed to grant Extra Life perks all provided members')
 
         else:
-            return await msg.edit(
-                content=f'{config.greenTick} Extra Life perks granted to {len(members) - errors}/{len(members)} member(s).'
+            return await interaction.edit_original_response(
+                content=f'{config.greenTick} Extra Life perks granted to {len(members) - len(errors)}/{len(members)} member(s).\nFailed users: ```{" ".join(errors)}```'
             )
 
-    @_perks.command(name='revoke')
-    @commands.check_any(commands.is_owner(), commands.has_guild_permissions(view_audit_log=True))
-    async def perks_revoke(self, ctx, members: commands.Greedy[tools.ResolveUser]):
-        errors = 0
-        msg = await ctx.send(f'{config.loading} Revoking Extra Life perks to {len(members)} member(s)...')
-        for member in members:
+    @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of users')
+    @app_commands.describe(members='A list of member IDs to revoke extra life perks from')
+    async def perks_revoke(self, interaction: discord.Interaction, members: str):
+        errors = []
+        await interaction.response.send_message(f'{config.loading} Revoking Extra Life perks to {len(members)} member(s)...')
+        for member in members.split():
             try:
-                await self._remove_properties(member)
+                obj = interaction.guild.get_member(int(member))
+                await self._remove_properties(obj)
 
-            except ValueError:
-                errors += 1
+            except (ValueError, AttributeError):
+                errors.append(member)
 
-        if errors == len(members):
-            return await msg.edit(content=f'{config.redTick} Extra Life perks revoked from 0 members')
+        if len(errors) == len(members):
+            return await interaction.edit_original_response(content=f'{config.redTick} Extra Life perks revoked from 0 members')
 
         else:
-            return await msg.edit(
-                content=f'{config.greenTick} Extra Life perks revoked from {len(members) - errors}/{len(members)} member(s).'
+            return await interaction.edit_original_response(
+                content=f'{config.greenTick} Extra Life perks revoked from {len(members) - len(errors)}/{len(members)} member(s).\nFailed users: ```{" ".join(errors)}```'
             )
 
     @commands.Cog.listener()

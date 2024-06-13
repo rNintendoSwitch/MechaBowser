@@ -7,6 +7,7 @@ from typing import Union
 
 import config
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 
@@ -15,50 +16,41 @@ class ChatRoleRandomEvent(commands.Cog):
         self.bot = bot
         self.roles = []
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.group(name='chatrolerandom', invoke_without_command=True)
-    async def _chatrolerand(self, ctx, roles: commands.Greedy[discord.Role] = None):
-        '''Manages a event where communicating in any text channel(s) gives a random role from a set.'''
-        if roles:
-            self.roles = [role.id for role in roles]
-            return await ctx.message.reply(
-                f'Event roles set: {" ".join([role.mention for role in roles])} ',
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ChatRoleRandomCommand(app_commands.Group):
+        pass
 
+    chatrolerand_group = ChatRoleRandomCommand(name='chatrolerandom', description='A whole server event that can distribute a list of roles randomly to users who send messages')
+
+    @chatrolerand_group.command(name='start', description='Start an random user role event')
+    @app_commands.describe(roles='A list of role IDs to randomly distribute')
+    async def _chatrolerand_start(self, interaction: discord.Interaction, roles: str):
+        '''Manages a event where communicating in any text channel(s) gives a random role from a set.'''
+        roleList = []
+        for role in roles.split():
+            try:
+                r = interaction.guild.get_role(int(role))
+                if not r:
+                    return interaction.response.send_message(f'{config.redTick} Invalid role `{role}` provided, please resolve and try again')
+
+                self.roles.append(r.id)
+
+            except:
+                return interaction.response.send_message(f'{config.redTick} Invalid role `{role}` provided, please resolve and try again')
+
+        return await interaction.response.send_message(
+            f'Event roles set: {" ".join([role.mention for role in roles])} ',
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @chatrolerand_group.command(name='end', description='A list of role IDs to randomly distribute')
+    async def _chatrolerand_end(self, interaction: discord.Interaction):
         roleList = " ".join([str(role) for role in self.roles]) if self.roles else '<role ids>'
-        enable = 'reenable' if self.roles else 'enable'
         self.roles = []
 
-        return await ctx.message.reply(f'Event disabled. Run `{ctx.prefix}chatrolerandom {roleList}` to {enable}')
-
-    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if not ctx.command:
-            return
-
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        ctx.command
-        if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(
-                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.BadArgument):
-            return await ctx.send(
-                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.CheckFailure):
-            return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+        return await interaction.response.send_message(f'Event disabled. Run `/chatrolerandom start {roleList}` to begin another event')
 
     @commands.Cog.listener()
     async def on_message(self, message):
