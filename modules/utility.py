@@ -517,7 +517,22 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed.description += f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
         embed.add_field(name='Punishments', value=punishments, inline=False)
-        return await interaction.followup.send(embed=embed)
+        return await interaction.followup.send(embed=embed, view=self.SuggestHistCommand())
+
+    class SuggestHistCommand(discord.ui.View):
+        def __init__(self):
+            super().__init__()
+
+        @discord.ui.button(label='Pull User History', style=discord.ButtonStyle.primary)
+        async def pull_history(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # Pull user ID from embed author of the interaction message, then pass to history to interact
+            userid = int(re.search(r'\| (\d+)', interaction.message.embeds[0].author.name).group(1))
+            user = interaction.client.get_user(userid)
+            if not user:
+                user = interaction.client.fetch_user(userid)
+
+            ChatCog = ChatControl(bot=interaction.client)
+            await ChatCog._pull_history(interaction, user)
 
     @app_commands.command(name='history', description='Get detailed information on a user\'s infraction history')
     @app_commands.describe(user='The user you wish to get infractions for. If left blank, get your own history')
@@ -525,6 +540,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _history(self, interaction: discord.Interaction, user: typing.Optional[discord.User]):
+        return await self._pull_history(interaction, user)
+
+    async def _pull_history(self, interaction: discord.Interaction, user: typing.Optional[discord.User]):
         if user is None:
             user = interaction.user
 
@@ -542,6 +560,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 )
 
         else:
+            await interaction.response.defer()
             self_check = False
 
         db = mclient.bowser.puns
@@ -644,30 +663,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if totalStrikes:
             desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
 
-        try:
-            # TODO: paginate via interaction
-            channel = interaction.user if self_check else interaction.channel
+        author = {'name': f'{user} | {user.id}', 'icon_url': user.display_avatar.url}
+        view = tools.PaginatedEmbed(
+            interaction=interaction,
+            fields=fields,
+            title='Infraction History',
+            description=desc,
+            color=0x18EE1C,
+            author=author
+        )
 
-            if self_check:
-                await channel.send(
-                    'You requested the following copy of your current infraction history. If you have questions concerning your history,'
-                    + f' you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>)'
-                )
-                await interaction.message.add_reaction('📬')
-
-            author = {'name': f'{user} | {user.id}', 'icon_url': user.display_avatar.url}
-            await tools.send_paginated_embed(
-                self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author
-            )
-
-        except discord.Forbidden:
-            if self_check:
-                await interaction.response.send_message(
-                    f'{config.redTick} I was unable to DM you. Please make sure your DMs are open and try again',
-                    ephemeral=True,
-                )
-            else:
-                raise
+        await interaction.edit_original_response(content='Here is the requested user history:', view=view)
 
     @app_commands.command(
         name='echoreply', description='Use the bot to reply to a message. Must provide either text, attachment, or both'
@@ -746,23 +752,25 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         return await interaction.followup.send('Done')
 
-    @commands.command(name='roles')
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.command(name='roles', description='Get a list of all server roles and their IDs')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _roles(self, interaction):
         lines = []
         for role in reversed(interaction.guild.roles):
             lines.append(f'{role.name} ({role.id})')
 
         fields = tools.convert_list_to_fields(lines, codeblock=True)
-        return await tools.send_paginated_embed(
-            self.bot,
-            interaction.channel,
-            fields,
-            owner=interaction.user,
+        view = tools.PaginatedEmbed(
+            interaction=interaction,
+            fields=fields,
             title='List of roles in guild:',
             description='',
-            page_character_limit=1500,
+            page_character_limit=1500
         )
+
+        await interaction.edit_original_response(content='Here is the requested role list:', view=view)
 
     async def _tag_autocomplete(
         self, interaction: discord.Interaction, current: str
@@ -877,15 +885,15 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             lines = ['*No results found*']
 
         fields = tools.convert_list_to_fields(lines, codeblock=False)
-        return await tools.send_paginated_embed(
-            self.bot,
-            interaction.channel,
-            fields,
-            owner=interaction.user,
+        view = tools.PaginatedEmbed(
+            interaction=interaction,
+            fields=fields,
             title='Tag List',
             description=embed_desc,
-            page_character_limit=1500,
+            page_character_limit=1500
         )
+
+        await interaction.edit_original_response(content='Here is the requested list of tags:', view=view)
 
     class TagEdit(discord.ui.Modal):
         textbox = discord.ui.TextInput(
