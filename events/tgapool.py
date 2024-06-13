@@ -30,7 +30,6 @@ class TGAPool(commands.Cog):
 
         self.response_check.start()
 
-
     @app_commands.command(name='tgagrant', description='Automatically assign trophies based on a user\'s predictions')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
@@ -61,7 +60,9 @@ class TGAPool(commands.Cog):
 
                         if interaction.channel.id != self.event_channel.id:
                             await self.event_channel.send(msg, allowed_mentions=discord.AllowedMentions.none())
-                            await interaction.followup.send(f'{config.greenTick} Done. Check {self.event_channel.mention} for output')
+                            await interaction.followup.send(
+                                f'{config.greenTick} Done. Check {self.event_channel.mention} for output'
+                            )
 
     @tasks.loop(seconds=30)
     async def response_check(self):

@@ -22,7 +22,10 @@ class ChatRoleRandomEvent(commands.Cog):
     class ChatRoleRandomCommand(app_commands.Group):
         pass
 
-    chatrolerand_group = ChatRoleRandomCommand(name='chatrolerandom', description='A whole server event that can distribute a list of roles randomly to users who send messages')
+    chatrolerand_group = ChatRoleRandomCommand(
+        name='chatrolerandom',
+        description='A whole server event that can distribute a list of roles randomly to users who send messages',
+    )
 
     @chatrolerand_group.command(name='start', description='Start an random user role event')
     @app_commands.describe(roles='A list of role IDs to randomly distribute')
@@ -33,12 +36,16 @@ class ChatRoleRandomEvent(commands.Cog):
             try:
                 r = interaction.guild.get_role(int(role))
                 if not r:
-                    return interaction.response.send_message(f'{config.redTick} Invalid role `{role}` provided, please resolve and try again')
+                    return interaction.response.send_message(
+                        f'{config.redTick} Invalid role `{role}` provided, please resolve and try again'
+                    )
 
                 self.roles.append(r.id)
 
             except:
-                return interaction.response.send_message(f'{config.redTick} Invalid role `{role}` provided, please resolve and try again')
+                return interaction.response.send_message(
+                    f'{config.redTick} Invalid role `{role}` provided, please resolve and try again'
+                )
 
         return await interaction.response.send_message(
             f'Event roles set: {" ".join([role.mention for role in roles])} ',
@@ -50,7 +57,9 @@ class ChatRoleRandomEvent(commands.Cog):
         roleList = " ".join([str(role) for role in self.roles]) if self.roles else '<role ids>'
         self.roles = []
 
-        return await interaction.response.send_message(f'Event disabled. Run `/chatrolerandom start {roleList}` to begin another event')
+        return await interaction.response.send_message(
+            f'Event disabled. Run `/chatrolerandom start {roleList}` to begin another event'
+        )
 
     @commands.Cog.listener()
     async def on_message(self, message):

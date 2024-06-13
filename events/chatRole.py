@@ -43,7 +43,10 @@ class ChatRoleEvent(commands.Cog):
     class ChatRoleCommand(app_commands.Group):
         pass
 
-    chatrole_group = ChatRoleCommand(name='chatrole', description='An event that automatically grants roles to users who participate in a channel or category')
+    chatrole_group = ChatRoleCommand(
+        name='chatrole',
+        description='An event that automatically grants roles to users who participate in a channel or category',
+    )
 
     @chatrole_group.command(name='start', description='Start a new chat role event')
     async def _chatrole_start(
@@ -51,7 +54,7 @@ class ChatRoleEvent(commands.Cog):
         interaction: discord.Interaction,
         role: discord.Role,
         channel_or_catagories: typing.Union[discord.TextChannel, discord.CategoryChannel],
-        notify_users: bool
+        notify_users: bool,
     ):
         if self.active:
             return await interaction.response.send_message(f'{config.redTick} A chat role event is already running!')
@@ -69,20 +72,30 @@ class ChatRoleEvent(commands.Cog):
                 return await interaction.response.send_message(f'{config.redTick} Invalid channel type: {channel}')
 
         self.active = True
-        return await interaction.response.send_message(f'{config.greenTick} Started chat role event:', embed=self.embed(interaction))
+        return await interaction.response.send_message(
+            f'{config.greenTick} Started chat role event:', embed=self.embed(interaction)
+        )
 
     @chatrole_group.command(name='stop', description='End an active role event')
     async def _chatrole_stop(self, interaction):
         if self.active:
             self.active = False
-            return await interaction.response.send_message(f'{config.greenTick} Ended chat role event:', embed=self.embed(interaction))
+            return await interaction.response.send_message(
+                f'{config.greenTick} Ended chat role event:', embed=self.embed(interaction)
+            )
         else:
-            return await interaction.response.send_message(f'{config.redTick} A chat role event is not currently running!')
+            return await interaction.response.send_message(
+                f'{config.redTick} A chat role event is not currently running!'
+            )
 
-    @chatrole_group.command(name='status', description='Get the current status of the Chat Role module and any event currently running')
+    @chatrole_group.command(
+        name='status', description='Get the current status of the Chat Role module and any event currently running'
+    )
     async def _chatrole_status(self, interaction):
         if self.active:
-            return await interaction.response.send_message('A chat role event is currently running:', embed=self.embed(interaction))
+            return await interaction.response.send_message(
+                'A chat role event is currently running:', embed=self.embed(interaction)
+            )
         else:
             return await interaction.response.send_message('A chat role event is not currently running!')
 
