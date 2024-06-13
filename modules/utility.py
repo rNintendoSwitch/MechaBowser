@@ -517,11 +517,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed.description += f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
         embed.add_field(name='Punishments', value=punishments, inline=False)
-        return await interaction.followup.send(embed=embed, view=self.SuggestHistCommand())
+        return await interaction.followup.send(embed=embed, view=self.SuggestHistCommand(interaction))
 
     class SuggestHistCommand(discord.ui.View):
-        def __init__(self):
-            super().__init__()
+        def __init__(self, interaction: discord.Interaction):
+            super().__init__(timeout=600.0)
+            self.INTERACTION = interaction
 
         @discord.ui.button(label='Pull User History', style=discord.ButtonStyle.primary)
         async def pull_history(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -531,8 +532,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             if not user:
                 user = interaction.client.fetch_user(userid)
 
+            self.INTERACTION = interaction
             ChatCog = ChatControl(bot=interaction.client)
             await ChatCog._pull_history(interaction, user)
+
+        async def on_timeout(self):
+            await self.INTERACTION.edit_original_response(view=None)
 
     @app_commands.command(name='history', description='Get detailed information on a user\'s infraction history')
     @app_commands.describe(user='The user you wish to get infractions for. If left blank, get your own history')
