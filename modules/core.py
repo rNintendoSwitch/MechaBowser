@@ -85,7 +85,7 @@ class MainEvents(commands.Cog):
     async def _ping(self, interaction: discord.Interaction):
         initiated = interaction.created_at
         await interaction.response.send_message('Evaluating...')
-        msg = await interaction.original_message()  # response.send_message does not return a discord.Message
+        msg = await interaction.original_response()  # response.send_message does not return a discord.Message
         roundtrip = (msg.created_at - initiated).total_seconds() * 1000
 
         database_start = time.time()
@@ -94,7 +94,7 @@ class MainEvents(commands.Cog):
 
         websocket = self.bot.latency * 1000
 
-        return await interaction.response.edit_message(
+        return await msg.edit(
             content=(
                 'Pong! Latency: **Roundtrip** `{:1.0f}ms`, **Websocket** `{:1.0f}ms`, **Database** `{:1.0f}ms`'.format(
                     roundtrip, websocket, database
