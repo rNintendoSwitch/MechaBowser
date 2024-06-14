@@ -789,6 +789,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         extraction = process.extract(current.lower(), tagList, limit=10)
         return [app_commands.Choice(name=e[0], value=e[0]) for e in extraction] or []
 
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class TagCommand(app_commands.Group):
         pass
 
