@@ -152,7 +152,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     class SocialCommand(app_commands.Group):
         pass
 
-    social_group = SocialCommand(name='profile', description='View and change your unique server profile to make it your own')
+    social_group = SocialCommand(
+        name='profile', description='View and change your unique server profile to make it your own'
+    )
 
     @social_group.command(name='view', description='Pull up and view your own server profile or someone elses!')
     @app_commands.describe(member='Who\'s profile you want to view. You can leave this blank to see your own')
@@ -179,10 +181,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not dbUser['profileSetup'] and member == interaction.user:
             await interaction.response.defer(ephemeral=True)
             embed, card = await self.generate_user_flow_embed(member, new_user=True)
-            return await interaction.followup.send('👋 Hi there! It looks like you have not setup your profile card' \
-            ' quite yet. You won\'t be able to publicly post your card on your own until you have updated at ' \
-            'least one element. This won\'t prevent other users from viewing your card if they request it however. ' \
-            'Here are some helpful instructions for you to get started -- it\'s easy!', file=card, embed=embed)
+            return await interaction.followup.send(
+                '👋 Hi there! It looks like you have not setup your profile card'
+                ' quite yet. You won\'t be able to publicly post your card on your own until you have updated at '
+                'least one element. This won\'t prevent other users from viewing your card if they request it however. '
+                'Here are some helpful instructions for you to get started -- it\'s easy!',
+                file=card,
+                embed=embed,
+            )
 
         else:
             await interaction.response.defer()
@@ -680,7 +686,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         returns discord.Embed, discord.File
         '''
 
-        embed = discord.Embed(title='Setup Your Profile Card!', color=0x8bc062)
+        embed = discord.Embed(title='Setup Your Profile Card!', color=0x8BC062)
         embed.set_author(name=member.name, icon_url=member.display_avatar.url)
         embed.set_footer(text='❔You can see this info again anytime if you run the /profile edit command')
 
@@ -695,29 +701,35 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         commandID = command.extras['id']
         if new_user:
             # We need to minorly modify description for info for first time user flow
-            embed_description = '**Profile card not setup yet?**\nLet\'s fix that! It can show off your fav games,' \
-            f' a flag to represent you, & more. Use </profile view:{commandID}> to see anyone\'s profile card or your own. Customize it with the commands below!'
+            embed_description = (
+                '**Profile card not setup yet?**\nLet\'s fix that! It can show off your fav games,'
+                f' a flag to represent you, & more. Use </profile view:{commandID}> to see anyone\'s profile card or your own. Customize it with the commands below!'
+            )
 
         else:
-            embed_description = '**Looking to spice up your profile card?**\n It\'s easy to update and make it ' \
-            f'your own. As a refresher, you can use </profile view:{commandID}> anytime to view anyone\'s profile card or your own. You can customize yours using the commands below!'
+            embed_description = (
+                '**Looking to spice up your profile card?**\n It\'s easy to update and make it '
+                f'your own. As a refresher, you can use </profile view:{commandID}> anytime to view anyone\'s profile card or your own. You can customize yours using the commands below!'
+            )
 
-        embed_description += f'\n\n- **Add Your Friend Code**: </profile code:{commandID}> Add your friend code to allow friend requests!' \
-        f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone.' \
-        f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji!' \
-        f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.' \
-        f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. ' \
-        'Earn more in events (like Trivia) to make your card pop!'
+        embed_description += (
+            f'\n\n- **Add Your Friend Code**: </profile code:{commandID}> Add your friend code to allow friend requests!'
+            f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone.'
+            f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji!'
+            f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.'
+            f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. '
+            'Earn more in events (like Trivia) to make your card pop!'
+        )
         embed.description = embed_description
         embed.add_field(
             name='Get Some Trophies',
             value='Earn a trophy when you participate in server events and Trivia! They\'ll show up automatically on your card when assigned by a moderator.\n\n'
-            'Default profiles are boring! Spruce it up!\n__Here\'s how your card currently looks:__'
+            'Default profiles are boring! Spruce it up!\n__Here\'s how your card currently looks:__',
         )
 
-        return embed, main_img # Both need to be passed into a message for image embedding to function
+        return embed, main_img  # Both need to be passed into a message for image embedding to function
 
-    #@_profile.command(name='edit')
+    # @_profile.command(name='edit')
     async def _profile_edit(self, ctx: commands.Context):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': ctx.author.id})
