@@ -22,6 +22,7 @@ import pytz
 import requests
 import token_bucket
 import yaml
+from discord import app_commands
 from discord.ext import commands
 from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
@@ -147,42 +148,46 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             ('trivia-gold-3', '<:triviagold3:1194031677715005490>'),
         ]
 
-    @commands.group(name='profile', invoke_without_command=True)
-    async def _profile(self, ctx, member: typing.Optional[discord.Member]):
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    class SocialCommand(app_commands.Group):
+        pass
+
+    social_group = SocialCommand(name='profile', description='View and change your unique server profile to make it your own')
+
+    @social_group.command(name='view', description='Pull up and view your own server profile or someone elses!')
+    @app_commands.describe(member='Who\'s profile you want to view. You can leave this blank to see your own')
+    async def _profile(self, interaction: discord.Interaction, member: typing.Optional[discord.Member]):
         if not member:
-            member = ctx.author
+            member = interaction.user
 
         # If channel can be ratelimited
-        if ctx.message.channel.id not in [config.commandsChannel, config.debugChannel]:
-            channel_being_rate_limited = not self.profile_bucket.consume(str(ctx.channel.id))
+        if interaction.channel.id not in [config.commandsChannel, config.debugChannel]:
+            channel_being_rate_limited = not self.profile_bucket.consume(str(interaction.channel.id))
             if channel_being_rate_limited:
                 #  Moderators consume a ratelimit token but are not limited
-                if not ctx.guild.get_role(config.moderator) in ctx.author.roles:
-                    await ctx.send(
+                if not interaction.guild.get_role(config.moderator) in interaction.user.roles:
+                    await interaction.response.send_message(
                         f'{config.redTick} That command is being used too often, try again in a few seconds.',
-                        delete_after=15,
+                        ephemeral=True,
                     )
-                    await ctx.message.delete(delay=15)
                     return
 
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
-        # If profile not setup, running on self, not a mod, and not in commands channel: disallow running profile command
-        if (
-            not dbUser['profileSetup']
-            and member == ctx.author
-            and ctx.guild.get_role(config.moderator) not in ctx.author.roles
-            and ctx.channel.id != config.commandsChannel
-        ):
-            await ctx.message.delete()
-            return await ctx.send(
-                f'{config.redTick} {ctx.author.mention} You need to setup your profile to view it outside of <#{config.commandsChannel}>! To setup your profile, use `!profile edit` in <#{config.commandsChannel}>.',
-                delete_after=15,
-            )
+        # If profile not setup and running on self: force ephemeral and provide NUX
+        if not dbUser['profileSetup'] and member == interaction.user:
+            await interaction.response.defer(ephemeral=True)
+            embed, card = await self.generate_user_flow_embed(member, new_user=True)
+            return await interaction.followup.send('👋 Hi there! It looks like you have not setup your profile card' \
+            ' quite yet. You won\'t be able to publicly post your card on your own until you have updated at ' \
+            'least one element. This won\'t prevent other users from viewing your card if they request it however. ' \
+            'Here are some helpful instructions for you to get started -- it\'s easy!', file=card, embed=embed)
 
-        card = await self._generate_profile_card_from_member(member)
-        await ctx.send(file=card)
+        else:
+            await interaction.response.defer()
+            card = await self._generate_profile_card_from_member(member)
+            await interaction.followup.send(file=card)
 
     def _load_fonts(self, fonts_defs):
         '''Load normal and CJK versions of given dict of fonts'''
@@ -668,7 +673,51 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         # Emoji not found
         return None
 
-    @_profile.command(name='edit')
+    async def generate_user_flow_embed(self, member: discord.Member, new_user: bool = False):
+        '''
+        Generates a discord.Embed with information profile card editing flow and all subcommands.
+
+        returns discord.Embed, discord.File
+        '''
+
+        embed = discord.Embed(title='Setup Your Profile Card!', color=0x8bc062)
+        embed.set_author(name=member.name, icon_url=member.display_avatar.url)
+        embed.set_footer(text='❔You can see this info again anytime if you run the /profile edit command')
+
+        main_img = await self._generate_profile_card_from_member(member)
+        embed.set_image(url='attachment://profile.png')
+
+        for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
+            # Iterate over commands in the tree so we can get the profile command ID
+            if command.name == 'profile':
+                break
+
+        commandID = command.extras['id']
+        if new_user:
+            # We need to minorly modify description for info for first time user flow
+            embed_description = '**Profile card not setup yet?**\nLet\'s fix that! It can show off your fav games,' \
+            f' a flag to represent you, & more. Use </profile view:{commandID}> to see anyone\'s profile card or your own. Customize it with the commands below!'
+
+        else:
+            embed_description = '**Looking to spice up your profile card?**\n It\'s easy to update and make it ' \
+            f'your own. As a refresher, you can use </profile view:{commandID}> anytime to view anyone\'s profile card or your own. You can customize yours using the commands below!'
+
+        embed_description += f'\n\n- **Add Your Friend Code**: </profile code:{commandID}> Add your friend code to allow friend requests!' \
+        f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone.' \
+        f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji!' \
+        f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.' \
+        f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. ' \
+        'Earn more in events (like Trivia) to make your card pop!'
+        embed.description = embed_description
+        embed.add_field(
+            name='Get Some Trophies',
+            value='Earn a trophy when you participate in server events and Trivia! They\'ll show up automatically on your card when assigned by a moderator.\n\n'
+            'Default profiles are boring! Spruce it up!\n__Here\'s how your card currently looks:__'
+        )
+
+        return embed, main_img # Both need to be passed into a message for image embedding to function
+
+    #@_profile.command(name='edit')
     async def _profile_edit(self, ctx: commands.Context):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': ctx.author.id})
