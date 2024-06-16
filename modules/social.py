@@ -39,6 +39,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.inprogressEdits = {}
         self.validate_allowed_users = []
 
+        self.Games = self.bot.get_cog('Games')
+
         # !profile ratelimits
         self.bucket_storage = token_bucket.MemoryStorage()
         self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
@@ -93,6 +95,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.friendCodeRegex = {
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})', re.I),
+            # Even more lenient FC for autocomplete
+            "autocomplete": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{1,4})[ \-\u2014_]?(\d{0,4})[ \-\u2014_]?(\d{0,4})', re.I),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
             # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
             "chatFilter": re.compile(
@@ -147,6 +151,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             ('trivia-gold-2', '<:triviagold2:1194031676649652305>'),
             ('trivia-gold-3', '<:triviagold3:1194031677715005490>'),
         ]
+
+        # Compile the most common timezones at runtime for autocomplete use
+        db = mclient.bowser.users
+        usersWithTimezones = db.find({'timezone': {'$ne': None}})
+        timezones = {}
+        for user in usersWithTimezones:
+            if user['timezone'] not in timezones.keys():
+                timezones[user['timezone']] = 1
+
+            else:
+                timezones[user['timezone']] += 1
+
+        self.commonTimezones = [x[0] for x in sorted(timezones.items(), key=lambda tz: tz[1], reverse=True)]
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class SocialCommand(app_commands.Group):
@@ -218,7 +235,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     # https://medium.com/the-artificial-impostor/4ac839ba313a
     def _determine_cjk_font(self, text):
         '''Determine correct CJK font, if needed'''
-        if re.search("[\u3040-\u30ff\u4e00-\u9FFF]", text):
+        if re.search(r"[\u3040-\u30ff\u4e00-\u9FFF]", text):
             return 'jp'
         return None
 
@@ -335,13 +352,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             do_recache = True
 
         if do_recache:
-            Games = self.bot.get_cog('Games')
-
-            if not Games:
+            if not self.Games:
                 return theme['missingImage']
 
             try:
-                gameImg = await Games.get_image(guid, 'icon_url')
+                gameImg = await self.Games.get_image(guid, 'icon_url')
 
                 if gameImg:
                     gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
@@ -575,7 +590,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         setGames = profile['games']
         gameCount = 0
-        Games = self.bot.get_cog('Games')
         if setGames:
             gamesDb = mclient.bowser.games
 
@@ -583,10 +597,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             setGames = setGames[:3]  # Limit to 3 results, just in case
 
             for game_guid in setGames:
-                if not Games:
+                if not self.Games:
                     continue
 
-                gameName = Games.get_preferred_name(game_guid)
+                gameName = self.Games.get_preferred_name(game_guid)
 
                 if not gameName:
                     continue
@@ -713,21 +727,274 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         embed_description += (
-            f'\n\n- **Add Your Friend Code**: </profile code:{commandID}> Add your friend code to allow friend requests!'
+            f'\n\n- **Add Your Friend Code**: </profile friendcode:{commandID}> Add your friend code to allow friend requests!'
             f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone.'
-            f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji!'
+            f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji on your card!'
             f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.'
             f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. '
             'Earn more in events (like Trivia) to make your card pop!'
+            '\n**Get Some Trophies**\nEarn a trophy when you participate in server events and Trivia!\n'
+            'They\'ll show up automatically on your card when assigned by a moderator\n\n'
+            'Default profiles are boring! Spruce it up!\n__Here\'s how your card currently looks:__'
         )
         embed.description = embed_description
-        embed.add_field(
-            name='Get Some Trophies',
-            value='Earn a trophy when you participate in server events and Trivia! They\'ll show up automatically on your card when assigned by a moderator.\n\n'
-            'Default profiles are boring! Spruce it up!\n__Here\'s how your card currently looks:__',
-        )
 
         return embed, main_img  # Both need to be passed into a message for image embedding to function
+
+    async def _profile_friendcode_autocomplete(
+            self, interaction: discord.Interaction, current: str
+    ) -> typing.List[app_commands.Choice[str]]:
+        partialCode = re.search(self.friendCodeRegex['autocomplete'], current)
+
+        removal = app_commands.Choice(name='Remove your friend code', value='remove')
+
+        def pad_extra_chars(partial_code: str):
+            length = len(partial_code)
+            if length < 4:
+                partial_code += '#' * (4 - length)
+
+            return partial_code
+
+        # Build a result
+        friendcode = 'SW-'
+        if not partialCode:
+            # No match at all, return a default value
+            return [
+                app_commands.Choice(name='SW-####-####-####', value='SW-####-####-####'),
+                removal
+            ]
+
+        friendcode += pad_extra_chars(partialCode.group(1))
+
+        if partialCode.group(2):
+            friendcode += '-' + pad_extra_chars(partialCode.group(2))
+            if partialCode.group(3):
+                friendcode += '-' + pad_extra_chars(partialCode.group(3))
+
+            else:
+                friendcode += '-####'
+
+
+        else:
+            friendcode += '-####-####'
+
+
+        return [
+            app_commands.Choice(name=friendcode, value=friendcode),
+            removal
+        ]
+
+    @social_group.command(name='friendcode', description='Use this command to edit the display friend code on your profile')
+    @app_commands.describe(code='Update your Switch Friend code, formatted as SW-0000-0000-0000. Type "remove" to remove it')
+    @app_commands.autocomplete(code=_profile_friendcode_autocomplete)
+    async def _profile_friendcode(self, interaction: discord.Interaction, code: str):
+        await interaction.response.defer(ephemeral=True)
+        db = mclient.bowser.users
+
+        friendcode = re.search(self.friendCodeRegex['profile'], code)
+        if friendcode:  # re match
+            friendcode = f'SW-{friendcode.group(1)}-{friendcode.group(2)}-{friendcode.group(3)}'
+            if friendcode == 'SW-0000-0000-0000':
+                return await interaction.followup.send(f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code')
+
+            db.update_one(
+                {'_id': interaction.user.id},
+                {'$set': {'friendcode': friendcode, 'profileSetup': True}}
+            )
+
+            msg = f'{config.greenTick} Your friend code has been successfully updated on your profile card! Here\'s how it looks:'
+
+            # Duplicate friend code detection
+            if db.count_documents({'friendcode': friendcode}) > 1:
+                duplicates = db.find(
+                    {'$and': {
+                        {'_id': {'$ne': interaction.user.id}},
+                        {'friendcode': friendcode}
+                    }}
+                )
+
+                if duplicates:
+                    # Check if accounts with matching friend codes have infractions on file
+                    punsDB = mclient.bowser.puns
+                    hasPuns = False
+                    otherUsers = []
+                    for u in duplicates:
+                        if punsDB.count_documents({'user': u['_id']}):
+                            hasPuns = True
+
+                        if interaction.user.id != u['id']:
+                            user = interaction.guild.get_member(u['_id'])
+                            if not user:
+                                user = await self.bot.fetch_user(u['_id'])
+
+                            otherUsers.append(f'> **{user}** ({u["_id"]})')
+
+                    if hasPuns:
+                        admin_channel = self.bot.get_channel(config.nintendoswitch)
+                        others = '\n'.join(otherUsers)
+                        plural = "that of another user" if (len(otherUsers) == 1) else "those of other users"
+                        await admin_channel.send(
+                            f'🕵️ **{interaction.user}** ({interaction.user.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
+                        )
+
+        elif code.lower() == 'remove':
+            db.update_one({'_id': interaction.user.id}, {'$set': {'friendcode': None}})
+            msg = f'{config.greenTick} Your friend code has been successfully removed from your profile card! Here\'s how it looks:'
+
+        else:
+            return await interaction.followup.send(f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code')
+
+        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
+
+    @social_group.command(name='flag', description='Choose an emoji flag to display on your profile')
+    @app_commands.describe(flag='The flag emoji you wish to set, from the emoji picker. Type "remove" to remove it')
+    async def _profile_flag(self, interaction: discord.Interaction, flag: str):
+        await interaction.response.defer(ephemeral=True)
+        db = mclient.bowser.users
+        flag = flag.strip()
+
+        if flag.strip().lower() == 'remove':
+            db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': None}})
+            return await interaction.followup.send(f'{config.greenTick} Your flag has been successfully removed from your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
+
+
+        code_points = self.check_flag(flag)
+        if code_points is None:
+            return await interaction.followup.send(f'{config.redTick} You didn\'t provide a valid supported emoji that represents a flag -- make sure you are providing an emoji, not an abbreviation or text. Please try again; note you can only use emoji like a country\'s flag or extras such as the pirate and gay pride flags')
+
+        # Convert list of ints to lowercase hex code points, seperated by dashes
+        pointStr = '-'.join('{:04x}'.format(n) for n in code_points)
+
+        if not Path(f'{self.twemojiPath}{pointStr}.png').is_file():
+            return await interaction.followup.send(f'{config.redTick} You didn\'t provide a valid supported emoji that represents a flag -- make sure you are providing an emoji, not an abbreviation or text. Please try again; note you can only use emoji like a country\'s flag or extras such as the pirate and gay pride flags')
+
+        db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': pointStr, 'profileSetup': True}})
+        await interaction.followup.send(f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
+
+    async def _profile_timezone_autocomplete(self, interaction: discord.Interaction, current: str):
+        removal = app_commands.Choice(name='Remove your timezone (This will prevent you from using LFG)', value='remove')
+        if current:
+            extraction = process.extract(current.lower(), pytz.all_timezones, limit=9)
+            return [removal] + [
+                app_commands.Choice(name=e[0], value=e[0]) for e in extraction
+                ]
+
+        else:
+            return [removal] + [
+                app_commands.Choice(name=tz, value=tz) for tz in self.commonTimezones[0:9]
+                ]
+
+    @social_group.command(name='timezone', description='Pick your timezone to show on your profile and for when others are looking for group')
+    @app_commands.describe(timezone='This is based on your region. I.e. "America/New_York. Type "remove" to remove it')
+    @app_commands.autocomplete(timezone=_profile_timezone_autocomplete)
+    async def _profile_timezone(self, interaction: discord.Interaction, timezone: str):
+        await interaction.response.defer(ephemeral=True)
+    
+        db = mclient.bowser.users
+    
+        if timezone.strip().lower() == 'remove':
+            db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': None}})
+            return await interaction.followup.send(f'{config.greenTick} Your timezone has been successfully removed from your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
+
+        for tz in pytz.all_timezones:
+            if timezone.lower() == tz.lower():
+                db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
+                return await interaction.followup.send(f'{config.greenTick} Your timezone has been successfully updated on your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
+
+        await interaction.followup.send(f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc')
+
+    async def _profile_games_autocomplete(self, interaction: discord.Interaction, current: str):
+        return await self.Games._games_search_autocomplete(interaction, current)
+
+    @social_group.command(name='games', description='Pick up-to 3 of your fav Nintendo Switch games to show them off')
+    @app_commands.describe(
+        game1='You need to pick at least one game. Search by name and use autocomplete to help!',
+        game2='Optionally pick a 2nd game to show on your profile as well. Search by name and use autocomplete to help!',
+        game3='Optionally pick a 3rd game to show on your profile as well. Search by name and use autocomplete to help!'
+    )
+    @app_commands.autocomplete(
+        game1=_profile_games_autocomplete,
+        game2=_profile_games_autocomplete,
+        game3=_profile_games_autocomplete
+    )
+    async def _profile_games(self, interaction: discord.Interaction, game1: str, game2: typing.Optional[str], game3: typing.Optional[str]):
+        await interaction.response.defer(ephemeral=True)
+
+        db = mclient.bowser.games
+
+        # If user selected an auto-complete result, we will be provided the guid automatically which saves effort
+        flagConfirmation = False
+        gameList = []
+        guid1 = db.find_one({'guid': game1})
+        guid2 = None if not game2 else db.find_one({'guid': game2})
+        guid3 = None if not game3 else db.find_one({'guid': game3})
+
+        def resolve_guid(game_name: str):
+            return self.Games.search(game_name)
+
+        async def return_failure(interaction: discord.Interaction, game_name: str):
+            return await interaction.followup.send(f'{config.redTick} I was unable to match the game named "{game_name}" with any game released on the Nintendo Switch. Please try again, or contact a moderator if you believe this is in error')
+
+        if not guid1:
+            flagConfirmation = True
+            guid1 = resolve_guid(game1)
+            if not guid1:
+                return await return_failure(interaction, game1)
+
+        gameList.append(guid1['guid'])
+
+        if game2 and not guid2:
+            flagConfirmation = True
+            guid2 = resolve_guid(game2)
+            if not guid2:
+                return await return_failure(interaction, game2)
+
+        if guid2: gameList.append(guid2['guid'])
+
+        if game3 and not guid3:
+            flagConfirmation = True
+            guid3 = resolve_guid(game3)
+            if not guid3:
+                return await return_failure(interaction, game3)
+
+        if guid3: gameList.append(guid3['guid'])
+
+        logging.info(guid1)
+        logging.info(guid2)
+        logging.info(guid3)
+
+        msg = None
+        if flagConfirmation:
+            # Double check with the user since we needed to use search confidence to obtain one or more of their games
+            embed = discord.Embed(title='Are these games correct?', description='*Use the buttons below to confirm*', color=0xf5ff00)
+            embed.add_field(name='Game 1', value=db.find_one({'guid': guid1['guid']})['name'])
+            if guid2: embed.add_field(name='Game 2', value=db.find_one({'guid': guid2['guid']})['name'])
+            if guid3: embed.add_field(name='Game 3', value=db.find_one({'guid': guid3['guid']})['name'])
+            view = tools.NormalConfirmation(timeout=90)
+
+            view.message = await interaction.followup.send(':mag: I needed to do an extra search to find one or more of your games. So that I can make sure I found the correct games for you, please use the **Yes** button if everything looks okay or the **No** button if something doesn\'t look right:', embed=embed, view=view, wait=True)
+            msg = view.message
+            await view.wait()            
+
+            if view.timedout:
+                return await view.message.edit(content=f'{config.redTick} Uh, oh. I didn\'t receive a response back from you in time; your profile\'s favorite games have not been changed. Please rerun the command to try again', embed=None)
+
+            elif not view.value:
+                # User selected No
+                return await view.message.edit(content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please contact a moderator', embed=None)
+
+        # We are good to commit changes
+        userDB = mclient.bowser.users
+        logging.info(gameList)
+        userDB.update_one({'_id': interaction.user.id}, {'$set': {'favgames': gameList}})
+        message_reply = f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:'
+
+        if msg:
+            # Webhooks cannot be edited with a file
+            await msg.delete()
+
+        await interaction.followup.send(message_reply, file=await self._generate_profile_card_from_member(interaction.user))
+
 
     # @_profile.command(name='edit')
     async def _profile_edit(self, ctx: commands.Context):
@@ -841,9 +1108,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         async def _phase4(message):
             failedFetch = False
             userGames = []
-            Games = self.bot.get_cog('Games')
 
-            if not Games:
+            if not self.Games:
                 await message.channel.send(
                     'Err, oops! It looks like we can\'t reach the games system at this time! Skipping that for now...'
                 )
@@ -868,7 +1134,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
                     return True
 
-                result = Games.search(response.content.strip())
+                result = self.Games.search(response.content.strip())
 
                 if result:
                     if len(userGames) == 0 and dbUser['favgames']:
@@ -878,7 +1144,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         failedFetch = True
                         continue
 
-                    name = Games.get_preferred_name(result['guid'])
+                    name = self.Games.get_preferred_name(result['guid'])
                     msg = f'Is **{name}** the game you are looking for? Type __yes__ or __no__'
 
                     while True:
@@ -1088,7 +1354,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await ctx.message.reply(':x: Attachment must be a 1600x900 PNG file')
 
         filename = os.path.splitext(attach.filename)[0]
-        safefilename = re.sub('[^A-Za-z0-9_-]|^(?=\d)', '_', filename)
+        safefilename = re.sub(r'[^A-Za-z0-9_-]|^(?=\d)', '_', filename)
 
         if filename != safefilename:
             return await ctx.message.reply(
