@@ -49,7 +49,7 @@ class GiantBomb:
 
     async def fetch_items(
         self, path: Literal['games', 'releases'], after: datetime = None
-    ) -> Generator[dict, None, None]:
+    ) -> Generator[dict, None, None]: # type: ignore
         if path not in ['games', 'releases']:
             raise ValueError(f'invalid path: {path}')
 
@@ -359,18 +359,39 @@ class Games(commands.Cog, name='Games'):
 
     games_group = GamesCommand(name='games', description='Find out information about games for the Nintendo Switch!')
 
+    async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
+        if current:
+            game = self.search(current)
+
+        else:
+            # Current textbox is empty
+            return []
+
+        if game:
+            return [app_commands.Choice(name=game['name'], value=game['guid'])]
+
+        else:
+            return []
+
     @games_group.command(name='search')
     @app_commands.describe(query='The term you want to search for a game')
+    @app_commands.autocomplete(query=_games_search_autocomplete)
     @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
     async def _games_search(self, interaction: discord.Interaction, query: str):
         '''Search for Nintendo Switch games'''
         await interaction.response.defer()
-        result = self.search(query)
+        user_guid = self.db.find_one({'guid': query.strip()})
+        game = None
 
-        if result and result['guid']:
-            game = self.db.find_one({'_type': 'game', 'guid': result['guid']})
+        if user_guid:
+            game = user_guid # User clicked an autocomplete, giving us the exact guid
+            result = {'guid': user_guid['guid'], 'score': 100.0, 'name': user_guid['name']}
+
         else:
-            game = None
+            result = self.search(query)
+
+        if not user_guid and result and result['guid']:
+            game = self.db.find_one({'_type': 'game', 'guid': result['guid']})
 
         if game:
             name = self.get_preferred_name(result['guid'])
