@@ -117,7 +117,7 @@ class MainEvents(commands.Cog):
 
         remote = await self.bot.tree.sync(guild=interaction.guild)
         local = self.bot.tree.get_commands(guild=interaction.guild)
-        for rc, lc in zip(remote, local): # We are pulling command IDs from server-side, then storing the mentions
+        for rc, lc in zip(remote, local):  # We are pulling command IDs from server-side, then storing the mentions
             lc.extras['id'] = rc.id
 
         await interaction.followup.send(f'Synced **{len(remote)}** guilds commands')

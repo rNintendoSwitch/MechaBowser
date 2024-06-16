@@ -49,7 +49,7 @@ class GiantBomb:
 
     async def fetch_items(
         self, path: Literal['games', 'releases'], after: datetime = None
-    ) -> Generator[dict, None, None]: # type: ignore
+    ) -> Generator[dict, None, None]:  # type: ignore
         if path not in ['games', 'releases']:
             raise ValueError(f'invalid path: {path}')
 
@@ -384,7 +384,7 @@ class Games(commands.Cog, name='Games'):
         game = None
 
         if user_guid:
-            game = user_guid # User clicked an autocomplete, giving us the exact guid
+            game = user_guid  # User clicked an autocomplete, giving us the exact guid
             result = {'guid': user_guid['guid'], 'score': 100.0, 'name': user_guid['name']}
 
         else:
