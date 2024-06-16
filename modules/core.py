@@ -102,6 +102,26 @@ class MainEvents(commands.Cog):
             )
         )
 
+    @app_commands.command(name='treesync')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _tree_sync(self, interaction: discord.Interaction):
+        '''
+        The purpose of this command is to allow us to manually resync the tree and command IDs if they may have changed say from a cog load/unload.
+
+        This may be eventually integrated into a custom jishaku cog to overwrite it's `load`, `reload`, `unload` commands to implement sync and id fetching.
+        '''
+
+        await interaction.response.defer(ephemeral=True)
+
+        remote = await self.bot.tree.sync(guild=interaction.guild)
+        local = self.bot.tree.get_commands(guild=interaction.guild)
+        for rc, lc in zip(remote, local): # We are pulling command IDs from server-side, then storing the mentions
+            lc.extras['id'] = rc.id
+
+        await interaction.followup.send(f'Synced **{len(remote)}** guilds commands')
+
     @commands.Cog.listener()
     async def on_resume(self):
         logging.warning('[Main] The bot has been resumed on Discord')
