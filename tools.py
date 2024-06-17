@@ -44,7 +44,7 @@ timeUnits = {
 class RiskyConfirmation(discord.ui.View):
     message: discord.Message | None = None
 
-    def __init__(self, timeout=120):
+    def __init__(self, timeout=120.0):
         super().__init__(timeout=timeout)
         self.value = None
         self.timedout = False
@@ -77,7 +77,7 @@ class RiskyConfirmation(discord.ui.View):
 class NormalConfirmation(discord.ui.View):
     message: discord.Message | None = None
 
-    def __init__(self, timeout=120):
+    def __init__(self, timeout=120.0):
         super().__init__(timeout=timeout)
         self.value = None
         self.timedout = False
