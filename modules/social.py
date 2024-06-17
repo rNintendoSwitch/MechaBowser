@@ -37,7 +37,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def __init__(self, bot):
         self.bot = bot
         self.inprogressEdits = {}
-        self.validate_allowed_users = []
 
         self.Games = self.bot.get_cog('Games')
 
@@ -745,9 +744,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:
         partialCode = re.search(self.friendCodeRegex['autocomplete'], current)
-
-        removal = app_commands.Choice(name='Remove your friend code', value='remove')
-
         def pad_extra_chars(partial_code: str):
             length = len(partial_code)
             if length < 4:
@@ -759,10 +755,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         friendcode = 'SW-'
         if not partialCode:
             # No match at all, return a default value
-            return [
-                app_commands.Choice(name='SW-####-####-####', value='SW-####-####-####'),
-                removal
-            ]
+            return [app_commands.Choice(name='SW-####-####-####', value='SW-####-####-####')]
 
         friendcode += pad_extra_chars(partialCode.group(1))
 
@@ -779,13 +772,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             friendcode += '-####-####'
 
 
-        return [
-            app_commands.Choice(name=friendcode, value=friendcode),
-            removal
-        ]
+        return [app_commands.Choice(name=friendcode, value=friendcode)]
 
-    @social_group.command(name='friendcode', description='Use this command to edit the display friend code on your profile')
-    @app_commands.describe(code='Update your Switch Friend code, formatted as SW-0000-0000-0000. Type "remove" to remove it')
+    @social_group.command(name='friendcode', description='Use this command to edit the displayed friend code on your profile')
+    @app_commands.describe(code='Update your Switch Friend code, formatted as SW-0000-0000-0000')
     @app_commands.autocomplete(code=_profile_friendcode_autocomplete)
     async def _profile_friendcode(self, interaction: discord.Interaction, code: str):
         await interaction.response.defer(ephemeral=True)
@@ -837,26 +827,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                             f'🕵️ **{interaction.user}** ({interaction.user.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
                         )
 
-        elif code.lower() == 'remove':
-            db.update_one({'_id': interaction.user.id}, {'$set': {'friendcode': None}})
-            msg = f'{config.greenTick} Your friend code has been successfully removed from your profile card! Here\'s how it looks:'
-
         else:
             return await interaction.followup.send(f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code')
 
         await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
 
     @social_group.command(name='flag', description='Choose an emoji flag to display on your profile')
-    @app_commands.describe(flag='The flag emoji you wish to set, from the emoji picker. Type "remove" to remove it')
+    @app_commands.describe(flag='The flag emoji you wish to set, from the emoji picker')
     async def _profile_flag(self, interaction: discord.Interaction, flag: str):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
         flag = flag.strip()
-
-        if flag.strip().lower() == 'remove':
-            db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': None}})
-            return await interaction.followup.send(f'{config.greenTick} Your flag has been successfully removed from your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
-
 
         code_points = self.check_flag(flag)
         if code_points is None:
@@ -872,30 +853,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.followup.send(f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
 
     async def _profile_timezone_autocomplete(self, interaction: discord.Interaction, current: str):
-        removal = app_commands.Choice(name='Remove your timezone (This will prevent you from using LFG)', value='remove')
         if current:
             extraction = process.extract(current.lower(), pytz.all_timezones, limit=9)
-            return [removal] + [
-                app_commands.Choice(name=e[0], value=e[0]) for e in extraction
-                ]
+            return [app_commands.Choice(name=e[0], value=e[0]) for e in extraction]
 
         else:
-            return [removal] + [
-                app_commands.Choice(name=tz, value=tz) for tz in self.commonTimezones[0:9]
-                ]
+            return [app_commands.Choice(name=tz, value=tz) for tz in self.commonTimezones[0:9]]
 
     @social_group.command(name='timezone', description='Pick your timezone to show on your profile and for when others are looking for group')
-    @app_commands.describe(timezone='This is based on your region. I.e. "America/New_York. Type "remove" to remove it')
+    @app_commands.describe(timezone='This is based on your region. I.e. "America/New_York')
     @app_commands.autocomplete(timezone=_profile_timezone_autocomplete)
     async def _profile_timezone(self, interaction: discord.Interaction, timezone: str):
         await interaction.response.defer(ephemeral=True)
     
         db = mclient.bowser.users
-    
-        if timezone.strip().lower() == 'remove':
-            db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': None}})
-            return await interaction.followup.send(f'{config.greenTick} Your timezone has been successfully removed from your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
-
         for tz in pytz.all_timezones:
             if timezone.lower() == tz.lower():
                 db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
@@ -970,7 +941,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             embed.add_field(name='Game 1', value=db.find_one({'guid': guid1['guid']})['name'])
             if guid2: embed.add_field(name='Game 2', value=db.find_one({'guid': guid2['guid']})['name'])
             if guid3: embed.add_field(name='Game 3', value=db.find_one({'guid': guid3['guid']})['name'])
-            view = tools.NormalConfirmation(timeout=90)
+            view = tools.NormalConfirmation(timeout=90.0)
 
             view.message = await interaction.followup.send(':mag: I needed to do an extra search to find one or more of your games. So that I can make sure I found the correct games for you, please use the **Yes** button if everything looks okay or the **No** button if something doesn\'t look right:', embed=embed, view=view, wait=True)
             msg = view.message
@@ -995,370 +966,144 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         await interaction.followup.send(message_reply, file=await self._generate_profile_card_from_member(interaction.user))
 
+    class BackgroundSelectMenu(discord.ui.View):
+        MESSAGE: discord.Message | None = None
 
-    # @_profile.command(name='edit')
-    async def _profile_edit(self, ctx: commands.Context):
-        db = mclient.bowser.users
-        dbUser = db.find_one({'_id': ctx.author.id})
-        mainMsg = None
+        def __init__(self, Parent, options: list[discord.SelectOption], initial_interaction: discord.Interaction):
+            super().__init__(timeout=180.0)
+            self.Parent = Parent
 
-        if (
-            ctx.guild.get_role(config.moderator) not in ctx.author.roles and ctx.channel.id != config.commandsChannel
-        ):  # commands
-            await ctx.message.delete()
-            return await ctx.send(
-                f'{config.redTick} {ctx.author.mention} Please use bot commands in <#{config.commandsChannel}>, not {ctx.channel.mention}',
-                delete_after=15,
-            )
+            self.menus = []
+            amt = len(options)
+            amt_req = math.ceil(amt/25) # Choice elements have a maximum of 25 items
+            logging.info(amt_req)
+            if amt_req > 125:
+                # Don't want to think about what to do if this happens.
+                # We'd have the max menus on this message already
+                logging.error(f'[Social] BackgroundSelectMenu received a request for > 125 backgrounds, out of range. {amt} | id {initial_interaction.user.id}')
+                raise IndexError(f'BackgroundSelectMenu received a request for > 125 backgrounds, out of range. {amt} | id {initial_interaction.user.id}')
 
-        if ctx.author.id in self.inprogressEdits.keys() and (time.time() - self.inprogressEdits[ctx.author.id]) < 300:
-            await ctx.message.delete()
-            return await ctx.send(
-                f'{config.redTick} {ctx.author.mention} You are already editing your profile! Please finish or wait a few minutes before trying again',
-                delete_after=15,
-            )
-
-        headerBase = 'Just a heads up! You can skip any section you do not want to edit right now by responding `skip` instead. Just edit your profile again to set it at a later time.'
-        phase1 = 'What is your Nintendo Switch friend code? It looks like this: `SW-XXXX-XXXX-XXXX`'
-        phase2 = 'What is the regional flag emoji for your country? Send a flag emoji like this: 🇺🇸'
-        phase3 = 'What is your timezone region? You can find a list of regions here if you aren\'t sure: <http://www.timezoneconverter.com/cgi-bin/findzone.tzc>. For example, `America/New_York`'
-        phase4 = 'Choose up to three (3) of your favorite games in total. You\'ve set {} out of 3 games so far. Send the title of a game as close to exact as possible, such as `1-2-Switch`'
-        phase5 = 'Choose the background theme you would like to use for your profile. You have access to use the following themes: {}'
-
-        # Lookup tables of values dependant on if user has setup their profile
-        header = {
-            True: f'{headerBase} If you would like to instead reset a section of your profile that you have previously set, just respond `reset` to any prompt.\n\n',
-            False: f'{headerBase}\n\n',
-        }
-
-        embedText = {
-            'title': {True: 'Edit your user profile', False: 'Setup your user profile'},
-            'descBase': {
-                True: 'Welcome back to profile setup.',
-                False: 'It appears you have not setup your profile before, let\'s get that taken care of!',
-            },
-        }
-
-        def check(m):
-            return m.author.id == ctx.author.id and m.channel.id == mainMsg.channel.id
-
-        async def _phase1(message):
-            response = await self.bot.wait_for('message', timeout=120, check=check)
-
-            content = response.content.lower().strip()
-            if response.content.lower().strip() == 'skip':
-                return True
-            if response.content.lower().strip() == 'reset':
-                db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': None}})
-                await message.channel.send('I\'ve gone ahead and reset your setting for **friend code**')
-                return True
-
-            code = re.search(self.friendCodeRegex['profile'], content)
-            if code:  # re match
-                friendcode = f'SW-{code.group(1)}-{code.group(2)}-{code.group(3)}'
-                db.update_one({'_id': ctx.author.id}, {'$set': {'friendcode': friendcode}})
-
-                return True
-
-            else:
-                return False
-
-        async def _phase2(message):
-            response = await self.bot.wait_for('message', timeout=120, check=check)
-
-            content = response.content.strip()
-            if response.content.lower().strip() == 'skip':
-                return True
-            if response.content.lower().strip() == 'reset':
-                db.update_one({'_id': ctx.author.id}, {'$set': {'regionFlag': None}})
-                await message.channel.send('I\'ve gone ahead and reset your setting for **regional flag**')
-                return True
-
-            code_points = self.check_flag(content)
-            if code_points is None:
-                return False
-
-            # Convert list of ints to lowercase hex code points, seperated by dashes
-            pointStr = '-'.join('{:04x}'.format(n) for n in code_points)
-
-            if not Path(f'{self.twemojiPath}{pointStr}.png').is_file():
-                return False
-
-            db.update_one({'_id': ctx.author.id}, {'$set': {'regionFlag': pointStr}})
-            return True
-
-        async def _phase3(message):
-            response = await self.bot.wait_for('message', timeout=300, check=check)
-
-            content = response.content.lower().strip()
-            if response.content.lower().strip() == 'skip':
-                return True
-            if response.content.lower().strip() == 'reset':
-                db.update_one({'_id': ctx.author.id}, {'$set': {'timezone': None}})
-                await message.channel.send('I\'ve gone ahead and reset your setting for **timezone**')
-                return True
-
-            for x in pytz.all_timezones:
-                if content == x.lower():
-                    db.update_one({'_id': ctx.author.id}, {'$set': {'timezone': x}})
-                    return True
-
-            return False
-
-        async def _phase4(message):
-            failedFetch = False
-            userGames = []
-
-            if not self.Games:
-                await message.channel.send(
-                    'Err, oops! It looks like we can\'t reach the games system at this time! Skipping that for now...'
+            for x in range(amt_req):
+                x += 1
+                logging.info('we ball')
+                choices = options[(x - 1) * 25:x * 25] # Make sure we need 25 long indexes i.e. [0:25], [25:50]
+                logging.info(choices)
+                menu = discord.ui.Select(
+                    placeholder='Choose a background',
+                    options=choices,
+                    min_values=0,
+                    max_values=1
                 )
-                return True
+                menu.callback = self.select_option
+                self.add_item(menu)
+                self.menus.append(menu)
 
-            while len(userGames) < 3:
-                if failedFetch:
-                    await message.channel.send(
-                        f'{config.redTick} Hmm, I can\'t add that game. Make sure you typed the game name correctly and don\'t add the same game twice.\n\n'
-                        + phase4.format(len(userGames))
-                    )
-                else:
-                    await message.channel.send(phase4.format(len(userGames)))
-                    failedFetch = False
+            button = discord.ui.Button(label='Cancel', style=discord.ButtonStyle.secondary)
+            button.callback = self.cancel_button
+            self.add_item(button)
+            logging.info(self.children)
+            asyncio.run_coroutine_threadsafe(initial_interaction.edit_original_response(view=self), initial_interaction.client.loop)
 
-                response = await self.bot.wait_for('message', timeout=180, check=check)
-                if response.content.lower().strip() == 'skip':
-                    break
+        async def select_option(self, interaction: discord.Interaction):
+            for s in self.menus:
+                if s.values:
+                    value = s.values[0]
+                    db = mclient.bowser.users
+                    db.update_one({'_id': interaction.user.id}, {'$set': {'background': value}})
 
-                if response.content.lower().strip() == 'reset':
-                    db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
-                    await message.channel.send('I\'ve gone ahead and reset your setting for **favorite games**')
-                    return True
+                    await self.MESSAGE.delete()
+                    await interaction.response.send_message(f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:', file=await self.Parent._generate_profile_card_from_member(interaction.user), embed=None, view=None, ephemeral=True)
+                    return self.stop()
 
-                result = self.Games.search(response.content.strip())
+            await interaction.response.edit_message(view=self)
 
-                if result:
-                    if len(userGames) == 0 and dbUser['favgames']:
-                        db.update_one({'_id': ctx.author.id}, {'$set': {'favgames': []}})
+        async def cancel_button(self, interaction: discord.Interaction):
+            await interaction.response.edit_message(content='Background editing canceled. To begin again, rerun the command', embed=None, view=None)
+            self.stop()
 
-                    if result['guid'] in userGames:
-                        failedFetch = True
-                        continue
+        async def on_timeout(self):
+            await self.MESSAGE.edit(content='Background editing timed out. To begin again, rerun the command', embed=None, view=None)
 
-                    name = self.Games.get_preferred_name(result['guid'])
-                    msg = f'Is **{name}** the game you are looking for? Type __yes__ or __no__'
+    @social_group.command(name='background', description='Update the background you use on your profile card')
+    async def _profile_background(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
 
-                    while True:
-                        await message.channel.send(msg)
+        db = mclient.bowser.users
+        user = db.find_one({'_id': interaction.user.id})
+        bg = user['background']
 
-                        checkResp = await self.bot.wait_for('message', timeout=120, check=check)
-                        if checkResp.content.lower().strip() in ['yes', 'y']:
-                            db.update_one({'_id': ctx.author.id}, {'$push': {'favgames': result['guid']}})
-                            userGames.append(result['guid'])
-                            break
+        choices = []
+        formattedBgs = []
 
-                        elif checkResp.content.lower().strip() in ['no', 'n']:
-                            break
+        for background in list(reversed(user['backgrounds'])):
+            name = background.replace('-', ' ').title()
+            choices.append(discord.SelectOption(label=name, value=background, default=bg == background))
+            formattedBgs.append(name)
 
-                        msg = "Your input was not __yes__ or __no__. Please say exactly __yes__ or __no__."
+        human_backgrounds = ', '.join(formattedBgs)
+        logging.info(choices)
+        view = self.BackgroundSelectMenu(self, choices, interaction, )
+        embed = discord.Embed(url='http://rnintendoswitch.com', color=0x8bc062)
+        embed.set_author(name=str(interaction.user), icon_url=interaction.user.display_avatar.url)
+        embed.description = '**Let\'s Choose a New Profile Background**\nUsing the select menus below, you can choose a new profile background!' \
+            f' You currently you access to:\n\n> {human_backgrounds}\nExamples of all these backgrounds are:'
 
-                else:
-                    failedFetch = True
+        view.MESSAGE = await interaction.followup.send(embeds=[embed], view=view, wait=True)
 
-        async def _phase5(message):
-            dbUser_phase5 = db.find_one({'_id': ctx.author.id})
+    @social_group.command(name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games')
+    @app_commands.describe(element='The part of your profile card you which to remove or reset')
+    async def _profile_remove(self, interaction: discord.Interaction, element: typing.Literal['Friend Code', 'Flag', 'Timezone', 'Favorite Games', 'Background']):
+        await interaction.response.defer(ephemeral=True)
+        elementKeyPairs = {
+            'Friend Code': ('friendcode', 'has'),
+            'Flag': ('regionFlag', 'has'),
+            'Timezone': ('timezone', 'has'),
+            'Favorite Games': ('favgames', 'have'),
+            'Background': ('background', 'has')
+        }
 
-            if 'default' in dbUser_phase5['backgrounds']:
-                backgrounds = list(dbUser_phase5['backgrounds'])
-                backgrounds.remove('default')
-                backgrounds.insert(0, 'default-dark')
-                backgrounds.insert(0, 'default-light')
+        db = mclient.bowser.users
+        msg = f'Your {element.lower()} {elementKeyPairs[element][1]} been removed from your profile successfully'
+        if element == 'Favorite Games':
+            db.update_one({'_id': interaction.user.id}, {'$set': {'favgames': []}})
 
-                db.update_one({'_id': ctx.author.id}, {'$set': {'backgrounds': backgrounds}})
+        elif element == 'Background':
+            db.update_one({'_id': interaction.user.id}, {'$set': {'background': 'default-light'}})
+            msg += ', and has been set to `Default Light` theme. '
 
-                if dbUser_phase5['background'] == 'default':
-                    db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default-light'}})
+        else:
+            db.update_one({'_id': interaction.user.id}, {'$set': {elementKeyPairs[element][0]: None}})
+            msg += '. '
 
-                dbUser_phase5 = db.find_one({'_id': ctx.author.id})
+        msg += 'Here\'s how it looks:'
+        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
 
-            loading_message = await message.channel.send('Just a moment...')
+    @social_group.command(name='edit', description='Run this command for help with editing your profile and what the other commands do')
+    async def _profile_edit(self, interaction: discord.Interaction):
+        db = mclient.bowser.users
+        u = db.find_one({'_id': interaction.user.id})
+        embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
+        await interaction.response.send_message(embed=embed, file=card)
 
-            backgrounds = list(dbUser_phase5['backgrounds'])
-            preview = self._generate_background_preview(backgrounds)
+    @social_group.command(name='validate', description='Validate a new background with selected opacity')
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _profile_validate(self, interaction: discord.Interaction, attach: discord.Attachment, theme: typing.Literal['light', 'dark'], bg_opacity: int):
+        await interaction.response.defer()
+        if interaction.user.id not in self.validate_allowed_users:
+            return await interaction.followup.send(':x: You do not have permission to run this command.', ephemeral=True)
 
-            await message.channel.send(phase5.format(', '.join(backgrounds)), file=preview)
-            await loading_message.delete()
-
-            while True:
-                response = await self.bot.wait_for('message', timeout=120, check=check)
-
-                content = response.content.lower().strip()
-                if response.content.lower().strip() == 'reset':
-                    db.update_one({'_id': ctx.author.id}, {'$set': {'background': 'default-light'}})
-                    await message.channel.send('I\'ve gone ahead and reset your setting for **profile background**')
-                    return True
-
-                elif content != 'skip':
-                    if content in backgrounds:
-                        db.update_one({'_id': ctx.author.id}, {'$set': {'background': content}})
-                        break
-
-                    else:
-                        await message.channel.send(
-                            f'{config.redTick} That background name doesn\'t look right. Make sure to send one of the options given.\n\n'
-                            + phase5.format(', '.join(backgrounds))
-                        )
-
-                else:
-                    break
-
-        profileSetup = dbUser['profileSetup']
-
-        embed = discord.Embed(
-            title=embedText['title'][profileSetup],
-            description=embedText["descBase"][profileSetup]
-            + '\nYou can customize the following values:\n\n･ Your Nintendo Switch friend code\n･ The regional flag for your country'
-            '\n･ Your timezone\n･ Up to three (3) of your favorite Nintendo Switch games\n･ The background theme of your profile'
-            '\n\nWhen prompted, simply reply with what you would like to set the field as.',
-        )
-        embed.set_author(name=str(ctx.author), icon_url=ctx.author.display_avatar.url)
-
-        try:
-            mainMsg = await ctx.author.send(embed=embed)
-            self.inprogressEdits[ctx.author.id] = time.time()
-            await ctx.message.add_reaction('📬')
-            private = True
-
-        except discord.Forbidden:  # DMs not allowed, try in channel
-            private = False
-            return await ctx.send(
-                f'{config.redTick} {ctx.author.mention} To edit your profile you\'ll need to open your DMs. I was unable to message you'
-            )
-            mainMsg = await ctx.send(ctx.author.mention, embed=embed)
-
-        if not profileSetup:
-            db.update_one({'_id': ctx.author.id}, {'$set': {'profileSetup': True}})
-
-        botMsg = await mainMsg.channel.send(header[profileSetup] + phase1)
-        try:
-            # Phase 1
-            phaseStart = time.time()
-            phaseSuccess = False
-            while not phaseSuccess:
-                if not await _phase1(botMsg):
-                    botMsg = await botMsg.channel.send(
-                        f'{config.redTick} That friend code doesn\'t look right.\n\n' + phase1
-                    )
-
-                else:
-                    phaseSuccess = True
-
-                # Duplicate friend code detection
-                friendcode = db.find_one({'_id': ctx.author.id})['friendcode']
-
-                if friendcode:
-                    query = db.find({"friendcode": friendcode})
-
-                    if query.count() > 1:
-                        hasPuns = False
-                        otherUsers = []
-                        for user in query:
-                            if mclient.bowser.puns.find({'user': user["_id"]}).count() > 0:
-                                hasPuns = True
-
-                            if user["_id"] != ctx.author.id:
-                                try:
-                                    fetchedUser = await self.bot.fetch_user(user["_id"])
-                                    otherUsers.append(f'> **{str(fetchedUser)}** ({user["_id"]})')
-                                except:
-                                    otherUsers.append(f'> {user["_id"]}')
-
-                        if hasPuns:
-                            adminChat = self.bot.get_channel(config.adminChannel)
-                            others = "\n".join(otherUsers)
-                            plural = "that of another user" if (len(otherUsers) == 1) else "those of other users"
-                            await adminChat.send(
-                                f'🕵️ **{ctx.author}** ({ctx.author.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
-                            )
-
-            # Phase 2
-            await botMsg.channel.send(phase2)
-
-            phaseStart = time.time()
-            phaseSuccess = False
-            while not phaseSuccess:
-                if not await _phase2(botMsg):
-                    botMsg = await botMsg.channel.send(
-                        f'{config.redTick} That emoji doesn\'t look right. Make sure you send only a flag emoji.\n\n'
-                        + phase2
-                    )
-
-                else:
-                    phaseSuccess = True
-
-            # Phase 3
-            await botMsg.channel.send(phase3)
-
-            phaseStart = time.time()
-            phaseSuccess = False
-            while not phaseSuccess:
-                if not await _phase3(botMsg):
-                    botMsg = await botMsg.channel.send(
-                        f'{config.redTick} That timezone doesn\'t look right. Make sure you send the timezone area exactly. If you are having trouble, ask a moderator for help or skip this part.\n\n'
-                        + phase3
-                    )
-
-                else:
-                    phaseSuccess = True
-
-            phaseStart = time.time()
-            phaseSuccess = False
-
-            # Phase 4
-            phaseStart = time.time()
-            phaseSuccess = False
-            await _phase4(botMsg)
-
-            # Phase 5
-            phaseStart = time.time()
-            phaseSuccess = False
-            await _phase5(botMsg)
-
-            del self.inprogressEdits[ctx.author.id]
-
-            loading_message = await mainMsg.channel.send('Just a moment...')
-            card = await self._generate_profile_card_from_member(ctx.author)
-
-            await mainMsg.channel.send('You are all set! Your profile has been edited:', file=card)
-            await loading_message.delete()
-            return
-
-        except asyncio.TimeoutError:
-            await mainMsg.delete()
-            del self.inprogressEdits[ctx.author.id]
-            return await botMsg.edit(
-                content=f'{ctx.author.mention} You have taken too long to respond and the edit has been timed out, please run `!profile edit` to start again'
-            )
-
-    @_profile.group(name='validate', invoke_without_command=True)
-    async def _profile_validate(self, ctx: commands.Context, theme, trophy_bg_opacity):
-        if (ctx.guild.get_role(config.moderator) not in ctx.author.roles) and (
-            ctx.author.id not in self.validate_allowed_users
-        ):
-            return await ctx.message.reply(':x: You do not have permission to run this command.', delete_after=15)
-
-        if not ctx.message.attachments:
-            return await ctx.message.reply(':x: Missing attachment')
-
-        attach = ctx.message.attachments[0]
         if not attach.content_type == 'image/png' or attach.height != 900 or attach.width != 1600:
-            return await ctx.message.reply(':x: Attachment must be a 1600x900 PNG file')
+            return await interaction.followup.send(':x: Attachment must be a 1600x900 PNG file', ephemeral=True)
 
         filename = os.path.splitext(attach.filename)[0]
         safefilename = re.sub(r'[^A-Za-z0-9_-]|^(?=\d)', '_', filename)
 
         if filename != safefilename:
-            return await ctx.message.reply(
-                ':x: Filenames cannot start with a number or contain non-alphanumeric characters except for an underscore'
+            return await interaction.followup.send(
+                ':x: Filenames cannot start with a number or contain non-alphanumeric characters except for an underscore',
+                ephemeral=True
             )
 
         bg_raw_img = Image.open(io.BytesIO(await attach.read())).convert("RGBA")
@@ -1378,16 +1123,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         percent_correct = correct_alpha_pixels / TOTAL_PIXELS
 
         if percent_correct < CORRECT_THRESHOLD:
-            return await ctx.message.reply(
+            return await interaction.followup.send(
                 ':x: Too many pixels have the incorrect transparency! '
-                f'Expected at least {CORRECT_THRESHOLD*100:0.3f}% correct, actually {percent_correct*100:0.3f}%'
+                f'Expected at least {CORRECT_THRESHOLD*100:0.3f}% correct, actually {percent_correct*100:0.3f}%',
+                ephemeral=True
             )
         # end check mask
 
         try:
-            bg_rendered = self._render_background_image(bg_raw_img, theme, trophy_bg_opacity)
+            bg_rendered = self._render_background_image(bg_raw_img, theme, bg_opacity)
         except ValueError as e:
-            return await ctx.message.reply(f':x: {e}')
+            return await interaction.followup.send(f'{config.redTick} {e}', ephemeral=True)
 
         background = {'image': bg_rendered, 'theme': theme}
 
@@ -1405,34 +1151,46 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
         card = await self._generate_profile_card(profile, background)
-        cfgstr = f"```yml\n{safefilename}:\n    theme: {theme}\n    trophy-bg-opacity: {trophy_bg_opacity}```"
+        cfgstr = f"```yml\n{safefilename}:\n    theme: {theme}\n    trophy-bg-opacity: {bg_opacity}```"
 
-        await ctx.message.reply(cfgstr, file=card)
+        await interaction.followup.send(cfgstr, file=card)
 
-    @_profile_validate.command(name='allow')
-    async def _profile_validate_allow(self, ctx, member: tools.ResolveUser):
-        self.validate_allowed_users.append(member.id)
-        return await ctx.message.reply(f'{config.greenTick} {member} temporarily added to allowlist')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class TriviaCommand(app_commands.Group):
+        pass
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.group(name='trivia')
-    async def _trivia(self, ctx):
-        return
+    trivia_group = TriviaCommand(name='trivia', description='Manage trivia awards for members')
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_trivia.command(name='award')
-    async def _trivia_award(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+    @trivia_group.command(name='award', description='Increase the trivia award trophy by one tier for one or more users')
+    @app_commands.describe(members='The user or users you wish to award. Must be user ids separated by a space')
+    async def _trivia_award(self, interaction, members: str):
         '''Increase the trivia award trophy by one tier for one or more users'''
         stats = [0] * len(self.triviaTrophyData)
         failed = []
-        msg = await ctx.send(f'{config.loading} Processing awards to {len(members)} member(s)...')
+        members = members.split()
+        await interaction.response.send_message(f'{config.loading} Processing awards to {len(members)} member(s)...')
         for m in members:
             try:
+                user = int(user)
+                m = interaction.guild.get_member(user)
+                if not m:
+                    try:
+                        m = self.bot.fetch_user(user)
+
+                    except:
+                        failed.append(f'{user}')
+                        continue
+
                 newLevel = await self.modify_trivia_level(m)
                 stats[newLevel] += 1
 
             except IndexError:
                 failed.append(f'{m.mention} ({m.id})')
+
+            except ValueError:
+                failed.append(str(user))
 
         embed = discord.Embed(title='Command Completion Stats')
 
@@ -1448,22 +1206,36 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".join(failed)}',
             )
 
-        await msg.edit(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
+        await interaction.edit_original_response(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_trivia.command(name='reduce')
-    async def _trivia_reduce(self, ctx, members: commands.Greedy[tools.ResolveUser]):
+    @trivia_group.command(name='reduce', description='Reduce the trivia award of a user by 1 tier. Consider profile revoke to fully remove')
+    @app_commands.describe(members='The user or users you wish to reduce. Must be user ids separated by a space')
+    async def _trivia_reduce(self, interaction: discord.Interaction, members: str):
         '''Reduce the trivia award trophy tier by 1 for one or more users. If you are trying to take away the trophy entirely, consider using the "profile revoke" command instead'''
         stats = [0] * len(self.triviaTrophyData)
         failed = []
-        msg = await ctx.send(f'{config.loading} Reducing awards from {len(members)} member(s)...')
+        members = members.split()
+        await interaction.response.send_message(f'{config.loading} Reducing awards from {len(members)} member(s)...')
         for m in members:
             try:
+                user = int(user)
+                m = interaction.guild.get_member(user)
+                if not m:
+                    try:
+                        m = self.bot.fetch_user(user)
+
+                    except:
+                        failed.append(f'{user}')
+                        continue
+
                 newLevel = await self.modify_trivia_level(m, regress=True)
                 stats[newLevel] += 1
 
             except IndexError:
                 failed.append(f'{m.mention} ({m.id})')
+
+            except ValueError:
+                failed.append(str(user))
 
         embed = discord.Embed(title='Command Completion Stats')
 
@@ -1479,36 +1251,42 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".join(failed)}',
             )
 
-        await msg.edit(content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed)
+        await interaction.edit_original_response(content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed)
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_profile.command(name='grant')
-    async def _profile_grant(self, ctx, item: str, members: commands.Greedy[tools.ResolveUser], name: str):
+    @social_group.command(name='grant', description='Grants a specified item, background, or trophy to a member')
+    @app_commands.describe(members='The user or users you wish to grant items. Must be user ids separated by a space')
+    async def _profile_grant(self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str):
         '''Grants specified item, background or trophy, to a member'''
+        await interaction.response.defer()
         item = item.lower()
         name = name.lower()
 
-        if not members:
-            return await ctx.send(
-                f'{config.redTick} Invalid formatting of members in command: please check your syntax and ensure you are providing at least one valid member then try again. Member(s) should be provided at the end of the command'
-            )
+        members = members.split()
+        users = []
+        for m in members:
+            try:
+                member = interaction.guild.get_member(int(m))
+                if not member:
+                    member = await self.bot.fetch_user(int(m))
 
-        if item not in ['background', 'trophy']:
-            return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
+                users.append(member)
+
+            except ValueError:
+                return await interaction.followup.send(f'{config.redTick} Provided user {m} is invalid', ephemeral=True)
 
         if item == 'background' and name not in self.backgrounds:
-            return await ctx.send(f'{config.redTick} Invalid background: {name}')
+            return await interaction.followup.send(f'{config.redTick} Invalid background: {name}', ephemeral=True)
 
         if item == 'trophy':
             if not os.path.isfile(f'resources/profiles/trophies/{name}.png'):
-                return await ctx.send(f'{config.redTick} Invalid trophy: {name}')
+                return await interaction.followup.send(f'{config.redTick} Invalid trophy: {name}', ephemeral=True)
 
             if name in self.special_trophies:
-                return await ctx.send(f'{config.redTick} Trophy cannot be granted via command: {name}')
+                return await interaction.followup.send(f'{config.redTick} Trophy cannot be granted via command: {name}', ephemeral=True)
 
-        msg = await ctx.send(f'{config.loading} Granting {item.title()} `{name}` to {len(members)} member(s)...')
+        msg = await interaction.followup.send(f'{config.loading} Granting {item.title()} `{name}` to {len(users)} member(s)...', wait=True)
         failCount = 0
-        for m in members:
+        for m in users:
             try:
                 await tools.commit_profile_change(self.bot, m, item, name)
 
@@ -1518,33 +1296,43 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not failCount:
             # 0 Failures
             return await msg.edit(
-                content=f'{config.greenTick} {item.title()} `{name}` granted to {len(members)} member(s)'
+                content=f'{config.greenTick} {item.title()} `{name}` granted to {len(users)} member(s)'
             )
 
-        elif failCount == len(members):
+        elif failCount == len(users):
             return await msg.edit(content=f'{config.redTick} {item.title()} `{name}` granted to 0 members')
 
         else:
             return await msg.edit(
-                content=f'{config.greenTick} {item.title()} `{name}` granted to {len(members) - failCount}/{len(members)} member(s).'
+                content=f'{config.greenTick} {item.title()} `{name}` granted to {len(users) - failCount}/{len(users)} member(s).'
             )
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_profile.command(name='revoke')
-    async def _profile_revoke(self, ctx, item: str, members: commands.Greedy[tools.ResolveUser], name: str):
+    @social_group.command(name='revoke', description='Revokes a specified item, background, or trophy from a member')
+    @app_commands.describe(members='The user or users you wish to revoke items. Must be user ids separated by a space')
+    async def _profile_revoke(self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str):
         '''Revokes specified item, background or trophy, from a member'''
+        await interaction.response.defer()
         item = item.lower()
         name = name.lower()
+        members = members.split()
+        users = []
+        for m in members:
+            try:
+                member = interaction.guild.get_member(int(m))
+                if not member:
+                    member = await self.bot.fetch_user(int(m))
 
-        if item not in ['background', 'trophy']:
-            return await ctx.send(f'{config.redTick} Invalid item: {item}. Expected either `background` or `trophy`')
+                users.append(member)
+
+            except ValueError:
+                return await interaction.followup.send(f'{config.redTick} Provided user {m} is invalid', ephemeral=True)
 
         if item == 'trophy' and name in self.special_trophies:
-            return await ctx.send(f'{config.redTick} Trophy cannot be revoked via command: {name}')
+            return await interaction.followup.send(f'{config.redTick} Trophy cannot be revoked via command: {name}', ephemeral=True)
 
-        msg = await ctx.send(f'{config.loading} Revoking {item.title()} `{name}` from {len(members)} member(s)...')
+        msg = await interaction.followup.send(f'{config.loading} Revoking {item.title()} `{name}` from {len(members)} member(s)...', wait=True)
         failCount = 0
-        for m in members:
+        for m in users:
             try:
                 await tools.commit_profile_change(self.bot, m, item, name, revoke=True)
 
@@ -1554,15 +1342,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not failCount:
             # 0 Failures
             return await msg.edit(
-                content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(members)} member(s)'
+                content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(users)} member(s)'
             )
 
-        elif failCount == len(members):
+        elif failCount == len(users):
             return await msg.edit(content=f'{config.redTick} {item.title()} `{name}` revoked from 0 members')
 
         else:
             return await msg.edit(
-                content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(members) - failCount}/{len(members)} member(s).'
+                content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(users) - failCount}/{len(users)} member(s).'
             )
 
     @commands.Cog.listener()
