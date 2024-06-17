@@ -508,7 +508,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         failedKicks = []
         couldNotDM = False
 
-        for user in users:
+        for user in users.split():
             try:
                 user = int(user)
 
