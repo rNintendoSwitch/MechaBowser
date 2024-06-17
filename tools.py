@@ -74,6 +74,7 @@ class RiskyConfirmation(discord.ui.View):
         if self.message:
             await self.message.edit(view=self)
 
+
 class NormalConfirmation(discord.ui.View):
     message: discord.Message | None = None
 
@@ -98,6 +99,7 @@ class NormalConfirmation(discord.ui.View):
         self.timedout = True
         if self.message:
             await self.message.edit(view=None)
+
 
 async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
     db = mclient.modmail.logs

@@ -95,7 +95,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # Profile setup/editor (lenient)
             "profile": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})[ \-\u2014_]?(\d{4})', re.I),
             # Even more lenient FC for autocomplete
-            "autocomplete": re.compile(r'(?:sw)?[ \-\u2014_]?(\d{1,4})[ \-\u2014_]?(\d{0,4})[ \-\u2014_]?(\d{0,4})', re.I),
+            "autocomplete": re.compile(
+                r'(?:sw)?[ \-\u2014_]?(\d{1,4})[ \-\u2014_]?(\d{0,4})[ \-\u2014_]?(\d{0,4})', re.I
+            ),
             # Chat filter, "It appears you've sent a friend code." Requires separators and discards select prefixes.
             # Discarded prefixes: MA/MO (AC Designer), DA (AC Dream Address).
             "chatFilter": re.compile(
@@ -741,7 +743,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return embed, main_img  # Both need to be passed into a message for image embedding to function
 
     async def _profile_friendcode_autocomplete(
-            self, interaction: discord.Interaction, current: str
+        self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:
         partialCode = re.search(self.friendCodeRegex['autocomplete'], current)
         def pad_extra_chars(partial_code: str):
@@ -767,7 +769,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             else:
                 friendcode += '-####'
 
-
         else:
             friendcode += '-####-####'
 
@@ -785,23 +786,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if friendcode:  # re match
             friendcode = f'SW-{friendcode.group(1)}-{friendcode.group(2)}-{friendcode.group(3)}'
             if friendcode == 'SW-0000-0000-0000':
-                return await interaction.followup.send(f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code')
+                return await interaction.followup.send(
+                    f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code'
+                )
 
-            db.update_one(
-                {'_id': interaction.user.id},
-                {'$set': {'friendcode': friendcode, 'profileSetup': True}}
-            )
+            db.update_one({'_id': interaction.user.id}, {'$set': {'friendcode': friendcode, 'profileSetup': True}})
 
             msg = f'{config.greenTick} Your friend code has been successfully updated on your profile card! Here\'s how it looks:'
 
             # Duplicate friend code detection
             if db.count_documents({'friendcode': friendcode}) > 1:
-                duplicates = db.find(
-                    {'$and': {
-                        {'_id': {'$ne': interaction.user.id}},
-                        {'friendcode': friendcode}
-                    }}
-                )
+                duplicates = db.find({'$and': {{'_id': {'$ne': interaction.user.id}}, {'friendcode': friendcode}}})
 
                 if duplicates:
                     # Check if accounts with matching friend codes have infractions on file
@@ -828,7 +823,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         )
 
         else:
-            return await interaction.followup.send(f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code')
+            return await interaction.followup.send(
+                f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code'
+            )
 
         await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
 
@@ -841,16 +838,23 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         code_points = self.check_flag(flag)
         if code_points is None:
-            return await interaction.followup.send(f'{config.redTick} You didn\'t provide a valid supported emoji that represents a flag -- make sure you are providing an emoji, not an abbreviation or text. Please try again; note you can only use emoji like a country\'s flag or extras such as the pirate and gay pride flags')
+            return await interaction.followup.send(
+                f'{config.redTick} You didn\'t provide a valid supported emoji that represents a flag -- make sure you are providing an emoji, not an abbreviation or text. Please try again; note you can only use emoji like a country\'s flag or extras such as the pirate and gay pride flags'
+            )
 
         # Convert list of ints to lowercase hex code points, seperated by dashes
         pointStr = '-'.join('{:04x}'.format(n) for n in code_points)
 
         if not Path(f'{self.twemojiPath}{pointStr}.png').is_file():
-            return await interaction.followup.send(f'{config.redTick} You didn\'t provide a valid supported emoji that represents a flag -- make sure you are providing an emoji, not an abbreviation or text. Please try again; note you can only use emoji like a country\'s flag or extras such as the pirate and gay pride flags')
+            return await interaction.followup.send(
+                f'{config.redTick} You didn\'t provide a valid supported emoji that represents a flag -- make sure you are providing an emoji, not an abbreviation or text. Please try again; note you can only use emoji like a country\'s flag or extras such as the pirate and gay pride flags'
+            )
 
         db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': pointStr, 'profileSetup': True}})
-        await interaction.followup.send(f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
+        await interaction.followup.send(
+            f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:',
+            file=await self._generate_profile_card_from_member(interaction.user),
+        )
 
     async def _profile_timezone_autocomplete(self, interaction: discord.Interaction, current: str):
         if current:
@@ -865,14 +869,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @app_commands.autocomplete(timezone=_profile_timezone_autocomplete)
     async def _profile_timezone(self, interaction: discord.Interaction, timezone: str):
         await interaction.response.defer(ephemeral=True)
-    
+
         db = mclient.bowser.users
         for tz in pytz.all_timezones:
             if timezone.lower() == tz.lower():
                 db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
-                return await interaction.followup.send(f'{config.greenTick} Your timezone has been successfully updated on your profile card! Here\'s how it looks:', file=await self._generate_profile_card_from_member(interaction.user))
+                return await interaction.followup.send(
+                    f'{config.greenTick} Your timezone has been successfully updated on your profile card! Here\'s how it looks:',
+                    file=await self._generate_profile_card_from_member(interaction.user),
+                )
 
-        await interaction.followup.send(f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc')
+        await interaction.followup.send(
+            f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc'
+        )
 
     async def _profile_games_autocomplete(self, interaction: discord.Interaction, current: str):
         return await self.Games._games_search_autocomplete(interaction, current)
@@ -881,14 +890,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @app_commands.describe(
         game1='You need to pick at least one game. Search by name and use autocomplete to help!',
         game2='Optionally pick a 2nd game to show on your profile as well. Search by name and use autocomplete to help!',
-        game3='Optionally pick a 3rd game to show on your profile as well. Search by name and use autocomplete to help!'
+        game3='Optionally pick a 3rd game to show on your profile as well. Search by name and use autocomplete to help!',
     )
     @app_commands.autocomplete(
-        game1=_profile_games_autocomplete,
-        game2=_profile_games_autocomplete,
-        game3=_profile_games_autocomplete
+        game1=_profile_games_autocomplete, game2=_profile_games_autocomplete, game3=_profile_games_autocomplete
     )
-    async def _profile_games(self, interaction: discord.Interaction, game1: str, game2: typing.Optional[str], game3: typing.Optional[str]):
+    async def _profile_games(
+        self, interaction: discord.Interaction, game1: str, game2: typing.Optional[str], game3: typing.Optional[str]
+    ):
         await interaction.response.defer(ephemeral=True)
 
         db = mclient.bowser.games
@@ -904,7 +913,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return self.Games.search(game_name)
 
         async def return_failure(interaction: discord.Interaction, game_name: str):
-            return await interaction.followup.send(f'{config.redTick} I was unable to match the game named "{game_name}" with any game released on the Nintendo Switch. Please try again, or contact a moderator if you believe this is in error')
+            return await interaction.followup.send(
+                f'{config.redTick} I was unable to match the game named "{game_name}" with any game released on the Nintendo Switch. Please try again, or contact a moderator if you believe this is in error'
+            )
 
         if not guid1:
             flagConfirmation = True
@@ -920,7 +931,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if not guid2:
                 return await return_failure(interaction, game2)
 
-        if guid2: gameList.append(guid2['guid'])
+        if guid2:
+            gameList.append(guid2['guid'])
 
         if game3 and not guid3:
             flagConfirmation = True
@@ -928,7 +940,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if not guid3:
                 return await return_failure(interaction, game3)
 
-        if guid3: gameList.append(guid3['guid'])
+        if guid3:
+            gameList.append(guid3['guid'])
 
         logging.info(guid1)
         logging.info(guid2)
@@ -937,22 +950,37 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         msg = None
         if flagConfirmation:
             # Double check with the user since we needed to use search confidence to obtain one or more of their games
-            embed = discord.Embed(title='Are these games correct?', description='*Use the buttons below to confirm*', color=0xf5ff00)
+            embed = discord.Embed(
+                title='Are these games correct?', description='*Use the buttons below to confirm*', color=0xF5FF00
+            )
             embed.add_field(name='Game 1', value=db.find_one({'guid': guid1['guid']})['name'])
-            if guid2: embed.add_field(name='Game 2', value=db.find_one({'guid': guid2['guid']})['name'])
-            if guid3: embed.add_field(name='Game 3', value=db.find_one({'guid': guid3['guid']})['name'])
+            if guid2:
+                embed.add_field(name='Game 2', value=db.find_one({'guid': guid2['guid']})['name'])
+            if guid3:
+                embed.add_field(name='Game 3', value=db.find_one({'guid': guid3['guid']})['name'])
             view = tools.NormalConfirmation(timeout=90.0)
 
-            view.message = await interaction.followup.send(':mag: I needed to do an extra search to find one or more of your games. So that I can make sure I found the correct games for you, please use the **Yes** button if everything looks okay or the **No** button if something doesn\'t look right:', embed=embed, view=view, wait=True)
+            view.message = await interaction.followup.send(
+                ':mag: I needed to do an extra search to find one or more of your games. So that I can make sure I found the correct games for you, please use the **Yes** button if everything looks okay or the **No** button if something doesn\'t look right:',
+                embed=embed,
+                view=view,
+                wait=True,
+            )
             msg = view.message
-            await view.wait()            
+            await view.wait()
 
             if view.timedout:
-                return await view.message.edit(content=f'{config.redTick} Uh, oh. I didn\'t receive a response back from you in time; your profile\'s favorite games have not been changed. Please rerun the command to try again', embed=None)
+                return await view.message.edit(
+                    content=f'{config.redTick} Uh, oh. I didn\'t receive a response back from you in time; your profile\'s favorite games have not been changed. Please rerun the command to try again',
+                    embed=None,
+                )
 
             elif not view.value:
                 # User selected No
-                return await view.message.edit(content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please contact a moderator', embed=None)
+                return await view.message.edit(
+                    content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please contact a moderator',
+                    embed=None,
+                )
 
         # We are good to commit changes
         userDB = mclient.bowser.users
