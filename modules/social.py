@@ -746,6 +746,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:
         partialCode = re.search(self.friendCodeRegex['autocomplete'], current)
+
         def pad_extra_chars(partial_code: str):
             length = len(partial_code)
             if length < 4:
@@ -772,10 +773,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         else:
             friendcode += '-####-####'
 
-
         return [app_commands.Choice(name=friendcode, value=friendcode)]
 
-    @social_group.command(name='friendcode', description='Use this command to edit the displayed friend code on your profile')
+    @social_group.command(
+        name='friendcode', description='Use this command to edit the displayed friend code on your profile'
+    )
     @app_commands.describe(code='Update your Switch Friend code, formatted as SW-0000-0000-0000')
     @app_commands.autocomplete(code=_profile_friendcode_autocomplete)
     async def _profile_friendcode(self, interaction: discord.Interaction, code: str):
@@ -864,7 +866,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         else:
             return [app_commands.Choice(name=tz, value=tz) for tz in self.commonTimezones[0:9]]
 
-    @social_group.command(name='timezone', description='Pick your timezone to show on your profile and for when others are looking for group')
+    @social_group.command(
+        name='timezone',
+        description='Pick your timezone to show on your profile and for when others are looking for group',
+    )
     @app_commands.describe(timezone='This is based on your region. I.e. "America/New_York')
     @app_commands.autocomplete(timezone=_profile_timezone_autocomplete)
     async def _profile_timezone(self, interaction: discord.Interaction, timezone: str):
@@ -992,7 +997,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # Webhooks cannot be edited with a file
             await msg.delete()
 
-        await interaction.followup.send(message_reply, file=await self._generate_profile_card_from_member(interaction.user))
+        await interaction.followup.send(
+            message_reply, file=await self._generate_profile_card_from_member(interaction.user)
+        )
 
     class BackgroundSelectMenu(discord.ui.View):
         MESSAGE: discord.Message | None = None
@@ -1003,25 +1010,24 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             self.menus = []
             amt = len(options)
-            amt_req = math.ceil(amt/25) # Choice elements have a maximum of 25 items
+            amt_req = math.ceil(amt / 25)  # Choice elements have a maximum of 25 items
             logging.info(amt_req)
             if amt_req > 125:
                 # Don't want to think about what to do if this happens.
                 # We'd have the max menus on this message already
-                logging.error(f'[Social] BackgroundSelectMenu received a request for > 125 backgrounds, out of range. {amt} | id {initial_interaction.user.id}')
-                raise IndexError(f'BackgroundSelectMenu received a request for > 125 backgrounds, out of range. {amt} | id {initial_interaction.user.id}')
+                logging.error(
+                    f'[Social] BackgroundSelectMenu received a request for > 125 backgrounds, out of range. {amt} | id {initial_interaction.user.id}'
+                )
+                raise IndexError(
+                    f'BackgroundSelectMenu received a request for > 125 backgrounds, out of range. {amt} | id {initial_interaction.user.id}'
+                )
 
             for x in range(amt_req):
                 x += 1
                 logging.info('we ball')
-                choices = options[(x - 1) * 25:x * 25] # Make sure we need 25 long indexes i.e. [0:25], [25:50]
+                choices = options[(x - 1) * 25 : x * 25]  # Make sure we need 25 long indexes i.e. [0:25], [25:50]
                 logging.info(choices)
-                menu = discord.ui.Select(
-                    placeholder='Choose a background',
-                    options=choices,
-                    min_values=0,
-                    max_values=1
-                )
+                menu = discord.ui.Select(placeholder='Choose a background', options=choices, min_values=0, max_values=1)
                 menu.callback = self.select_option
                 self.add_item(menu)
                 self.menus.append(menu)
@@ -1030,7 +1036,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             button.callback = self.cancel_button
             self.add_item(button)
             logging.info(self.children)
-            asyncio.run_coroutine_threadsafe(initial_interaction.edit_original_response(view=self), initial_interaction.client.loop)
+            asyncio.run_coroutine_threadsafe(
+                initial_interaction.edit_original_response(view=self), initial_interaction.client.loop
+            )
 
         async def select_option(self, interaction: discord.Interaction):
             for s in self.menus:
@@ -1040,17 +1048,27 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     db.update_one({'_id': interaction.user.id}, {'$set': {'background': value}})
 
                     await self.MESSAGE.delete()
-                    await interaction.response.send_message(f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:', file=await self.Parent._generate_profile_card_from_member(interaction.user), embed=None, view=None, ephemeral=True)
+                    await interaction.response.send_message(
+                        f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:',
+                        file=await self.Parent._generate_profile_card_from_member(interaction.user),
+                        embed=None,
+                        view=None,
+                        ephemeral=True,
+                    )
                     return self.stop()
 
             await interaction.response.edit_message(view=self)
 
         async def cancel_button(self, interaction: discord.Interaction):
-            await interaction.response.edit_message(content='Background editing canceled. To begin again, rerun the command', embed=None, view=None)
+            await interaction.response.edit_message(
+                content='Background editing canceled. To begin again, rerun the command', embed=None, view=None
+            )
             self.stop()
 
         async def on_timeout(self):
-            await self.MESSAGE.edit(content='Background editing timed out. To begin again, rerun the command', embed=None, view=None)
+            await self.MESSAGE.edit(
+                content='Background editing timed out. To begin again, rerun the command', embed=None, view=None
+            )
 
     @social_group.command(name='background', description='Update the background you use on your profile card')
     async def _profile_background(self, interaction: discord.Interaction):
@@ -1070,24 +1088,36 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         human_backgrounds = ', '.join(formattedBgs)
         logging.info(choices)
-        view = self.BackgroundSelectMenu(self, choices, interaction, )
-        embed = discord.Embed(url='http://rnintendoswitch.com', color=0x8bc062)
+        view = self.BackgroundSelectMenu(
+            self,
+            choices,
+            interaction,
+        )
+        embed = discord.Embed(url='http://rnintendoswitch.com', color=0x8BC062)
         embed.set_author(name=str(interaction.user), icon_url=interaction.user.display_avatar.url)
-        embed.description = '**Let\'s Choose a New Profile Background**\nUsing the select menus below, you can choose a new profile background!' \
+        embed.description = (
+            '**Let\'s Choose a New Profile Background**\nUsing the select menus below, you can choose a new profile background!'
             f' You currently you access to:\n\n> {human_backgrounds}\nExamples of all these backgrounds are:'
+        )
 
         view.MESSAGE = await interaction.followup.send(embeds=[embed], view=view, wait=True)
 
-    @social_group.command(name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games')
+    @social_group.command(
+        name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games'
+    )
     @app_commands.describe(element='The part of your profile card you which to remove or reset')
-    async def _profile_remove(self, interaction: discord.Interaction, element: typing.Literal['Friend Code', 'Flag', 'Timezone', 'Favorite Games', 'Background']):
+    async def _profile_remove(
+        self,
+        interaction: discord.Interaction,
+        element: typing.Literal['Friend Code', 'Flag', 'Timezone', 'Favorite Games', 'Background'],
+    ):
         await interaction.response.defer(ephemeral=True)
         elementKeyPairs = {
             'Friend Code': ('friendcode', 'has'),
             'Flag': ('regionFlag', 'has'),
             'Timezone': ('timezone', 'has'),
             'Favorite Games': ('favgames', 'have'),
-            'Background': ('background', 'has')
+            'Background': ('background', 'has'),
         }
 
         db = mclient.bowser.users
@@ -1106,7 +1136,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         msg += 'Here\'s how it looks:'
         await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
 
-    @social_group.command(name='edit', description='Run this command for help with editing your profile and what the other commands do')
+    @social_group.command(
+        name='edit', description='Run this command for help with editing your profile and what the other commands do'
+    )
     async def _profile_edit(self, interaction: discord.Interaction):
         db = mclient.bowser.users
         u = db.find_one({'_id': interaction.user.id})
@@ -1117,10 +1149,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     @app_commands.checks.has_any_role(config.moderator, config.eh)
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _profile_validate(self, interaction: discord.Interaction, attach: discord.Attachment, theme: typing.Literal['light', 'dark'], bg_opacity: int):
+    async def _profile_validate(
+        self,
+        interaction: discord.Interaction,
+        attach: discord.Attachment,
+        theme: typing.Literal['light', 'dark'],
+        bg_opacity: int,
+    ):
         await interaction.response.defer()
         if interaction.user.id not in self.validate_allowed_users:
-            return await interaction.followup.send(':x: You do not have permission to run this command.', ephemeral=True)
+            return await interaction.followup.send(
+                ':x: You do not have permission to run this command.', ephemeral=True
+            )
 
         if not attach.content_type == 'image/png' or attach.height != 900 or attach.width != 1600:
             return await interaction.followup.send(':x: Attachment must be a 1600x900 PNG file', ephemeral=True)
@@ -1131,7 +1171,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if filename != safefilename:
             return await interaction.followup.send(
                 ':x: Filenames cannot start with a number or contain non-alphanumeric characters except for an underscore',
-                ephemeral=True
+                ephemeral=True,
             )
 
         bg_raw_img = Image.open(io.BytesIO(await attach.read())).convert("RGBA")
@@ -1154,7 +1194,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await interaction.followup.send(
                 ':x: Too many pixels have the incorrect transparency! '
                 f'Expected at least {CORRECT_THRESHOLD*100:0.3f}% correct, actually {percent_correct*100:0.3f}%',
-                ephemeral=True
+                ephemeral=True,
             )
         # end check mask
 
@@ -1191,7 +1231,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     trivia_group = TriviaCommand(name='trivia', description='Manage trivia awards for members')
 
-    @trivia_group.command(name='award', description='Increase the trivia award trophy by one tier for one or more users')
+    @trivia_group.command(
+        name='award', description='Increase the trivia award trophy by one tier for one or more users'
+    )
     @app_commands.describe(members='The user or users you wish to award. Must be user ids separated by a space')
     async def _trivia_award(self, interaction, members: str):
         '''Increase the trivia award trophy by one tier for one or more users'''
@@ -1234,9 +1276,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 value=f'The following users were not updated because they already have the max level trophy:\n\n{", ".join(failed)}',
             )
 
-        await interaction.edit_original_response(content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed)
+        await interaction.edit_original_response(
+            content=f'{config.greenTick} Trivia trophy awards complete.', embed=embed
+        )
 
-    @trivia_group.command(name='reduce', description='Reduce the trivia award of a user by 1 tier. Consider profile revoke to fully remove')
+    @trivia_group.command(
+        name='reduce',
+        description='Reduce the trivia award of a user by 1 tier. Consider profile revoke to fully remove',
+    )
     @app_commands.describe(members='The user or users you wish to reduce. Must be user ids separated by a space')
     async def _trivia_reduce(self, interaction: discord.Interaction, members: str):
         '''Reduce the trivia award trophy tier by 1 for one or more users. If you are trying to take away the trophy entirely, consider using the "profile revoke" command instead'''
@@ -1279,11 +1326,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 value=f'The following users were not updated because they do not have any trivia trophies:\n\n{", ".join(failed)}',
             )
 
-        await interaction.edit_original_response(content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed)
+        await interaction.edit_original_response(
+            content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed
+        )
 
     @social_group.command(name='grant', description='Grants a specified item, background, or trophy to a member')
     @app_commands.describe(members='The user or users you wish to grant items. Must be user ids separated by a space')
-    async def _profile_grant(self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str):
+    async def _profile_grant(
+        self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str
+    ):
         '''Grants specified item, background or trophy, to a member'''
         await interaction.response.defer()
         item = item.lower()
@@ -1310,9 +1361,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 return await interaction.followup.send(f'{config.redTick} Invalid trophy: {name}', ephemeral=True)
 
             if name in self.special_trophies:
-                return await interaction.followup.send(f'{config.redTick} Trophy cannot be granted via command: {name}', ephemeral=True)
+                return await interaction.followup.send(
+                    f'{config.redTick} Trophy cannot be granted via command: {name}', ephemeral=True
+                )
 
-        msg = await interaction.followup.send(f'{config.loading} Granting {item.title()} `{name}` to {len(users)} member(s)...', wait=True)
+        msg = await interaction.followup.send(
+            f'{config.loading} Granting {item.title()} `{name}` to {len(users)} member(s)...', wait=True
+        )
         failCount = 0
         for m in users:
             try:
@@ -1337,7 +1392,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @social_group.command(name='revoke', description='Revokes a specified item, background, or trophy from a member')
     @app_commands.describe(members='The user or users you wish to revoke items. Must be user ids separated by a space')
-    async def _profile_revoke(self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str):
+    async def _profile_revoke(
+        self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str
+    ):
         '''Revokes specified item, background or trophy, from a member'''
         await interaction.response.defer()
         item = item.lower()
@@ -1356,9 +1413,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 return await interaction.followup.send(f'{config.redTick} Provided user {m} is invalid', ephemeral=True)
 
         if item == 'trophy' and name in self.special_trophies:
-            return await interaction.followup.send(f'{config.redTick} Trophy cannot be revoked via command: {name}', ephemeral=True)
+            return await interaction.followup.send(
+                f'{config.redTick} Trophy cannot be revoked via command: {name}', ephemeral=True
+            )
 
-        msg = await interaction.followup.send(f'{config.loading} Revoking {item.title()} `{name}` from {len(members)} member(s)...', wait=True)
+        msg = await interaction.followup.send(
+            f'{config.loading} Revoking {item.title()} `{name}` from {len(members)} member(s)...', wait=True
+        )
         failCount = 0
         for m in users:
             try:
