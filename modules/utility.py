@@ -49,14 +49,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         # Add context menus to command tree
         self.historyContextMenu = app_commands.ContextMenu(
-            name='View History', 
-            callback=self._pull_history, 
-            type=discord.AppCommandType.user
+            name='View History', callback=self._pull_history, type=discord.AppCommandType.user
         )
-        self.bot.tree.add_command(
-            self.historyContextMenu,
-            guild=discord.Object(id=config.nintendoswitch)
-        )
+        self.bot.tree.add_command(self.historyContextMenu, guild=discord.Object(id=config.nintendoswitch))
 
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
@@ -556,7 +551,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _history(self, interaction: discord.Interaction, user: typing.Optional[discord.User]):
-        if not user: user = interaction.user
+        if not user:
+            user = interaction.user
         return await self._pull_history(interaction, user)
 
     async def _pull_history(self, interaction: discord.Interaction, user: discord.User):
