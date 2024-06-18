@@ -1091,7 +1091,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f' You currently you access to:\n\n> {human_backgrounds}\nExamples of all these backgrounds are:'
         )
 
-        view.MESSAGE = await interaction.followup.send(embeds=[embed], file=await self._generate_background_preview(backgrounds), view=view, wait=True)
+        view.MESSAGE = await interaction.followup.send(
+            embeds=[embed], file=await self._generate_background_preview(backgrounds), view=view, wait=True
+        )
 
     @social_group.command(
         name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games'
