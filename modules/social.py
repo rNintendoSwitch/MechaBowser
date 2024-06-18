@@ -729,7 +729,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         embed_description += (
             f'\n\n- **Add Your Friend Code**: </profile friendcode:{commandID}> Add your friend code to allow friend requests!'
-            f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone.'
+            f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone. You can find yours by clicking [here](https://www.timezoneconverter.com/cgi-bin/findzone.tzc).'
             f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji on your card!'
             f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.'
             f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. '
@@ -885,7 +885,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 )
 
         await interaction.followup.send(
-            f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc'
+            f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc)'
         )
 
     async def _profile_games_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -948,10 +948,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if guid3:
             gameList.append(guid3['guid'])
 
-        logging.info(guid1)
-        logging.info(guid2)
-        logging.info(guid3)
-
         msg = None
         if flagConfirmation:
             # Double check with the user since we needed to use search confidence to obtain one or more of their games
@@ -989,7 +985,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # We are good to commit changes
         userDB = mclient.bowser.users
-        logging.info(gameList)
         userDB.update_one({'_id': interaction.user.id}, {'$set': {'favgames': gameList}})
         message_reply = f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:'
 
@@ -1011,7 +1006,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.menus = []
             amt = len(options)
             amt_req = math.ceil(amt / 25)  # Choice elements have a maximum of 25 items
-            logging.info(amt_req)
             if amt_req > 125:
                 # Don't want to think about what to do if this happens.
                 # We'd have the max menus on this message already
@@ -1024,9 +1018,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
             for x in range(amt_req):
                 x += 1
-                logging.info('we ball')
                 choices = options[(x - 1) * 25 : x * 25]  # Make sure we need 25 long indexes i.e. [0:25], [25:50]
-                logging.info(choices)
                 menu = discord.ui.Select(placeholder='Choose a background', options=choices, min_values=0, max_values=1)
                 menu.callback = self.select_option
                 self.add_item(menu)
@@ -1035,7 +1027,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             button = discord.ui.Button(label='Cancel', style=discord.ButtonStyle.secondary)
             button.callback = self.cancel_button
             self.add_item(button)
-            logging.info(self.children)
             asyncio.run_coroutine_threadsafe(
                 initial_interaction.edit_original_response(view=self), initial_interaction.client.loop
             )
@@ -1049,7 +1040,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                     await self.MESSAGE.delete()
                     await interaction.response.send_message(
-                        f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:',
+                        f'{config.greenTick} Your background has been successfully updated on your profile card! Here\'s how it looks:',
                         file=await self.Parent._generate_profile_card_from_member(interaction.user),
                         embed=None,
                         view=None,
@@ -1080,14 +1071,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         choices = []
         formattedBgs = []
+        backgrounds = list(reversed(user['backgrounds']))
 
-        for background in list(reversed(user['backgrounds'])):
+        for background in backgrounds:
             name = background.replace('-', ' ').title()
             choices.append(discord.SelectOption(label=name, value=background, default=bg == background))
             formattedBgs.append(name)
 
         human_backgrounds = ', '.join(formattedBgs)
-        logging.info(choices)
         view = self.BackgroundSelectMenu(
             self,
             choices,
@@ -1100,7 +1091,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f' You currently you access to:\n\n> {human_backgrounds}\nExamples of all these backgrounds are:'
         )
 
-        view.MESSAGE = await interaction.followup.send(embeds=[embed], view=view, wait=True)
+        view.MESSAGE = await interaction.followup.send(embeds=[embed], file=await self._generate_background_preview(backgrounds), view=view, wait=True)
 
     @social_group.command(
         name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games'
@@ -1143,7 +1134,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db = mclient.bowser.users
         u = db.find_one({'_id': interaction.user.id})
         embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
-        await interaction.response.send_message(embed=embed, file=card)
+        await interaction.response.send_message(embed=embed, file=card, ephemeral=True)
 
     @social_group.command(name='validate', description='Validate a new background with selected opacity')
     @app_commands.checks.has_any_role(config.moderator, config.eh)
