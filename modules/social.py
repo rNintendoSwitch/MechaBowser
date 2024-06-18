@@ -252,9 +252,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         img = Image.new('RGBA', theme['pfpBackground'].size, (0, 0, 0, 0))
 
         snoo = Image.open('resources/profiles/layout/snoo.png').convert("RGBA")
-        gameUnderline = Image.open(f'resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert(
-            "RGBA"
-        )
+        gameUnderline = Image.open(f'resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert("RGBA")
         trophyUnderline = Image.open(f'resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
             "RGBA"
         )
@@ -571,7 +569,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             14: (616, 745),
             15: (728, 745),
             16: (839, 745),
-            17: (950, 745)
+            17: (950, 745),
         }
         trophyNum = 0
         useBorder = None
@@ -622,13 +620,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 for char in gameName:
                     if nameW >= nameWMax:
                         if lineNum == 3:
-                            draw.text(
-                                (nameW, lineHight), '...', tuple(theme["primary"]), font=game_name_font
-                            )
+                            draw.text((nameW, lineHight), '...', tuple(theme["primary"]), font=game_name_font)
                             break
 
                         lineNum += 1
-                        lineHight += 40 #px
+                        lineHight += 40  # px
                         nameW = 1285
 
                     draw.text((nameW, lineHight), char, tuple(theme["primary"]), font=game_name_font)
@@ -910,10 +906,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         game5='Optionally pick a 5th game to show on your profile as well. Search by name and use autocomplete to help!',
     )
     @app_commands.autocomplete(
-        game1=_profile_games_autocomplete, game2=_profile_games_autocomplete, game3=_profile_games_autocomplete, game4=_profile_games_autocomplete, game5=_profile_games_autocomplete
+        game1=_profile_games_autocomplete,
+        game2=_profile_games_autocomplete,
+        game3=_profile_games_autocomplete,
+        game4=_profile_games_autocomplete,
+        game5=_profile_games_autocomplete,
     )
     async def _profile_games(
-        self, interaction: discord.Interaction, game1: str, game2: typing.Optional[str], game3: typing.Optional[str], game4: typing.Optional[str], game5: typing.Optional[str]
+        self,
+        interaction: discord.Interaction,
+        game1: str,
+        game2: typing.Optional[str],
+        game3: typing.Optional[str],
+        game4: typing.Optional[str],
+        game5: typing.Optional[str],
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -928,20 +934,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         guid4 = None if not game4 else db.find_one({'guid': game4})
         guid5 = None if not game5 else db.find_one({'guid': game5})
 
-        games = [
-            game1,
-            game2,
-            game3,
-            game4,
-            game5
-        ]
-        guids = [
-            guid1,
-            guid2,
-            guid3,
-            guid4,
-            guid5
-        ]
+        games = [game1, game2, game3, game4, game5]
+        guids = [guid1, guid2, guid3, guid4, guid5]
 
         def resolve_guid(game_name: str):
             return self.Games.search(game_name)
