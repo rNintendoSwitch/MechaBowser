@@ -47,8 +47,12 @@ class BotCache(commands.Cog):
 
             logging.info('[Bot] Syncronizing command tree')
             guildObj = discord.Object(id=config.nintendoswitch)
-            self.bot.tree.copy_global_to(guild=guildObj)
-            await self.bot.tree.sync(guild=guildObj)
+
+            # Sync tree and grab command IDs
+            remote = await self.bot.tree.sync(guild=guildObj)
+            local = self.bot.tree.get_commands(guild=guildObj)
+            for rc, lc in zip(remote, local):  # We are pulling command IDs from server-side, then storing the mentions
+                lc.extras['id'] = rc.id
 
             logging.info('[Cache] Performing initial database synchronization')
             db = mclient.bowser.users
