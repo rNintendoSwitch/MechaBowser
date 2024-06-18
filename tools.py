@@ -775,7 +775,7 @@ class PaginatedEmbed(discord.ui.View):
         if self.single_page:
             interaction.client.loop.call_soon(
                 interaction.client.loop.create_task,
-                self.process_response(embed, interaction=interaction, button_interact=False)
+                self.process_response(embed, interaction=interaction, button_interact=False),
             )
 
             self.stop()  # If one page is required, exit the view
@@ -784,7 +784,7 @@ class PaginatedEmbed(discord.ui.View):
             self.ui_setup()  # Create our UI elements
             interaction.client.loop.call_soon(
                 interaction.client.loop.create_task,
-                self.process_response(embed, interaction=interaction, button_interact=False)
+                self.process_response(embed, interaction=interaction, button_interact=False),
             )
 
     def ui_setup(self):

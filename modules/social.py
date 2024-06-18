@@ -1028,8 +1028,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             button.callback = self.cancel_button
             self.add_item(button)
             initial_interaction.client.loop.call_soon(
-                initial_interaction.client.loop.create_task,
-                initial_interaction.edit_original_response(view=self)
+                initial_interaction.client.loop.create_task, initial_interaction.edit_original_response(view=self)
             )
 
         async def select_option(self, interaction: discord.Interaction):
