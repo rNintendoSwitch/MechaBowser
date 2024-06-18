@@ -124,6 +124,32 @@ class Games(commands.Cog, name='Games'):
         self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
         self.db.create_index([("game.id", pymongo.ASCENDING)])
 
+        # Generate the pipeline
+        self.pipeline = [
+            {'$match': {'_type': 'game'}},  # Select games
+            {
+                '$graphLookup': {
+                    'from': 'games',
+                    'startWith': '$id',
+                    'connectFromField': 'id',
+                    'connectToField': 'game.id',
+                    'as': '_releases',
+                    'restrictSearchWithMatch': {'_type': 'release'},
+                }
+            },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
+            {
+                '$project': {
+                    'guid': 1,
+                    'name': 1,
+                    'aliases': 1,
+                    'original_release_date': 1,
+                    '_releases.name': 1,
+                    '_releases.release_date': 1,
+                }
+            },  # Filter to only stuff we want
+        ]
+        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
+
         if AUTO_SYNC:
             self.sync_db.start()  # pylint: disable=no-member
 
@@ -171,6 +197,7 @@ class Games(commands.Cog, name='Games'):
             'count': count,
             'running': False,
         }
+        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
 
         return count, detail_str
 
@@ -199,32 +226,7 @@ class Games(commands.Cog, name='Games'):
 
     def search(self, query: str) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
-
-        pipeline = [
-            {'$match': {'_type': 'game'}},  # Select games
-            {
-                '$graphLookup': {
-                    'from': 'games',
-                    'startWith': '$id',
-                    'connectFromField': 'id',
-                    'connectToField': 'game.id',
-                    'as': '_releases',
-                    'restrictSearchWithMatch': {'_type': 'release'},
-                }
-            },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
-            {
-                '$project': {
-                    'guid': 1,
-                    'name': 1,
-                    'aliases': 1,
-                    'original_release_date': 1,
-                    '_releases.name': 1,
-                    '_releases.release_date': 1,
-                }
-            },  # Filter to only stuff we want
-        ]
-
-        for game in self.db.aggregate(pipeline):
+        for game in self.aggregatePipeline:
             names = collections.Counter([game['name']])
             if game['aliases']:
                 names.update(game['aliases'])
