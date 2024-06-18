@@ -373,7 +373,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _info(self, interaction: discord.Interaction, user: discord.User):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         inServer = True
         dbUser = mclient.bowser.users.find_one({'_id': user.id})
 
