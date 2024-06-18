@@ -968,9 +968,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 wait=True,
             )
             msg = view.message
-            await view.wait()
+            timedOut = await view.wait()
 
-            if view.timedout:
+            if timedOut:
                 return await view.message.edit(
                     content=f'{config.redTick} Uh, oh. I didn\'t receive a response back from you in time; your profile\'s favorite games have not been changed. Please rerun the command to try again',
                     embed=None,

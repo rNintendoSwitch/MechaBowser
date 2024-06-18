@@ -267,9 +267,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 view=view,
                 wait=True,
             )
-            await view.wait()
+            timedOut = await view.wait()
 
-            if view.timedout:
+            if timedOut:
                 await view.message.edit(content='Confirmation timed out, clean action canceled.', view=view)
                 return await view.message.delete(delay=5)
 
@@ -976,9 +976,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 f'This action will delete the tag "{name}", are you sure you want to proceed?', view=view
             )
             view.message = await interaction.original_response()
-            await view.wait()
+            timedOut = await view.wait()
 
-            if view.timedout:
+            if timedOut:
                 await view.message.edit(content='Deletion timed out. Rerun command to try again', view=view)
 
             if view.value:

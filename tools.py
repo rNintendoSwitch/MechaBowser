@@ -47,7 +47,6 @@ class RiskyConfirmation(discord.ui.View):
     def __init__(self, timeout=120.0):
         super().__init__(timeout=timeout)
         self.value = None
-        self.timedout = False
 
     @discord.ui.button(label='Yes', style=discord.ButtonStyle.danger)
     async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -68,8 +67,6 @@ class RiskyConfirmation(discord.ui.View):
             c.disabled = True
 
     async def on_timeout(self):
-        # TODO: on_timeout not being called back
-        self.timedout = True
         self.disable_buttons()
         if self.message:
             await self.message.edit(view=self)
@@ -81,7 +78,6 @@ class NormalConfirmation(discord.ui.View):
     def __init__(self, timeout=120.0):
         super().__init__(timeout=timeout)
         self.value = None
-        self.timedout = False
 
     @discord.ui.button(label='Yes', style=discord.ButtonStyle.success)
     async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -96,7 +92,6 @@ class NormalConfirmation(discord.ui.View):
         self.stop()
 
     async def on_timeout(self):
-        self.timedout = True
         if self.message:
             await self.message.edit(view=None)
 
