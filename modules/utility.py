@@ -1261,5 +1261,5 @@ async def setup(bot):
 
 
 async def teardown(bot):
-    bot.remove_cog('ChatControl')
+    await bot.remove_cog('ChatControl')
     logging.info('[Extension] Utility module unloaded')
