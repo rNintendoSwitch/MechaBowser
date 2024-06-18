@@ -25,7 +25,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.publicModLogs = self.bot.get_channel(config.publicModChannel)
         self.taskHandles = {}
         self.NS = self.bot.get_guild(config.nintendoswitch)
-        self.roles = {'mute': self.NS.get_role(config.mute)}
 
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
