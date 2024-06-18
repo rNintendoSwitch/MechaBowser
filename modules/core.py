@@ -28,8 +28,8 @@ class MainEvents(commands.Cog):
             await self.bot.load_extension('modules.moderation')
             await self.bot.load_extension('modules.utility')
             await self.bot.load_extension('modules.statistics')
-            await self.bot.load_extension('modules.social')
             await self.bot.load_extension('modules.games')
+            await self.bot.load_extension('modules.social')
             try:  # Private submodule extensions
                 await self.bot.load_extension('private.automod')
             except commands.errors.ExtensionNotFound:
