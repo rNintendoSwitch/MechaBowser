@@ -773,15 +773,18 @@ class PaginatedEmbed(discord.ui.View):
         self.build_pages(interaction, fields)
         embed = self.generate_new_embed()
         if self.single_page:
-            asyncio.run_coroutine_threadsafe(
-                self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop
+            interaction.client.loop.call_soon(
+                interaction.client.loop.create_task,
+                self.process_response(embed, interaction=interaction, button_interact=False)
             )
+
             self.stop()  # If one page is required, exit the view
 
         else:
             self.ui_setup()  # Create our UI elements
-            asyncio.run_coroutine_threadsafe(
-                self.process_response(embed, interaction=interaction, button_interact=False), self.bot.loop
+            interaction.client.loop.call_soon(
+                interaction.client.loop.create_task,
+                self.process_response(embed, interaction=interaction, button_interact=False)
             )
 
     def ui_setup(self):
