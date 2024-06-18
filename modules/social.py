@@ -252,25 +252,25 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         img = Image.new('RGBA', theme['pfpBackground'].size, (0, 0, 0, 0))
 
         snoo = Image.open('resources/profiles/layout/snoo.png').convert("RGBA")
-        trophyUnderline = Image.open(f'resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert(
+        gameUnderline = Image.open(f'resources/profiles/layout/{theme_name}/trophy-case-underline.png').convert(
             "RGBA"
         )
-        gameUnderline = Image.open(f'resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
+        trophyUnderline = Image.open(f'resources/profiles/layout/{theme_name}/favorite-games-underline.png').convert(
             "RGBA"
         )
 
         img.paste(snoo, (50, 50), snoo)
-        img.paste(trophyUnderline, (1150, 100), trophyUnderline)
-        img.paste(gameUnderline, (60, 645), gameUnderline)
+        img.paste(trophyUnderline, (60, 610), trophyUnderline)
+        img.paste(gameUnderline, (1150, 95), gameUnderline)
 
         draw = ImageDraw.Draw(img)
-        self._draw_text(draw, (150, 50), '/r/NintendoSwitch Discord', theme['branding'], fonts['meta'])
-        self._draw_text(draw, (150, 90), 'User Profile', theme['secondary_heading'], fonts['meta'])
-        self._draw_text(draw, (60, 470), 'Member since', theme['secondary_heading'], fonts['small'])
-        self._draw_text(draw, (435, 470), 'Messages sent', theme['secondary_heading'], fonts['small'])
-        self._draw_text(draw, (790, 470), 'Local time', theme['secondary_heading'], fonts['small'])
-        self._draw_text(draw, (60, 595), 'Favorite games', theme['primary_heading'], fonts['medium'])
-        self._draw_text(draw, (1150, 45), 'Trophy case', theme['primary_heading'], fonts['medium'])
+        self._draw_text(draw, (150, 60), '/r/NintendoSwitch Discord', theme['branding'], fonts['meta'])
+        self._draw_text(draw, (150, 100), 'User Profile', theme['secondary_heading'], fonts['meta'])
+        self._draw_text(draw, (60, 460), 'Member since', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (435, 460), 'Messages sent', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (790, 460), 'Local time', theme['secondary_heading'], fonts['small'])
+        self._draw_text(draw, (1150, 50), 'Favorite games', theme['primary_heading'], fonts['medium'])
+        self._draw_text(draw, (60, 565), 'Trophy case', theme['primary_heading'], fonts['medium'])
 
         return img
 
@@ -360,7 +360,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 gameImg = await self.Games.get_image(guid, 'icon_url')
 
                 if gameImg:
-                    gameIcon = Image.open(gameImg).convert('RGBA').resize((45, 45))
+                    gameIcon = Image.open(gameImg).convert('RGBA').resize((120, 120))
                 else:
                     gameIcon = None
 
@@ -432,7 +432,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         else:
             setGames = dbUser['favgames']
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
-            setGames = setGames[:3]  # Limit to 3 results, just in case
+            setGames = setGames[0:5]  # Limit to 5 results, just in case
 
             message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
 
@@ -471,12 +471,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if lambda_function(member, member.guild):
                 trophies.append(trophy)
 
-        if len(trophies) < 15:  # Check for additional non-prefered trophies
+        if len(trophies) < 18:  # Check for additional non-prefered trophies
             for x in dbUser['trophies']:
                 if x not in trophies:
                     trophies.append(x)
 
-        while len(trophies) < 15:
+        while len(trophies) < 18:
             trophies.append(None)
 
         profile = {
@@ -548,27 +548,30 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if profile['friendcode']:
             self._draw_text(draw, (350, 330), profile['friendcode'], theme["friend_code"], fonts['subtext'])
 
-        self._draw_text(draw, (435, 505), profile['message_count'], theme["primary"], fonts['medium'])
-        self._draw_text(draw, (60, 505), profile['joindate'], theme["primary"], fonts['medium'])
-        self._draw_text(draw, (790, 505), profile['usertime'], theme["primary"], fonts['medium'])
+        self._draw_text(draw, (435, 490), profile['message_count'], theme["primary"], fonts['medium'])
+        self._draw_text(draw, (60, 490), profile['joindate'], theme["primary"], fonts['medium'])
+        self._draw_text(draw, (790, 490), profile['usertime'], theme["primary"], fonts['medium'])
 
         # Start trophies
         trophyLocations = {
-            0: (1150, 150),
-            1: (1300, 150),
-            2: (1450, 150),
-            3: (1150, 300),
-            4: (1300, 300),
-            5: (1450, 300),
-            6: (1150, 450),
-            7: (1300, 450),
-            8: (1450, 450),
-            9: (1150, 600),
-            10: (1300, 600),
-            11: (1450, 600),
-            12: (1150, 750),
-            13: (1300, 750),
-            14: (1450, 750),
+            0: (60, 630),
+            1: (171, 630),
+            2: (283, 630),
+            3: (394, 630),
+            4: (505, 630),
+            5: (616, 630),
+            6: (728, 630),
+            7: (839, 630),
+            8: (950, 630),
+            9: (60, 745),
+            10: (171, 745),
+            11: (283, 745),
+            12: (394, 745),
+            13: (505, 745),
+            14: (616, 745),
+            15: (728, 745),
+            16: (839, 745),
+            17: (950, 745)
         }
         trophyNum = 0
         useBorder = None
@@ -586,8 +589,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.paste(border, (0, 0), border)
 
         # Start favorite games
-        gameIconLocations = {0: (60, 665), 1: (60, 730), 2: (60, 795)}
-        gameTextLocations = {0: 660, 1: 725, 2: 791}
+        gameIconLocations = {0: (1150, 130), 1: (1150, 280), 2: (1150, 430), 3: (1150, 580), 4: (1150, 730)}
+        gameTextLocations = {0: 130, 1: 280, 2: 430, 3: 580, 4: 730}
 
         setGames = profile['games']
         gameCount = 0
@@ -595,7 +598,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             gamesDb = mclient.bowser.games
 
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
-            setGames = setGames[:3]  # Limit to 3 results, just in case
+            setGames = setGames[:5]  # Limit to 5 results, just in case
 
             for game_guid in setGames:
                 if not self.Games:
@@ -609,24 +612,31 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 gameIcon = await self._cache_game_img(gamesDb, game_guid, theme)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
-                nameW = 120
-                nameWMax = 950
+                nameW = 1285
+                nameWMax = 1525
 
                 game_name_font = fonts['medium'][self._determine_cjk_font(gameName)]
 
+                lineNum = 1
+                lineHight = gameTextLocations[gameCount]
                 for char in gameName:
                     if nameW >= nameWMax:
-                        draw.text(
-                            (nameW, gameTextLocations[gameCount]), '...', tuple(theme["primary"]), font=game_name_font
-                        )
-                        break
+                        if lineNum == 3:
+                            draw.text(
+                                (nameW, lineHight), '...', tuple(theme["primary"]), font=game_name_font
+                            )
+                            break
 
-                    draw.text((nameW, gameTextLocations[gameCount]), char, tuple(theme["primary"]), font=game_name_font)
+                        lineNum += 1
+                        lineHight += 40 #px
+                        nameW = 1285
+
+                    draw.text((nameW, lineHight), char, tuple(theme["primary"]), font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
 
         if gameCount == 0:  # No games rendered
-            self._draw_text(draw, (60, 665), 'Not specified', theme["secondary_heading"], fonts['medium'])
+            self._draw_text(draw, (1150, 130), 'Not specified', theme["secondary_heading"], fonts['medium'])
 
         bytesFile = io.BytesIO()
         card.save(bytesFile, format='PNG')
@@ -896,12 +906,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         game1='You need to pick at least one game. Search by name and use autocomplete to help!',
         game2='Optionally pick a 2nd game to show on your profile as well. Search by name and use autocomplete to help!',
         game3='Optionally pick a 3rd game to show on your profile as well. Search by name and use autocomplete to help!',
+        game4='Optionally pick a 4th game to show on your profile as well. Search by name and use autocomplete to help!',
+        game5='Optionally pick a 5th game to show on your profile as well. Search by name and use autocomplete to help!',
     )
     @app_commands.autocomplete(
-        game1=_profile_games_autocomplete, game2=_profile_games_autocomplete, game3=_profile_games_autocomplete
+        game1=_profile_games_autocomplete, game2=_profile_games_autocomplete, game3=_profile_games_autocomplete, game4=_profile_games_autocomplete, game5=_profile_games_autocomplete
     )
     async def _profile_games(
-        self, interaction: discord.Interaction, game1: str, game2: typing.Optional[str], game3: typing.Optional[str]
+        self, interaction: discord.Interaction, game1: str, game2: typing.Optional[str], game3: typing.Optional[str], game4: typing.Optional[str], game5: typing.Optional[str]
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -913,6 +925,23 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         guid1 = db.find_one({'guid': game1})
         guid2 = None if not game2 else db.find_one({'guid': game2})
         guid3 = None if not game3 else db.find_one({'guid': game3})
+        guid4 = None if not game4 else db.find_one({'guid': game4})
+        guid5 = None if not game5 else db.find_one({'guid': game5})
+
+        games = [
+            game1,
+            game2,
+            game3,
+            game4,
+            game5
+        ]
+        guids = [
+            guid1,
+            guid2,
+            guid3,
+            guid4,
+            guid5
+        ]
 
         def resolve_guid(game_name: str):
             return self.Games.search(game_name)
@@ -922,31 +951,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{config.redTick} I was unable to match the game named "{game_name}" with any game released on the Nintendo Switch. Please try again, or contact a moderator if you believe this is in error'
             )
 
-        if not guid1:
-            flagConfirmation = True
-            guid1 = resolve_guid(game1)
-            if not guid1:
-                return await return_failure(interaction, game1)
+        flagConfirmation = False
+        for idx, guid in enumerate(guids):
+            if not games[idx]:
+                continue
 
-        gameList.append(guid1['guid'])
+            if not guid:
+                flagConfirmation = True
+                guid = resolve_guid(games[idx])
 
-        if game2 and not guid2:
-            flagConfirmation = True
-            guid2 = resolve_guid(game2)
-            if not guid2:
-                return await return_failure(interaction, game2)
+            if not guid:
+                return await return_failure(interaction, games[idx])
 
-        if guid2:
-            gameList.append(guid2['guid'])
-
-        if game3 and not guid3:
-            flagConfirmation = True
-            guid3 = resolve_guid(game3)
-            if not guid3:
-                return await return_failure(interaction, game3)
-
-        if guid3:
-            gameList.append(guid3['guid'])
+            gameList.append(guid['guid'])
 
         msg = None
         if flagConfirmation:
@@ -954,13 +971,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             embed = discord.Embed(
                 title='Are these games correct?', description='*Use the buttons below to confirm*', color=0xF5FF00
             )
-            embed.add_field(name='Game 1', value=db.find_one({'guid': guid1['guid']})['name'])
-            if guid2:
-                embed.add_field(name='Game 2', value=db.find_one({'guid': guid2['guid']})['name'])
-            if guid3:
-                embed.add_field(name='Game 3', value=db.find_one({'guid': guid3['guid']})['name'])
-            view = tools.NormalConfirmation(timeout=90.0)
+            for idx, game in enumerate(gameList):
+                embed.add_field(name=f'Game {idx + 1}', value=db.find_one({'guid': game})['name'])
 
+            view = tools.NormalConfirmation(timeout=90.0)
             view.message = await interaction.followup.send(
                 ':mag: I needed to do an extra search to find one or more of your games. So that I can make sure I found the correct games for you, please use the **Yes** button if everything looks okay or the **No** button if something doesn\'t look right:',
                 embed=embed,
@@ -1207,7 +1221,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'message_count': "8,675,309",
             'joindate': "Jan. 01, 1970",
             'usertime': "Not specified",
-            'trophies': [None] * 15,
+            'trophies': [None] * 18,
             'games': ['3030-88442', '3030-87348', '3030-89546'],  # Games with really long titles
         }
 
