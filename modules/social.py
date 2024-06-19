@@ -267,8 +267,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self._draw_text(draw, (60, 460), 'Member since', theme['secondary_heading'], fonts['small'])
         self._draw_text(draw, (435, 460), 'Messages sent', theme['secondary_heading'], fonts['small'])
         self._draw_text(draw, (790, 460), 'Local time', theme['secondary_heading'], fonts['small'])
-        self._draw_text(draw, (1150, 50), 'Favorite games', theme['primary_heading'], fonts['medium'])
-        self._draw_text(draw, (60, 565), 'Trophy case', theme['primary_heading'], fonts['medium'])
+        self._draw_text(draw, (1150, 42), 'Favorite games', theme['primary_heading'], fonts['medium'])
+        self._draw_text(draw, (60, 557), 'Trophy case', theme['primary_heading'], fonts['medium'])
 
         return img
 
@@ -616,18 +616,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 game_name_font = fonts['medium'][self._determine_cjk_font(gameName)]
 
                 lineNum = 1
-                lineHight = gameTextLocations[gameCount]
+                lineHeight = gameTextLocations[gameCount]
                 for char in gameName:
                     if nameW >= nameWMax:
                         if lineNum == 3:
-                            draw.text((nameW, lineHight), '...', tuple(theme["primary"]), font=game_name_font)
+                            draw.text((nameW, lineHeight), '...', tuple(theme["primary"]), font=game_name_font)
                             break
 
                         lineNum += 1
-                        lineHight += 40  # px
+                        lineHeight += 40  # px
                         nameW = 1285
+                        if char == ' ':
+                            continue
 
-                    draw.text((nameW, lineHight), char, tuple(theme["primary"]), font=game_name_font)
+                    draw.text((nameW, lineHeight), char, tuple(theme["primary"]), font=game_name_font)
                     nameW += game_name_font.getsize(char)[0]
                 gameCount += 1
 
@@ -1005,7 +1007,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
 
     class BackgroundSelectMenu(discord.ui.View):
-        MESSAGE: discord.Message | None = None
+        message: discord.Message | None = None
 
         def __init__(self, Parent, options: list[discord.SelectOption], initial_interaction: discord.Interaction):
             super().__init__(timeout=180.0)
@@ -1046,7 +1048,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     db = mclient.bowser.users
                     db.update_one({'_id': interaction.user.id}, {'$set': {'background': value}})
 
-                    await self.MESSAGE.delete()
+                    await self.message.delete()
                     await interaction.response.send_message(
                         f'{config.greenTick} Your background has been successfully updated on your profile card! Here\'s how it looks:',
                         file=await self.Parent._generate_profile_card_from_member(interaction.user),
@@ -1065,7 +1067,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.stop()
 
         async def on_timeout(self):
-            await self.MESSAGE.edit(
+            await self.message.edit(
                 content='Background editing timed out. To begin again, rerun the command', embed=None, view=None
             )
 
@@ -1098,10 +1100,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             '**Let\'s Choose a New Profile Background**\nUsing the select menus below, you can choose a new profile background!'
             f' You currently you access to:\n\n> {human_backgrounds}\nExamples of all these backgrounds are:'
         )
+        embed.set_image(url='attachment://preview.png')
 
-        view.MESSAGE = await interaction.followup.send(
-            embeds=[embed], file=await self._generate_background_preview(backgrounds), view=view, wait=True
+        msg = await interaction.followup.send(
+            embeds=[embed], file=self._generate_background_preview(backgrounds), view=view, wait=True
         )
+        view.message = msg
+        view.wait()
 
     @social_group.command(
         name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games'
