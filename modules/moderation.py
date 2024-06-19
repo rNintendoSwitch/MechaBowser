@@ -69,11 +69,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     class GuildGroupCommand(app_commands.Group):
         pass
 
-    @app_commands.command(name='hide', description='Hide and mark the reason of an infraction as sensitive')
+    infraction_group = GuildGroupCommand(name='infraction', description='Tools to update an existing infraction')
+
+    @infraction_group.command(name='hide', description='Hide and mark the reason of an infraction as sensitive')
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
-    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
-    @app_commands.default_permissions(view_audit_log=True)
-    @app_commands.checks.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _hide_modlog(self, interaction: discord.Interaction, uuid: str):
         db = mclient.bowser.puns
@@ -138,11 +137,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             f'{config.greenTick} Successfully toggled the sensitive status for that infraction'
         )
 
-    infraction_group = GuildGroupCommand(name='infraction', description='Tools to update an existing infraction')
-
-    @infraction_group.command(
-        name='reason', description='Change the given reason for an infraction and notify the user of the change'
-    )
     @app_commands.describe(
         uuid='The infraction UUID, found in the footer of the mod log message embeds',
         reason='The new reason text for the infraction',
