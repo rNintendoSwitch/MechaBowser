@@ -262,8 +262,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         img.paste(gameUnderline, (1150, 95), gameUnderline)
 
         draw = ImageDraw.Draw(img)
-        self._draw_text(draw, (150, 60), '/r/NintendoSwitch Discord', theme['branding'], fonts['meta'])
-        self._draw_text(draw, (150, 100), 'User Profile', theme['secondary_heading'], fonts['meta'])
+        self._draw_text(draw, (150, 51), '/r/NintendoSwitch Discord', theme['branding'], fonts['meta'])
+        self._draw_text(draw, (150, 91), 'User Profile', theme['secondary_heading'], fonts['meta'])
         self._draw_text(draw, (60, 460), 'Member since', theme['secondary_heading'], fonts['small'])
         self._draw_text(draw, (435, 460), 'Messages sent', theme['secondary_heading'], fonts['small'])
         self._draw_text(draw, (790, 460), 'Local time', theme['secondary_heading'], fonts['small'])
