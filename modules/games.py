@@ -359,7 +359,7 @@ class Games(commands.Cog, name='Games'):
     class GamesCommand(app_commands.Group):
         pass
 
-    games_group = GamesCommand(name='games', description='Find out information about games for the Nintendo Switch!')
+    games_group = GamesCommand(name='game', description='Find out information about games for the Nintendo Switch!')
 
     async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
         if current:
