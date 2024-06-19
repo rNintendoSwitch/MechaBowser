@@ -190,7 +190,7 @@ class Games(commands.Cog, name='Games'):
                     count[path] += 1
 
             except aiohttp.ClientResponseError as e:
-                if e.status in [429, 420]: # Giantbomb uses 420 as ratelimiting
+                if e.status in [429, 420]:  # Giantbomb uses 420 as ratelimiting
                     logging.error('[Games] Ratelimited with GiantBomb, attempting retry at next loop')
                     raise RatelimitException
 
