@@ -180,8 +180,9 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
             f'{config.redTick} An error occured when running that command. Please wait a bit, then try again'
         )
         logging.error(f'[Bot] Unhandled exception in {interaction.command}: {exception}')
+        raise
 
 
 if __name__ == '__main__':
-    print('\033[94mMechaBowser by MattBSG#8888 2019\033[0m')
+    logging.info('\033[94mMechaBowser by mattbsg & lyrus ©2019-2024\033[0m')
     asyncio.run(bot.start(config.token))
