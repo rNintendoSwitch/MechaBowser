@@ -472,11 +472,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         punishments = ''
         punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
+        puns = 0
         if not punsCol.count():
             punishments = '__*No punishments on record*__'
 
         else:
-            puns = 0
             activeStrikes = 0
             totalStrikes = 0
             activeMute = None
@@ -523,12 +523,17 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed.description += f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
         embed.add_field(name='Punishments', value=punishments, inline=False)
-        return await interaction.followup.send(embed=embed, view=self.SuggestHistCommand(interaction))
+        if puns != 0:
+            await interaction.followup.send(embed=embed, view=self.SuggestHistCommand(interaction, self))
+
+        else:
+            await interaction.followup.send(embed=embed)
 
     class SuggestHistCommand(discord.ui.View):
-        def __init__(self, interaction: discord.Interaction):
+        def __init__(self, interaction: discord.Interaction, ChatCog: commands.Cog):
             super().__init__(timeout=600.0)
             self.INTERACTION = interaction
+            self.ChatCog = ChatCog
 
         @discord.ui.button(label='Pull User History', style=discord.ButtonStyle.primary)
         async def pull_history(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -539,8 +544,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 user = interaction.client.fetch_user(userid)
 
             self.INTERACTION = interaction
-            ChatCog = ChatControl(bot=interaction.client)
-            await ChatCog._pull_history(interaction, user)
+            await self.ChatCog._pull_history(interaction, user)
 
         async def on_timeout(self):
             await self.INTERACTION.edit_original_response(view=None)
@@ -769,7 +773,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _roles(self, interaction):
+    async def _roles(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         lines = []
         for role in reversed(interaction.guild.roles):
             lines.append(f'{role.name} ({role.id})')
@@ -783,7 +788,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             page_character_limit=1500,
         )
 
-        await interaction.edit_original_response(content='Here is the requested role list:', view=view)
+        await interaction.followup.send('Here is the requested role list:', view=view)
 
     async def _tag_autocomplete(
         self, interaction: discord.Interaction, current: str

@@ -897,7 +897,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_games_autocomplete(self, interaction: discord.Interaction, current: str):
         return await self.Games._games_search_autocomplete(interaction, current)
 
-    @social_group.command(name='games', description='Pick up-to 3 of your fav Nintendo Switch games to show them off')
+    @social_group.command(name='games', description='Pick up-to 5 of your fav Nintendo Switch games to show them off')
     @app_commands.describe(
         game1='You need to pick at least one game. Search by name and use autocomplete to help!',
         game2='Optionally pick a 2nd game to show on your profile as well. Search by name and use autocomplete to help!',
