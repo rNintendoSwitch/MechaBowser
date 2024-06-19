@@ -181,12 +181,22 @@ class Games(commands.Cog, name='Games'):
         count = {}
         for type, path in [('game', 'games'), ('release', 'releases')]:
             count[path] = 0
-            async for game in self.GiantBomb.fetch_items(path, None if full else after):
-                if full:
-                    game['_full_sync_updated'] = True
+            try:
+                async for game in self.GiantBomb.fetch_items(path, None if full else after):
+                    if full:
+                        game['_full_sync_updated'] = True
 
-                self.update_item_in_db(type, game)
-                count[path] += 1
+                    self.update_item_in_db(type, game)
+                    count[path] += 1
+
+            except aiohttp.ClientResponseError as e:
+                if e.status in [429, 420]: # Giantbomb uses 420 as ratelimiting
+                    logging.error('[Games] Ratelimited with GiantBomb, attempting retry at next loop')
+                    raise RatelimitException
+
+            except Exception as e:
+                logging.error(f'[Games] Exception while syncing games: {e}')
+                raise
 
         if full:
             self.db.delete_many({'_full_sync_updated': False})  # If items were not updated, delete them
@@ -573,7 +583,7 @@ class Games(commands.Cog, name='Games'):
 
         except RatelimitException:
             return await interaction.edit_original_message(
-                content=f'{config.redTick} Unable to complete sync, ratelimiting'
+                content=f'{config.redTick} Unable to complete sync, ratelimited'
             )
 
 
