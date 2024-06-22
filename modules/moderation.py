@@ -932,16 +932,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return
 
             punGuild = self.bot.get_guild(guild)
-            try:
-                member = await punGuild.fetch_member(doc['user'])
-
-            except discord.NotFound:
-                # User has left the server after the mute was issued. Lets just move on and let on_member_join handle on return
-                return
-
-            except discord.HTTPException:
-                # Issue with API, lets just try again later in 30 seconds
-                self.schedule_task(30, _id, guild)
+            member = punGuild.get_member(doc['user'])
+            if not member:
+                logging.debug(f'[Moderation] {doc["user"]} not in guild and has mute to be expired, ignoring')
                 return
 
             public_notify = False
