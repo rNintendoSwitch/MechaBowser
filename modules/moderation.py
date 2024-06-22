@@ -46,11 +46,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         loop = self.bot.loop
         loop.create_task(self._initialize_infractions())
 
-
     async def cog_unload(self):
         for task in self.taskHandles.values():
             task.cancel()
-
 
     async def _initialize_infractions(self):
         # Publish all unposted/pending public modlogs on cog load
@@ -88,7 +86,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
         logging.info('[Moderation] Infraction expiration checks completed')
-
 
     @commands.command(name='hide', aliases=['unhide'])
     @commands.has_any_role(config.moderator, config.eh)
