@@ -88,7 +88,11 @@ class AutomodSubstitute(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         if not self.antispam_loaded:
-            await self.bot.get_cog('Utility Commands').on_automod_finished(message)
+            try:
+                await self.bot.get_cog('Utility Commands').on_automod_finished(message)
+
+            except AttributeError:
+                pass
 
 
 async def safe_send_message(channel, content=None, embeds=None):
