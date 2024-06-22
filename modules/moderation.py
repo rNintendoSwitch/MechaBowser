@@ -26,19 +26,28 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.taskHandles = {}
         self.NS = self.bot.get_guild(config.nintendoswitch)
 
+        loop = self.bot.loop
+        loop.create_task(self._initialize_infractions())
+
+    async def cog_unload(self):
+        for task in self.taskHandles.values():
+            task.cancel()
+
+    async def _initialize_infractions(self):
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
         pendingLogs = db.find({'public': True, 'public_log_message': None, 'type': {'$ne': 'note'}})
-        loop = bot.loop
         for log in pendingLogs:
-            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs))
+            await tools.send_public_modlog(self.bot, log['_id'], self.publicModLogs)
 
         # Run expiration tasks
         userDB = mclient.bowser.users
         pendingPuns = db.find({'active': True, 'type': {'$in': ['strike', 'mute']}})
         twelveHr = 60 * 60 * 12
         trackedStrikes = []  # List of unique users
+        logging.info('[Moderation] Starting infraction expiration checks')
         for pun in pendingPuns:
+            await asyncio.sleep(0.5)
             if pun['type'] == 'strike':
                 if pun['user'] in trackedStrikes:
                     continue  # We don't want to create many tasks when we only remove one
@@ -59,9 +68,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
                 self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
-    def cog_unload(self):
-        for task in self.taskHandles.values():
-            task.cancel()
+        logging.info('[Moderation] Infraction expiration checks completed')
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
@@ -950,6 +957,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         )
 
     async def expire_actions(self, _id, guild):
+        await asyncio.sleep(0.5)
         db = mclient.bowser.puns
         doc = db.find_one({'_id': _id})
         if not doc:
@@ -1017,16 +1025,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 return
 
             punGuild = self.bot.get_guild(guild)
-            try:
-                member = await punGuild.fetch_member(doc['user'])
-
-            except discord.NotFound:
-                # User has left the server after the mute was issued. Lets just move on and let on_member_join handle on return
-                return
-
-            except discord.HTTPException:
-                # Issue with API, lets just try again later in 30 seconds
-                self.schedule_task(30, _id, guild)
+            member = punGuild.get_member(doc['user'])
+            if not member:
+                logging.debug(f'[Moderation] {doc["user"]} not in guild and has mute to be expired, ignoring')
                 return
 
             public_notify = False

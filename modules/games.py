@@ -153,7 +153,7 @@ class Games(commands.Cog, name='Games'):
         if AUTO_SYNC:
             self.sync_db.start()  # pylint: disable=no-member
 
-    def cog_unload(self):
+    async def cog_unload(self):
         if AUTO_SYNC:
             self.sync_db.cancel()  # pylint: disable=no-member
 

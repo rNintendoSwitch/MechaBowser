@@ -138,7 +138,7 @@ class Mansion(commands.Cog):
         self._expire_effects.start()  # pylint: disable=no-member
         logging.info('[Extension] LM Event extension loaded')
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self._make_ghost.cancel()  # pylint: disable=no-member
         self._spawn_boss.cancel()  # pylint: disable=no-member
         self._expire_effects.cancel()  # pylint: disable=no-member
