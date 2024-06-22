@@ -76,7 +76,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
                 self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
-    def cog_unload(self):
+    async def cog_unload(self):
         for task in self.taskHandles.values():
             task.cancel()
 

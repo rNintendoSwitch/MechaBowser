@@ -77,7 +77,7 @@ class TGAPool(commands.Cog):
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.response_check.cancel()  # pylint: disable=no-member
 
 

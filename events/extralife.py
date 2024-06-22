@@ -197,7 +197,7 @@ class ExtraLife(commands.Cog):
         await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY, revoke=True)
         await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND, revoke=True)
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
 
 
