@@ -43,7 +43,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.NS = self.bot.get_guild(config.nintendoswitch)
         self.roles = {'mute': self.NS.get_role(config.mute)}
 
-    async def cog_load(self):
+        loop = self.bot.loop
+        loop.create_task(self._initialize_infractions())
+
+
+    async def cog_unload(self):
+        for task in self.taskHandles.values():
+            task.cancel()
+
+
+    async def _initialize_infractions(self):
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
         pendingLogs = db.find({'public': True, 'public_log_message': None, 'type': {'$ne': 'note'}})
@@ -78,11 +87,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
                 self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
-        logging.info('[Moderation] Infraction expiration checks complete')
+        logging.info('[Moderation] Infraction expiration checks completed')
 
-    async def cog_unload(self):
-        for task in self.taskHandles.values():
-            task.cancel()
 
     @commands.command(name='hide', aliases=['unhide'])
     @commands.has_any_role(config.moderator, config.eh)
