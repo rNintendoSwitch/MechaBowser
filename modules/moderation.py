@@ -865,6 +865,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         )
 
     async def expire_actions(self, _id, guild):
+        await asyncio.sleep(0.5)
         db = mclient.bowser.puns
         doc = db.find_one({'_id': _id})
         if not doc:
