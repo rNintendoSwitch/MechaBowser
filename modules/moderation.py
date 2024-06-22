@@ -43,19 +43,21 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.NS = self.bot.get_guild(config.nintendoswitch)
         self.roles = {'mute': self.NS.get_role(config.mute)}
 
+    async def cog_load(self):
         # Publish all unposted/pending public modlogs on cog load
         db = mclient.bowser.puns
         pendingLogs = db.find({'public': True, 'public_log_message': None, 'type': {'$ne': 'note'}})
-        loop = bot.loop
         for log in pendingLogs:
-            loop.create_task(tools.send_public_modlog(bot, log['_id'], self.publicModLogs))
+            await tools.send_public_modlog(self.bot, log['_id'], self.publicModLogs)
 
         # Run expiration tasks
         userDB = mclient.bowser.users
         pendingPuns = db.find({'active': True, 'type': {'$in': ['strike', 'mute']}})
         twelveHr = 60 * 60 * 12
         trackedStrikes = []  # List of unique users
+        logging.info('[Moderation] Starting infraction expiration checks')
         for pun in pendingPuns:
+            await asyncio.sleep(0.5)
             if pun['type'] == 'strike':
                 if pun['user'] in trackedStrikes:
                     continue  # We don't want to create many tasks when we only remove one
@@ -75,6 +77,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             elif pun['type'] == 'mute':
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
                 self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
+
+        logging.info('[Moderation] Infraction expiration checks complete')
 
     async def cog_unload(self):
         for task in self.taskHandles.values():
