@@ -1056,9 +1056,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         view=None,
                         ephemeral=True,
                     )
-                    return self.stop()
-
-            await interaction.response.edit_message(view=self)
+                    self.stop()
+                    break
+                    
+            if not s.values:
+                await interaction.response.edit_message(view=self)
 
         async def cancel_button(self, interaction: discord.Interaction):
             await interaction.response.edit_message(
@@ -1067,9 +1069,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.stop()
 
         async def on_timeout(self):
-            await self.message.edit(
-                content='Background editing timed out. To begin again, rerun the command', embed=None, view=None
-            )
+            if self.message:
+                await self.message.edit(
+                    content='Background editing timed out. To begin again, rerun the command', embed=None,view=None
+                )
 
     @social_group.command(name='background', description='Update the background you use on your profile card')
     async def _profile_background(self, interaction: discord.Interaction):
@@ -1106,7 +1109,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             embeds=[embed], file=self._generate_background_preview(backgrounds), view=view, wait=True
         )
         view.message = msg
-        view.wait()
+        #await view.wait()
 
     @social_group.command(
         name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games'
@@ -1163,11 +1166,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         bg_opacity: int,
     ):
         await interaction.response.defer()
-        if interaction.user.id not in self.validate_allowed_users:
-            return await interaction.followup.send(
-                ':x: You do not have permission to run this command.', ephemeral=True
-            )
-
         if not attach.content_type == 'image/png' or attach.height != 900 or attach.width != 1600:
             return await interaction.followup.send(':x: Attachment must be a 1600x900 PNG file', ephemeral=True)
 
