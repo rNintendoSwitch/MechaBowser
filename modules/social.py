@@ -1058,7 +1058,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     )
                     self.stop()
                     break
-                    
+
             if not s.values:
                 await interaction.response.edit_message(view=self)
 
@@ -1071,7 +1071,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         async def on_timeout(self):
             if self.message:
                 await self.message.edit(
-                    content='Background editing timed out. To begin again, rerun the command', embed=None,view=None
+                    content='Background editing timed out. To begin again, rerun the command', embed=None, view=None
                 )
 
     @social_group.command(name='background', description='Update the background you use on your profile card')
@@ -1109,7 +1109,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             embeds=[embed], file=self._generate_background_preview(backgrounds), view=view, wait=True
         )
         view.message = msg
-        #await view.wait()
+        # await view.wait()
 
     @social_group.command(
         name='remove', description='Remove or reset an element on your profile card, i.e. your friend code or fav games'
