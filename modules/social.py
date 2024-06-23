@@ -1063,14 +1063,20 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         async def cancel_button(self, interaction: discord.Interaction):
             await interaction.response.edit_message(
-                content='Background editing canceled. To begin again, rerun the command', attachments=[], embed=None, view=None
+                content='Background editing canceled. To begin again, rerun the command',
+                attachments=[],
+                embed=None,
+                view=None,
             )
             self.stop()
 
         async def on_timeout(self):
             if self.message and not self.is_finished():
                 await self.message.edit(
-                    content='Background editing timed out. To begin again, rerun the command', attachments=[], embed=None, view=None
+                    content='Background editing timed out. To begin again, rerun the command',
+                    attachments=[],
+                    embed=None,
+                    view=None,
                 )
 
     @social_group.command(name='background', description='Update the background you use on your profile card')

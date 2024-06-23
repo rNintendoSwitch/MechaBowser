@@ -223,13 +223,11 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             title = f'{interaction.guild.name} Role Statistics'
             fields = tools.convert_list_to_fields(lines)
             view = tools.PaginatedEmbed(
-                interaction=interaction,
-                fields=fields,
-                title=title,
-                description=desc,
-                color=0xD267BA
+                interaction=interaction, fields=fields, title=title, description=desc, color=0xD267BA
             )
-            return await interaction.edit_original_response(content='Here is the requested list of members with that role:', view=view)
+            return await interaction.edit_original_response(
+                content='Here is the requested list of members with that role:', view=view
+            )
 
         else:
             roleCounts = []
