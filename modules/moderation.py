@@ -144,6 +144,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             f'{config.greenTick} Successfully toggled the sensitive status for that infraction'
         )
 
+    @infraction_group.command(name='reason', description='Update the reason that an infraction was issued for')
     @app_commands.describe(
         uuid='The infraction UUID, found in the footer of the mod log message embeds',
         reason='The new reason text for the infraction',
@@ -498,7 +499,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         users: str,
-        reason: typing.Optional[app_commands.Range[str, None, 990]] = '-No reason specified-',
+        reason: app_commands.Range[str, None, 990],
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not users:
@@ -595,7 +596,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         interaction: discord.Interaction,
         member: discord.Member,
         duration: str,
-        reason: typing.Optional[app_commands.Range[str, None, 990]] = '-No reason specified-',
+        reason: app_commands.Range[str, None, 990],
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
 
