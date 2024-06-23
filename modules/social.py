@@ -1003,7 +1003,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await msg.delete()
 
         await interaction.followup.send(
-            message_reply, file=await self._generate_profile_card_from_member(interaction.user)
+            message_reply, file=await self._generate_profile_card_from_member(interaction.user), ephemeral=True
         )
 
     class BackgroundSelectMenu(discord.ui.View):
@@ -1053,7 +1053,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         f'{config.greenTick} Your background has been successfully updated on your profile card! Here\'s how it looks:',
                         file=await self.Parent._generate_profile_card_from_member(interaction.user),
                         embed=None,
-                        view=None,
                         ephemeral=True,
                     )
                     self.stop()
@@ -1064,14 +1063,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         async def cancel_button(self, interaction: discord.Interaction):
             await interaction.response.edit_message(
-                content='Background editing canceled. To begin again, rerun the command', embed=None, view=None
+                content='Background editing canceled. To begin again, rerun the command', attachments=[], embed=None, view=None
             )
             self.stop()
 
         async def on_timeout(self):
-            if self.message:
+            if self.message and not self.is_finished():
                 await self.message.edit(
-                    content='Background editing timed out. To begin again, rerun the command', embed=None, view=None
+                    content='Background editing timed out. To begin again, rerun the command', attachments=[], embed=None, view=None
                 )
 
     @social_group.command(name='background', description='Update the background you use on your profile card')
@@ -1247,7 +1246,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.send_message(f'{config.loading} Processing awards to {len(members)} member(s)...')
         for m in members:
             try:
-                user = int(user)
+                user = int(m)
                 m = interaction.guild.get_member(user)
                 if not m:
                     try:
@@ -1297,7 +1296,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.send_message(f'{config.loading} Reducing awards from {len(members)} member(s)...')
         for m in members:
             try:
-                user = int(user)
+                user = int(m)
                 m = interaction.guild.get_member(user)
                 if not m:
                     try:

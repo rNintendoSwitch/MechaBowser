@@ -295,14 +295,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             # Message may not exist
             pass
 
-        if count >= 100:
-            # Original interaction deleted
-            m = await interaction.channel.send(f'{config.greenTick} Clean action complete')
-
-        else:
-            # Original interaction still available, need to use followup
-            m = await interaction.followup.send(f'{config.greenTick} Clean action complete', wait=True)
-
+        m = await interaction.channel.send(f'{config.greenTick} Clean action complete')
         return await m.delete(delay=5)
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))

@@ -151,7 +151,7 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
 
         dayStr = (
             'In the last 30 days'
-            if not start
+            if not start and not end
             else 'Between ' + searchDate.strftime('%Y-%m-%d') + ' and ' + endDate.strftime('%Y-%m-%d')
         )
         netMembers = netJoins - netLeaves
@@ -216,24 +216,20 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         await interaction.response.send_message('One moment, crunching the numbers...')
         if role:
             lines = []
-            desc = f'There are currently **{len(role.members)}** users with the **{role.name}** role:\n\n'
+            desc = f'There are currently **{len(role.members)}** members with the **{role.name}** role:\n\n'
             for member in role.members:
                 lines.append(f'* {member} ({member.id})')
 
             title = f'{interaction.guild.name} Role Statistics'
             fields = tools.convert_list_to_fields(lines)
-            await interaction.delete_original_response()
-            # TODO: embed pagination need to be converted to UI Kit
-            return await tools.send_paginated_embed(
-                self.bot,
-                interaction.channel,
-                fields,
-                owner=interaction.user,
+            view = tools.PaginatedEmbed(
+                interaction=interaction,
+                fields=fields,
                 title=title,
                 description=desc,
-                color=0xD267BA,
-                page_character_limit=3000,
+                color=0xD267BA
             )
+            return await interaction.edit_original_response(content='Here is the requested list of members with that role:', view=view)
 
         else:
             roleCounts = []
