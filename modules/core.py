@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import config  # type: ignore
 import discord
 import pymongo
+from discord import app_commands
 from discord.ext import commands, tasks
 
 import tools  # type: ignore
@@ -29,8 +30,8 @@ class MainEvents(commands.Cog):
             await self.bot.load_extension('modules.moderation')
             await self.bot.load_extension('modules.utility')
             await self.bot.load_extension('modules.statistics')
-            await self.bot.load_extension('modules.social')
             await self.bot.load_extension('modules.games')
+            await self.bot.load_extension('modules.social')
             try:  # Private submodule extensions
                 await self.bot.load_extension('private.automod')
             except commands.errors.ExtensionNotFound:
@@ -78,10 +79,15 @@ class MainEvents(commands.Cog):
 
         logging.info('[Core] Finished sanitzation of old EUD')
 
-    @commands.command(name='ping')
-    async def _ping(self, ctx):
-        initiated = ctx.message.created_at
-        msg = await ctx.send('Evaluating...')
+    @app_commands.command(
+        name='ping', description='Checks that the bot is responding normally and shows various latency values'
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    async def _ping(self, interaction: discord.Interaction):
+        initiated = interaction.created_at
+        await interaction.response.send_message('Evaluating...')
+        msg = await interaction.original_response()  # response.send_message does not return a discord.Message
         roundtrip = (msg.created_at - initiated).total_seconds() * 1000
 
         database_start = time.time()
@@ -97,6 +103,26 @@ class MainEvents(commands.Cog):
                 )
             )
         )
+
+    @app_commands.command(name='treesync')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _tree_sync(self, interaction: discord.Interaction):
+        '''
+        The purpose of this command is to allow us to manually resync the tree and command IDs if they may have changed say from a cog load/unload.
+
+        This may be eventually integrated into a custom jishaku cog to overwrite it's `load`, `reload`, `unload` commands to implement sync and id fetching.
+        '''
+
+        await interaction.response.defer(ephemeral=True)
+
+        remote = await self.bot.tree.sync(guild=interaction.guild)
+        local = self.bot.tree.get_commands(guild=interaction.guild)
+        for rc, lc in zip(remote, local):  # We are pulling command IDs from server-side, then storing the mentions
+            lc.extras['id'] = rc.id
+
+        await interaction.followup.send(f'Synced **{len(remote)}** guilds commands')
 
     @commands.Cog.listener()
     async def on_resume(self):
@@ -281,9 +307,9 @@ class MainEvents(commands.Cog):
                 explanation = (
                     'Hello there **{}**,\nI am letting you know of a change in status for your active level {} warning issued on {}.\n\n'
                     'The **/r/NintendoSwitch** Discord server is moving to a strike-based system for infractions. Here is what you need to know:\n'
-                    '\* Your warning level will be converted to **{}** strikes.\n'
-                    '\* __Your strikes will decay at a equivalent rate as warnings previously did__. Each warning tier is equivalent to four strikes, where one strike decays once per week instead of one warn level per four weeks\n'
-                    '\* You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
+                    '- Your warning level will be converted to **{}** strikes.\n'
+                    '- __Your strikes will decay at a equivalent rate as warnings previously did__. Each warning tier is equivalent to four strikes, where one strike decays once per week instead of one warn level per four weeks\n'
+                    '- You will no longer have any permission restrictions you previously had with this warning. Moderators will instead restrict features as needed to enforce the rules on a case-by-case basis.\n\n'
                     'Strikes will allow the moderation team to weigh rule-breaking behavior better and serve as a reminder to users who may need to review our rules. You may also now view your infraction history '
                     'by using the `!history` command in <#{}>. Please feel free to send a modmail to @Parakarry (<@{}>) if you have any questions or concerns.'
                 ).format(
@@ -694,78 +720,69 @@ class MainEvents(commands.Cog):
             storedRoles.remove(role.id)
             db.update_one({'_id': user['_id']}, {'$set': {'roles': storedRoles}})
 
-    @commands.Cog.listener()
-    async def on_command_error(self, context, exception):
-        if isinstance(exception, commands.CommandNotFound):
-            pass
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class BotUpdateCommand(app_commands.Group):
+        pass
 
-        else:
-            raise exception
+    update_group = BotUpdateCommand(name='update', description='Update components of the bot')
 
-    @commands.command(name='update')
-    @commands.is_owner()
-    async def _update(self, ctx, sub, *args):
-        if sub == 'pfp':
-            if not ctx.message.attachments:
-                return await ctx.send(':warning: An attachment to change the picture to was not provided')
+    @update_group.command(name='pfp', description='Update the bot profile picture')
+    @app_commands.describe(image='The image to use as the new profile picture')
+    async def _update_pfp(self, interaction: discord.Interaction, image: discord.Attachment):
+        await interaction.response.defer()
+        attachment = await image.read()
+        await self.bot.user.edit(avatar=attachment)
 
-            else:
-                attachment = await ctx.message.attachments[0].read()
-                await self.bot.user.edit(avatar=attachment)
+        return await interaction.followup.send('Done.')
 
-            return await ctx.send('Done.')
+    @update_group.command(name='name', description='Update the bot username')
+    @app_commands.describe(name='The new username')
+    async def _update_name(self, interaction: discord.Interaction, name: str):
+        await interaction.response.defer()
+        if len(name) >= 32:
+            return await interaction.followup.send(f'{config.redTick} That username is too long.')
 
-        elif sub == 'name':
-            username = ''
-            for x in args:
-                username += f'{x} '
+        await self.bot.user.edit(username=name)
+        return await interaction.followup.send('Done.')
 
-            if len(username[:-1]) >= 32:
-                return await ctx.send(':warning: That username is too long.')
+    @update_group.command(
+        name='cache', description='Update the database message cache for the entire server. API and resource intensive'
+    )
+    async def _update_cache(self, interaction: discord.Interaction):
+        funcStart = time.time()
+        logging.info('[Core] Starting db message sync')
+        await interaction.send_message(
+            'Starting syncronization of db for all messages in server. This will take a conciderable amount of time.'
+        )
 
-            await self.bot.user.edit(username=username)
+        for channel in interaction.guild.channels:
+            if not issubclass(channel.__class__, discord.abc.Messageable):
+                continue
 
-        elif sub == 'servermsgcache':
-            funcStart = time.time()
-            logging.info('[Core] Starting db message sync')
-            await ctx.send(
-                'Starting syncronization of db for all messages in server. This will take a conciderable amount of time.'
-            )
-            for channel in ctx.guild.channels:
-                if not issubclass(channel.__class__, discord.abc.Messageable):
-                    continue
+            # Because this will definitely exceed the interaction expiry, send messages to the channel directly
+            await interaction.channel.send(f'Starting syncronization for <#{channel.id}>')
 
-                await ctx.send(f'Starting syncronization for <#{channel.id}>')
+            try:
+                x, y = await self.store_message_cache(channel)
+                await interaction.channel.send(
+                    f'Syncronized <#{channel.id}>. Processed {x} messages and recorded meta data for {y} messages'
+                )
 
-                try:
-                    x, y = await self.store_message_cache(channel)
-                    await ctx.send(
-                        f'Syncronized <#{channel.id}>. Processed {x} messages and recorded meta data for {y} messages'
-                    )
+            except (discord.Forbidden, discord.HTTPException):
+                await interaction.channel.send(f'Failed to syncronize <#{channel.id}>')
 
-                except (discord.Forbidden, discord.HTTPException):
-                    await ctx.send(f'Failed to syncronize <#{channel.id}>')
+        timeToComplete = tools.humanize_duration(tools.resolve_duration(f'{int(time.time() - funcStart)}s'))
+        return await interaction.channel.send(
+            f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
+        )
 
-            timeToComplete = tools.humanize_duration(tools.resolve_duration(f'{int(time.time() - funcStart)}s'))
-            return await ctx.send(f'<@{ctx.author.id}> Syncronization completed. Took {timeToComplete}')
-
-        else:
-            return await ctx.send('Invalid sub command')
-
-    @commands.command(name='pundb')
-    @commands.is_owner()
-    async def _pundb(
-        self, ctx, _type, user, moderator, strTime, active: typing.Optional[bool], *, reason='-No reason specified-'
-    ):
-        date = datetime.strptime(strTime, '%m/%d/%y')
-        expiry = None if not active else int(date.timestamp() + (60 * 60 * 24 * 30))
-        await tools.issue_pun(int(user), int(moderator), _type, reason, expiry, active, 'old', date.timestamp())
-        await ctx.send(f'{config.greenTick} Done')
-
-    @commands.command(name='shutdown')
-    @commands.is_owner()
-    async def _shutdown(self, ctx):
-        await ctx.send('Closing connection to discord and shutting down')
+    @app_commands.command(name='shutdown', description='Shutdown the bot and all modules')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(manage_guild=True)
+    async def _shutdown(self, interaction: discord.Interaction):
+        await interaction.response.send_message('Closing connection to discord and shutting down')
         return await self.bot.close()
 
     async def store_message_cache(self, channel):

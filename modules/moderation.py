@@ -8,29 +8,13 @@ from datetime import datetime, timezone
 import config
 import discord
 import pymongo
+from discord import app_commands
 from discord.ext import commands, tasks
 
 import tools
 
 
 mclient = pymongo.MongoClient(config.mongoURI)
-
-
-class StrikeRange(commands.Converter):
-    async def convert(self, ctx, argument):
-        if not argument:
-            raise commands.BadArgument
-
-        try:
-            arg = int(argument)
-
-        except:
-            raise commands.BadArgument
-
-        if not 0 <= arg <= 16:
-            raise commands.BadArgument
-
-        return arg
 
 
 class Moderation(commands.Cog, name='Moderation Commands'):
@@ -41,7 +25,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self.publicModLogs = self.bot.get_channel(config.publicModChannel)
         self.taskHandles = {}
         self.NS = self.bot.get_guild(config.nintendoswitch)
-        self.roles = {'mute': self.NS.get_role(config.mute)}
 
         loop = self.bot.loop
         loop.create_task(self._initialize_infractions())
@@ -87,23 +70,32 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         logging.info('[Moderation] Infraction expiration checks completed')
 
-    @commands.command(name='hide', aliases=['unhide'])
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class GuildGroupCommand(app_commands.Group):
+        pass
+
+    infraction_group = GuildGroupCommand(name='infraction', description='Tools to update an existing infraction')
+
+    @infraction_group.command(name='hide', description='Hide and mark the reason of an infraction as sensitive')
+    @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _hide_modlog(self, ctx, uuid):
+    async def _hide_modlog(self, interaction: discord.Interaction, uuid: str):
         db = mclient.bowser.puns
         doc = db.find_one({'_id': uuid})
 
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not doc:
-            return await ctx.send(f'{config.redTick} No punishment with that UUID exists')
+            return await interaction.followup.send(f'{config.redTick} No infraction with that UUID exists')
 
         sensitive = True if not doc['sensitive'] else False  # Toggle sensitive value
 
         if not doc['public_log_message']:
             # Public log has not been posted yet
             db.update_one({'_id': uuid}, {'$set': {'sensitive': sensitive}})
-            return await ctx.send(
-                f'{config.greenTick} Successfully {"" if sensitive else "un"}marked modlog as sensitive'
+            return await interaction.followup.send(
+                f'{config.greenTick} Successfully {"" if sensitive else "un"}marked modlog as sensitive',
             )
 
         else:
@@ -116,8 +108,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     raise ValueError
 
             except (ValueError, discord.NotFound, discord.Forbidden):
-                return await ctx.send(
-                    f'{config.redTick} There was an issue toggling that log\'s sensitive status; the message may have been deleted or I do not have permission to view the channel'
+                return await interaction.followup.send(
+                    f'{config.redTick} There was an issue toggling that log\'s sensitive status; the message may have been deleted or I do not have permission to view the public log channel',
                 )
 
             embed = message.embeds[0]
@@ -148,45 +140,56 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             newEmbed = discord.Embed.from_dict(newEmbedDict)
             await message.edit(embed=newEmbed)
 
-        await ctx.send(f'{config.greenTick} Successfully toggled the sensitive status for that infraction')
+        await interaction.followup.send(
+            f'{config.greenTick} Successfully toggled the sensitive status for that infraction'
+        )
 
-    @commands.group(name='infraction', aliases=['inf'], invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _infraction(self, ctx):
-        return await ctx.send_help(self._infraction)
+    @infraction_group.command(name='reason', description='Update the reason that an infraction was issued for')
+    @app_commands.describe(
+        uuid='The infraction UUID, found in the footer of the mod log message embeds',
+        reason='The new reason text for the infraction',
+    )
+    async def _infraction_reason(self, interaction, uuid: str, reason: app_commands.Range[str, None, 990]):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+        await self._infraction_editing(interaction, uuid, reason)
 
-    @_infraction.command(name='reason')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _infraction_reason(self, ctx, infraction, *, reason):
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
+    @infraction_group.command(name='duration', description='Update when an active mute will expire')
+    @app_commands.describe(
+        uuid='The infraction UUID, found in the footer of the mod log message embeds',
+        duration='The new formatted duration for this mute -- measured from now',
+        reason='The reason you are updating this mute duration',
+    )
+    async def _infraction_duration(
+        self, interaction: discord.Interaction, uuid: str, duration: str, reason: app_commands.Range[str, None, 990]
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+        await self._infraction_editing(interaction, uuid, reason, duration)
 
-        await self._infraction_editing(ctx, infraction, reason)
-
-    @_infraction.command(name='duration', aliases=['dur', 'time'])
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _infraction_duration(self, ctx, infraction, duration, *, reason):
-        await self._infraction_editing(ctx, infraction, reason, duration)
-
-    async def _infraction_editing(self, ctx, infraction, reason, duration=None):
+    async def _infraction_editing(
+        self,
+        interaction: discord.Interaction,
+        uuid: str,
+        reason: app_commands.Range[str, None, 990],
+        duration: str = None,
+    ):
         db = mclient.bowser.puns
-        doc = db.find_one({'_id': infraction})
+        doc = db.find_one({'_id': uuid})
         if not doc:
-            return await ctx.send(f'{config.redTick} An invalid infraction id was provided')
+            return await interaction.followup.send(f'{config.redTick} An invalid infraction id was provided')
 
         if not doc['active'] and duration:
-            return await ctx.send(
-                f'{config.redTick} That infraction has already expired and the duration cannot be edited'
+            return await interaction.followup.send(
+                f'{config.redTick} That infraction has already expired and the duration cannot be edited',
             )
 
         if duration and doc['type'] != 'mute':  # TODO: Should we support strikes in the future?
-            return ctx.send(f'{config.redTick} Setting durations is not supported for {doc["type"]}')
+            return await interaction.followup.send(
+                f'{config.redTick} Setting durations is not supported for {doc["type"]}'
+            )
 
         user = await self.bot.fetch_user(doc['user'])
         try:
-            member = await ctx.guild.fetch_member(doc['user'])
+            member = await interaction.guild.fetch_member(doc['user'])
 
         except:
             member = None
@@ -204,19 +207,21 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     pass
 
             except (KeyError, TypeError):
-                return await ctx.send(f'{config.redTick} Invalid duration passed')
+                return await interaction.followup.send(f'{config.redTick} Invalid duration passed')
 
             if stamp - time.time() < 60:  # Less than a minute
-                return await ctx.send(f'{config.redTick} Cannot set the new duration to be less than one minute')
+                return await interaction.followup.send(
+                    f'{config.redTick} Cannot set the new duration to be less than one minute'
+                )
 
             twelveHr = 60 * 60 * 12
             tryTime = twelveHr if stamp - time.time() > twelveHr else stamp - time.time()
-            self.schedule_task(tryTime, infraction, config.nintendoswitch)
+            self.schedule_task(tryTime, uuid, config.nintendoswitch)
 
             if member:
                 await member.edit(timed_out_until=_duration, reason='Mute duration modified by moderator')
 
-            db.update_one({'_id': infraction}, {'$set': {'expiry': int(stamp)}})
+            db.update_one({'_id': uuid}, {'$set': {'expiry': int(stamp)}})
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
@@ -224,13 +229,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 doc['_id'],
                 reason,
                 user=user,
-                moderator=ctx.author,
+                moderator=interaction.user,
                 expires=expireStr,
                 extra_author=doc['type'].capitalize(),
             )
 
         else:
-            db.update_one({'_id': infraction}, {'$set': {'reason': reason}})
+            db.update_one({'_id': uuid}, {'$set': {'reason': reason}})
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
@@ -238,7 +243,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 doc['_id'],
                 reason,
                 user=user,
-                moderator=ctx.author,
+                moderator=interaction.user,
                 extra_author=doc['type'].capitalize(),
                 updated=doc['reason'],
             )
@@ -276,7 +281,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         error = ''
         try:
-            member = await ctx.guild.fetch_member(doc['user'])
+            member = await interaction.guild.fetch_member(doc['user'])
             if duration:
                 await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
 
@@ -295,91 +300,122 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         except (discord.NotFound, discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'
 
-        await ctx.send(
-            f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}'
+        await interaction.followup.send(
+            f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}',
         )
 
-    @commands.is_owner()
-    @_infraction.command('remove')
-    async def _inf_revoke(self, ctx, _id):
+    @infraction_group.command(name='remove', description='Permanently delete an infraction. Dev-only')
+    @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
+    async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         db = mclient.bowser.puns
-        doc = db.find_one_and_delete({'_id': _id})
+        doc = db.find_one_and_delete({'_id': uuid})
         if not doc:  # Delete did nothing if doc is None
-            return ctx.send(f'{config.redTick} No matching infraction found')
+            return await interaction.followup.send(f'{config.redTick} No matching infraction found')
 
-        await ctx.send(f'{config.greenTick} removed {_id}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}')
+        await interaction.followup.send(
+            f'{config.greenTick} removed {uuid}: {doc["type"]} against {doc["user"]} by {doc["moderator"]}'
+        )
 
-    @commands.command(name='ban', aliases=['banid', 'forceban'])
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.command(name='ban', description='Ban a user from the guild')
+    @app_commands.describe(
+        users='The user or users you wish to ban. Must be user ids separated by a space',
+        reason='The reason for issuing the ban',
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _banning(self, ctx, users: commands.Greedy[tools.ResolveUser], *, reason='-No reason specified-'):
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Ban reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
-        if not users:
-            return await ctx.send(f'{config.redTick} An invalid user was provided')
+    async def _banning(
+        self,
+        interaction: discord.Interaction,
+        users: str,
+        reason: app_commands.Range[str, None, 990],
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
 
         banCount = 0
-        failedBans = 0
+        failedBans = []
         couldNotDM = False
 
+        users = users.split()
         for user in users:
-            userid = user if (type(user) is int) else user.id
-            username = userid if (type(user) is int) else f'{str(user)}'
+            try:
+                user = int(user)
+
+            except ValueError:
+                if len(users) == 1:
+                    return await interaction.followup.send(
+                        f'{config.redTick} An argument provided in users is invalid: `{user}`'
+                    )
+                else:
+                    failedBans.append(user)
+                    continue
+
+            member = interaction.guild.get_member(user)
+            userid = user
+            username = userid if (type(member) is int) else str(member)
 
             # If not a user, manually contruct a user object
             user = discord.Object(id=userid) if (type(user) is int) else user
 
-            try:
-                member = await ctx.guild.fetch_member(userid)
+            if member:
                 usr_role_pos = member.top_role.position
-            except:
+
+            else:
                 usr_role_pos = -1
 
-            if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
+            if (usr_role_pos >= interaction.guild.me.top_role.position) or (
+                usr_role_pos >= interaction.user.top_role.position
+            ):
                 if len(users) == 1:
-                    return await ctx.send(f'{config.redTick} Insufficent permissions to ban {username}')
+                    return await interaction.followup.send(
+                        f'{config.redTick} Insufficent permissions to ban {username}'
+                    )
                 else:
-                    failedBans += 1
+                    failedBans.append(str(userid))
                     continue
 
             try:
-                await ctx.guild.fetch_ban(user)
+                await interaction.guild.fetch_ban(user)
                 if len(users) == 1:
-                    if ctx.author.id == self.bot.user.id:  # Non-command invoke, such as automod
+                    if interaction.user.id == self.bot.user.id:  # Non-command invoke, such as automod
                         # We could do custom exception types, but the whole "automod context" is already a hack anyway.
                         raise ValueError
                     else:
-                        return await ctx.send(f'{config.redTick} {username} is already banned')
+                        return await interaction.followup.send(f'{config.redTick} {username} is already banned')
 
                 else:
                     # If a many-user ban, don't exit if a user is already banned
-                    failedBans += 1
+                    failedBans.append(str(userid))
                     continue
 
             except discord.NotFound:
                 pass
 
             try:
-                await user.send(tools.format_pundm('ban', reason, ctx.author, auto=ctx.author.id == self.bot.user.id))
+                await user.send(
+                    tools.format_pundm('ban', reason, interaction.user, auto=interaction.user.id == self.bot.user.id)
+                )
 
             except (discord.Forbidden, AttributeError):
                 couldNotDM = True
                 pass
 
+            member = discord.Object(id=userid) if not member else member
+
             try:
-                await ctx.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
+                await interaction.guild.ban(member, reason=f'Ban action performed by moderator', delete_message_days=3)
 
             except discord.NotFound:
                 # User does not exist
                 if len(users) == 1:
-                    return await ctx.send(f'{config.redTick} User {userid} does not exist')
+                    return await interaction.followup.send(f'{config.redTick} User {userid} does not exist')
 
-                failedBans += 1
+                failedBans.append(str(userid))
                 continue
 
-            docID = await tools.issue_pun(userid, ctx.author.id, 'ban', reason=reason)
+            docID = await tools.issue_pun(userid, interaction.user.id, 'ban', reason=reason)
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
@@ -388,15 +424,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 reason,
                 username=username,
                 userid=userid,
-                moderator=ctx.author,
+                moderator=interaction.user,
                 public=True,
             )
             banCount += 1
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        if ctx.author.id != self.bot.user.id:  # Command invoke, i.e. anything not automod
+        if interaction.user.id != self.bot.user.id:  # Command invoke, i.e. anything not automod
             if len(users) == 1:
                 resp = f'{config.greenTick} {users[0]} has been successfully banned'
                 if couldNotDM:
@@ -405,35 +438,42 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             else:
                 resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
                 if failedBans:
-                    resp += f'. Failed to ban **{failedBans}** from the provided list'
+                    resp += (
+                        f'. Failed to ban **{len(failedBans)}** from the provided list:\n```{" ".join(failedBans)}```'
+                    )
 
-            return await ctx.send(resp)
+            return await interaction.followup.send(resp)
 
-    @commands.command(name='unban')
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.command(name='unban', description='Unban a specified user from the server')
+    @app_commands.describe(user='The user id to unban', reason='The reason for unbanning the user')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _unbanning(self, ctx, user: int, *, reason='-No reason specified-'):
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Unban reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
+    async def _unbanning(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        reason: app_commands.Range[str, None, 990],
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+
         db = mclient.bowser.puns
-        userObj = discord.Object(id=user)
         try:
-            await ctx.guild.fetch_ban(userObj)
+            await interaction.guild.fetch_ban(user)
 
         except discord.NotFound:
-            return await ctx.send(f'{config.redTick} {user} is not currently banned')
+            return await interaction.followup.send(f'{config.redTick} {user} is not currently banned')
 
-        openAppeal = mclient.modmail.logs.find_one({'open': True, 'ban_appeal': True, 'recipient.id': str(user)})
+        openAppeal = mclient.modmail.logs.find_one({'open': True, 'ban_appeal': True, 'recipient.id': user.id})
         if openAppeal:
-            return await ctx.send(
-                f'{config.redTick} You cannot use the unban command on {user} while a ban appeal is in-progress. You can accept the appeal in <#{int(openAppeal["channel_id"])}> with `/appeal accept [reason]`'
+            return await interaction.followup.send(
+                f'{config.redTick} You cannot use the unban command on {user} while a ban appeal is in-progress. You can accept the appeal in <#{int(openAppeal["channel_id"])}> with `/appeal accept [reason]`',
             )
 
-        db.find_one_and_update({'user': user, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
-        docID = await tools.issue_pun(user, ctx.author.id, 'unban', reason, active=False)
-        await ctx.guild.unban(userObj, reason='Unban action performed by moderator')
+        db.find_one_and_update({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
+        docID = await tools.issue_pun(user.id, interaction.user.id, 'unban', reason, active=False)
+        await interaction.guild.unban(user, reason='Unban action performed by moderator')
         await tools.send_modlog(
             self.bot,
             self.modLogs,
@@ -441,60 +481,74 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             docID,
             reason,
             username=str(user),
-            userid=user,
-            moderator=ctx.author,
+            userid=user.id,
+            moderator=interaction.user,
             public=True,
         )
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
+        await interaction.followup.send(f'{config.greenTick} {user} has been unbanned')
 
-        await ctx.send(f'{config.greenTick} {user} has been unbanned')
-
-    @commands.command(name='kick')
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.command(name='kick', description='Kick a user from the guild')
+    @app_commands.describe(
+        users='The user or users you wish to kick. Must be user ids', reason='The reason for issuing the kick. Optional'
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _kicking(self, ctx, users: commands.Greedy[tools.ResolveUser], *, reason='-No reason specified-'):
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Kick reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
+    async def _kicking(
+        self,
+        interaction: discord.Interaction,
+        users: str,
+        reason: app_commands.Range[str, None, 990],
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not users:
-            return await ctx.send(f'{config.redTick} An invalid user was provided')
+            return await interaction.followup.send(f'{config.redTick} An invalid user was provided')
 
         kickCount = 0
-        failedKicks = 0
+        failedKicks = []
         couldNotDM = False
 
-        for user in users:
-            userid = user if (type(user) is int) else user.id
-            username = userid if (type(user) is int) else f'{str(user)}'
-
-            user = (
-                discord.Object(id=userid) if (type(user) is int) else user
-            )  # If not a user, manually contruct a user object
-
+        for user in users.split():
             try:
-                member = await ctx.guild.fetch_member(userid)
-            except discord.HTTPException:  # Member not in guild
-                if len(users) == 1:
-                    return await ctx.send(f'{config.redTick} {username} is not the server!')
+                user = int(user)
 
-                else:
-                    # If a many-user kick, don't exit if a user is already gone
-                    failedKicks += 1
-                    continue
+            except ValueError:
+                return await interaction.followup.send(
+                    f'{config.redTick} An argument provided in users is invalid: `{user}`'
+                )
+
+            member = interaction.guild.get_member(user)
+            userid = user
+            username = userid if (type(member) is int) else str(member)
+
+            if not member:
+                try:
+                    member = await interaction.guild.fetch_member(userid)
+                except discord.HTTPException:  # Member not in guild
+                    if len(users) == 1:
+                        return await interaction.followup.send(f'{config.redTick} {username} is not the server')
+
+                    else:
+                        # If a many-user kick, don't exit if a user is already gone
+                        failedKicks.append(str(userid))
+                        continue
 
             usr_role_pos = member.top_role.position
 
-            if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
+            if (usr_role_pos >= interaction.guild.me.top_role.position) or (
+                usr_role_pos >= interaction.user.top_role.position
+            ):
                 if len(users) == 1:
-                    return await ctx.send(f'{config.redTick} Insufficent permissions to kick {username}')
+                    return await interaction.followup.send(
+                        f'{config.redTick} Insufficent permissions to kick {username}'
+                    )
                 else:
-                    failedKicks += 1
+                    failedKicks.append(str(userid))
                     continue
 
             try:
-                await user.send(tools.format_pundm('kick', reason, ctx.author))
+                await user.send(tools.format_pundm('kick', reason, interaction.user))
             except (discord.Forbidden, AttributeError):
                 couldNotDM = True
                 pass
@@ -502,19 +556,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             try:
                 await member.kick(reason='Kick action performed by moderator')
             except discord.Forbidden:
-                failedKicks += 1
+                failedKicks.append(str(userid))
                 continue
 
-            docID = await tools.issue_pun(member.id, ctx.author.id, 'kick', reason, active=False)
+            docID = await tools.issue_pun(member.id, interaction.user.id, 'kick', reason, active=False)
             await tools.send_modlog(
-                self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=ctx.author, public=True
+                self.bot, self.modLogs, 'kick', docID, reason, user=member, moderator=interaction.user, public=True
             )
             kickCount += 1
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        if ctx.author.id != self.bot.user.id:  # Non-command invoke, such as automod
+        if interaction.user.id != self.bot.user.id:  # Non-command invoke, such as automod
             if len(users) == 1:
                 resp = f'{config.greenTick} {users[0]} has been successfully kicked'
                 if couldNotDM:
@@ -523,21 +574,35 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             else:
                 resp = f'{config.greenTick} **{kickCount}** users have been successfully kicked'
                 if failedKicks:
-                    resp += f'. Failed to kick **{failedKicks}** from the provided list'
+                    resp += f'. Failed to kick **{len(failedKicks)}** from the provided list:\n```{" ".join(failedKicks)}```'
 
-            return await ctx.send(resp)
+            return await interaction.followup.send(resp)
 
-    @commands.command(name='mute')
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.command(
+        name='mute',
+        description='Timeout a user for a period of time and disallow sending messages or joining voice chat',
+    )
+    @app_commands.describe(
+        member='The user you wish to timeout. Must be a user id',
+        duration='The formatted duration the user should be timed out for',
+        reason='The reason for issuing the mute. Optional',
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
-    async def _muting(self, ctx, member: discord.Member, duration, *, reason='-No reason specified-'):
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Mute reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
+    async def _muting(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        duration: str,
+        reason: app_commands.Range[str, None, 990],
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+
         db = mclient.bowser.puns
         if db.find_one({'user': member.id, 'type': 'mute', 'active': True}):
-            return await ctx.send(f'{config.redTick} {member} ({member.id}) is already muted')
+            return await interaction.followup.send(f'{config.redTick} {member} ({member.id}) is already muted')
 
         try:
             _duration = tools.resolve_duration(duration)
@@ -549,38 +614,41 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 pass
 
         except (KeyError, TypeError):
-            return await ctx.send(f'{config.redTick} Invalid duration passed')
+            return await interaction.followup.send(f'{config.redTick} Invalid duration passed')
 
         durDiff = (_duration - datetime.now(tz=timezone.utc)).total_seconds()
         if durDiff - 1 > 60 * 60 * 24 * 28:
             # Discord Timeouts cannot exceed 28 days, so we must check this
-            return await ctx.send(f'{config.redTick} Mutes cannot be longer than 28 days')
+            return await interaction.followup.send(f'{config.redTick} Mutes cannot be longer than 28 days')
 
         try:
-            member = await ctx.guild.fetch_member(member.id)
+            member = await interaction.guild.fetch_member(member.id)
             usr_role_pos = member.top_role.position
         except:
             usr_role_pos = -1
 
-        if (usr_role_pos >= ctx.guild.me.top_role.position) or (usr_role_pos >= ctx.author.top_role.position):
-            return await ctx.send(f'{config.redTick} Insufficent permissions to mute {member.name}')
+        if (usr_role_pos >= interaction.guild.me.top_role.position) or (
+            usr_role_pos >= interaction.user.top_role.position
+        ):
+            return await interaction.followup.send(f'{config.redTick} Insufficent permissions to mute {member.name}')
 
         await member.edit(timed_out_until=_duration, reason='Mute action performed by moderator')
 
         error = ""
         public_notify = False
         try:
-            await member.send(tools.format_pundm('mute', reason, ctx.author, f'<t:{int(_duration.timestamp())}:R>'))
+            await member.send(
+                tools.format_pundm('mute', reason, interaction.user, f'<t:{int(_duration.timestamp())}:R>')
+            )
 
         except (discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'
             public_notify = True
 
-        if not tools.mod_cmd_invoke_delete(ctx.channel):
-            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted{error}')
+        await interaction.followup.send(f'{config.greenTick} {member} ({member.id}) has been successfully muted{error}')
 
         docID = await tools.issue_pun(
-            member.id, ctx.author.id, 'mute', reason, int(_duration.timestamp()), public_notify=public_notify
+            member.id, interaction.user.id, 'mute', reason, int(_duration.timestamp()), public_notify=public_notify
         )
         await tools.send_modlog(
             self.bot,
@@ -589,7 +657,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             docID,
             reason,
             user=member,
-            moderator=ctx.author,
+            moderator=interaction.user,
             expires=f'<t:{int(_duration.timestamp())}:f> (<t:{int(_duration.timestamp())}:R>)',
             public=True,
         )
@@ -597,27 +665,28 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         twelveHr = 60 * 60 * 12
         expireTime = time.mktime(_duration.timetuple())
         tryTime = twelveHr if expireTime - time.time() > twelveHr else expireTime - time.time()
-        self.schedule_task(tryTime, docID, ctx.guild.id)
+        self.schedule_task(tryTime, docID, interaction.guild.id)
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-    @commands.command(name='unmute')
-    @commands.has_any_role(config.moderator, config.eh)
+    @app_commands.command(name='unmute', description='Unmute a user who is currently timed out')
+    @app_commands.describe(member='The user you wish to unmute', reason='The reason for removing the mute. Optional')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
     @commands.max_concurrency(1, commands.BucketType.guild, wait=True)
     async def _unmuting(
-        self, ctx, member: discord.Member, *, reason='-No reason specified-'
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        reason: typing.Optional[app_commands.Range[str, None, 990]] = '-No reason specified-',
     ):  # TODO: Allow IDs to be unmuted (in the case of not being in the guild)
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Unmute reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+
         db = mclient.bowser.puns
         action = db.find_one_and_update(
             {'user': member.id, 'type': 'mute', 'active': True}, {'$set': {'active': False}}
         )
         if not action:
-            return await ctx.send(
+            return await interaction.followup.send(
                 f'{config.redTick} Cannot unmute {member} ({member.id}), they are not currently muted'
             )
 
@@ -626,17 +695,24 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         error = ""
         public_notify = False
         try:
-            await member.send(tools.format_pundm('unmute', reason, ctx.author))
+            await member.send(tools.format_pundm('unmute', reason, interaction.user))
 
         except (discord.Forbidden, AttributeError):
             error = '. I was not able to DM them about this action'
             public_notify = True
 
-        if not tools.mod_cmd_invoke_delete(ctx.channel):
-            await ctx.send(f'{config.greenTick} {member} ({member.id}) has been successfully unmuted{error}')
+        await interaction.followup.send(
+            f'{config.greenTick} {member} ({member.id}) has been successfully unmuted{error}'
+        )
 
         docID = await tools.issue_pun(
-            member.id, ctx.author.id, 'unmute', reason, context=action['_id'], active=False, public_notify=public_notify
+            member.id,
+            interaction.user.id,
+            'unmute',
+            reason,
+            context=action['_id'],
+            active=False,
+            public_notify=public_notify,
         )
         await tools.send_modlog(
             self.bot,
@@ -645,196 +721,206 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             docID,
             reason,
             user=member,
-            moderator=ctx.author,
+            moderator=interaction.user,
             public=True,
         )
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.command(name='note')
-    async def _note(self, ctx, user: tools.ResolveUser, *, content):
+    @app_commands.command(name='note', description='Attach a private mod note to a user\'s account')
+    @app_commands.describe(user='The user id you wish to attach a note to', content='The content of the note')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _note(
+        self, interaction: discord.Interaction, user: discord.User, content: app_commands.Range[str, None, 990]
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         userid = user if (type(user) is int) else user.id
 
-        if len(content) > 900:
-            return await ctx.send(
-                f'{config.redTick} Note is too long, reduce it by at least {len(content) - 990} characters'
+        await tools.issue_pun(userid, interaction.user.id, 'note', content, active=False, public=False)
+
+        return await interaction.followup.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
+
+    @app_commands.command(name='strike', description='Issue 1 to 16 strikes to a user')
+    @app_commands.describe(
+        user='The user id you wish to strike',
+        count='The number of strikes you want to issue. Must be between 1 and 16; total active strikes cannot exceed 16',
+        reason='The reason for issuing the strike(s)',
+        mode='Determines if strikes are being added or set to a level. Valid options: \'add\' or \'set\'. Defaults to add',
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _strike(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        count: app_commands.Range[int, 1, 16],
+        reason: app_commands.Range[str, None, 990],
+        mode: typing.Literal['add', 'set'] = 'add',
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+        if count <= 0:
+            return await interaction.followup.send(
+                f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `/strike set`',
             )
 
-        await tools.issue_pun(userid, ctx.author.id, 'note', content, active=False, public=False)
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
-
-        return await ctx.send(f'{config.greenTick} Note successfully added to {user} ({user.id})')
-
-    @commands.has_any_role(config.moderator, config.eh)
-    @commands.group(name='strike', invoke_without_command=True)
-    async def _strike(self, ctx, user: tools.ResolveUser, count: typing.Optional[StrikeRange] = 1, *, reason):
-        if count == 0:
-            return await ctx.send(
-                f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `{ctx.prefix}strike set`'
+        elif count > 16:
+            return await interaction.followup.send(
+                f'{config.redTick} You cannot issue more than sixteen strikes to a user at once'
             )
 
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Strike reason is too long, reduce it by at least {len(reason) - 990} characters'
+        mode = mode.lower()
+        if mode not in ['add', 'set']:
+            # A typing.Literal should prevent this, but the case is handled should it fail
+            return await interaction.followup.send(
+                f'{config.redTick} The strike mode must be either \'add\' or \'set\''
             )
+
         punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
         userDoc = userDB.find_one({'_id': user.id})
         if not userDoc:
-            return await ctx.send(f'{config.redTick} Unable strike user who has never joined the server')
+            return await interaction.followup.send(
+                f'{config.redTick} Unable strike user who has never joined the server'
+            )
 
         activeStrikes = 0
         for pun in punDB.find({'user': user.id, 'type': 'strike', 'active': True}):
             activeStrikes += pun['active_strike_count']
 
-        activeStrikes += count
-        if activeStrikes > 16:  # Max of 16 active strikes
-            return await ctx.send(
-                f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead'
-            )
-
         error = ""
         public_notify = False
-        try:
-            await user.send(tools.format_pundm('strike', reason, ctx.author, details=count))
 
-        except discord.Forbidden:
-            error = '. I was not able to DM them about this action'
-            public_notify = True
+        if mode == 'set':
+            if activeStrikes == count:
+                # Mod trying to set strikes to existing amount
+                return await interaction.followup.send(
+                    f'{config.redTick} That user already has {activeStrikes} active strikes'
+                )
 
-        if activeStrikes == 16:
-            error += '.\n:exclamation: You may want to consider a ban'
+            if count > activeStrikes:
+                # Mod is setting a higher amount, pretend this is a mode: add from here
+                count = count - activeStrikes
+                mode = 'add'
 
-        if not tools.mod_cmd_invoke_delete(ctx.channel):
-            await ctx.send(
-                f'{config.greenTick} {user} ({user.id}) has been successfully struck, they now have '
-                f'{activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count}){error}'
-            )
+            elif count < activeStrikes:
+                # Mod is setting lower amount, we need to remove strikes
+                removedStrikes = activeStrikes - count
+                diff = removedStrikes  # accumlator
 
-        docID = await tools.issue_pun(
-            user.id, ctx.author.id, 'strike', reason, strike_count=count, public=True, public_notify=public_notify
-        )
+                puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
+                for pun in puns:
+                    if pun['active_strike_count'] - diff >= 0:
+                        punDB.update_one(
+                            {'_id': pun['_id']},
+                            {
+                                '$set': {
+                                    'active_strike_count': pun['active_strike_count'] - diff,
+                                    'active': pun['active_strike_count'] - diff > 0,
+                                }
+                            },
+                        )
+                        userDB.update_one(
+                            {'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}}
+                        )
+                        self.schedule_task(60 * 60 * 12, pun['_id'], interaction.guild.id)
 
-        await tools.send_modlog(
-            self.bot,
-            self.modLogs,
-            'strike',
-            docID,
-            reason,
-            user=user,
-            moderator=ctx.author,
-            extra_author=count,
-            public=True,
-        )
-        content = (
-            f'{config.greenTick} {user} ({user.id}) has been successfully struck, '
-            f'they now have {activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count})'
-        )
+                        # Logic to calculate the remaining (diff) strikes will simplify to 0
+                        # new_diff = diff - removed_strikes
+                        #          = diff - (old_strike_amount - new_strike_amount)
+                        #          = diff - (old_strike_amount - (old_strike_amount - diff))
+                        #          = diff - old_strike_amount + old_strike_amount - diff
+                        #          = 0
+                        diff = 0
+                        break
 
-        userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
-        self.schedule_task(60 * 60 * 12, docID, ctx.guild.id)
+                    elif pun['active_strike_count'] - diff < 0:
+                        punDB.update_one({'_id': pun['_id']}, {'$set': {'active_strike_count': 0, 'active': False}})
+                        diff -= pun['active_strike_count']
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
+                if diff != 0:  # Something has gone horribly wrong
+                    raise ValueError('Diff != 0 after full iteration')
 
-    @commands.has_any_role(config.moderator, config.eh)
-    @_strike.command(name='set')
-    async def _strike_set(self, ctx, user: tools.ResolveUser, count: StrikeRange, *, reason):
-        punDB = mclient.bowser.puns
-        activeStrikes = 0
-        puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True})
-        for pun in puns:
-            activeStrikes += pun['active_strike_count']
+                try:
+                    await user.send(tools.format_pundm('destrike', reason, interaction.user, details=removedStrikes))
+                except discord.Forbidden:
+                    error = 'I was not able to DM them about this action'
+                    public_notify = True
 
-        if activeStrikes == count:
-            return await ctx.send(f'{config.redTick} That user already has {activeStrikes} active strikes')
+                docID = await tools.issue_pun(
+                    user.id,
+                    interaction.user.id,
+                    'destrike',
+                    reason=reason,
+                    active=False,
+                    strike_count=removedStrikes,
+                    public_notify=public_notify,
+                )
+                await tools.send_modlog(
+                    self.bot,
+                    self.modLogs,
+                    'destrike',
+                    docID,
+                    reason,
+                    user=user,
+                    moderator=interaction.user,
+                    extra_author=(removedStrikes),
+                    public=True,
+                )
 
-        elif (
-            count > activeStrikes
-        ):  # This is going to be a positive diff, lets just do the math and defer work to _strike()
-            return await self._strike(ctx, user, count - activeStrikes, reason=reason)
+                await interaction.followup.send(
+                    f'{config.greenTick} {user} ({user.id}) has had {removedStrikes} strikes removed, '
+                    f'they now have {count} strike{"s" if count > 1 else ""} '
+                    f'({activeStrikes} - {removedStrikes}) {error}',
+                )
 
-        else:  # Negative diff, we will need to reduce our strikes
-            removedStrikes = activeStrikes - count
-            diff = removedStrikes  # accumlator
+        if mode == 'add':
+            # Separate statement because a strike set can resolve to an 'add' if the set would be additive
+            activeStrikes += count
+            if activeStrikes > 16:  # Max of 16 active strikes
+                return await interaction.followup.send(
+                    f'{config.redTick} Striking {count} time{"s" if count > 1 else ""} would exceed the maximum of 16 strikes. The amount being issued must be lowered by at least {activeStrikes - 16} or consider banning the user instead',
+                )
 
-            puns = punDB.find({'user': user.id, 'type': 'strike', 'active': True}).sort('timestamp', 1)
-            for pun in puns:
-                if pun['active_strike_count'] - diff >= 0:
-                    userDB = mclient.bowser.users
-                    userDoc = userDB.find_one({'_id': user.id})
-                    if not userDoc:
-                        return await ctx.send(f'{config.redTick} Unable strike user who has never joined the server')
-
-                    punDB.update_one(
-                        {'_id': pun['_id']},
-                        {
-                            '$set': {
-                                'active_strike_count': pun['active_strike_count'] - diff,
-                                'active': pun['active_strike_count'] - diff > 0,
-                            }
-                        },
-                    )
-                    userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})
-                    self.schedule_task(60 * 60 * 12, pun['_id'], ctx.guild.id)
-
-                    # Logic to calculate the remaining (diff) strikes will simplify to 0
-                    # new_diff = diff - removed_strikes
-                    #          = diff - (old_strike_amount - new_strike_amount)
-                    #          = diff - (old_strike_amount - (old_strike_amount - diff))
-                    #          = diff - old_strike_amount + old_strike_amount - diff
-                    #          = 0
-                    diff = 0
-                    break
-
-                elif pun['active_strike_count'] - diff < 0:
-                    punDB.update_one({'_id': pun['_id']}, {'$set': {'active_strike_count': 0, 'active': False}})
-                    diff -= pun['active_strike_count']
-
-            if diff != 0:  # Something has gone horribly wrong
-                raise ValueError('Diff != 0 after full iteration')
-
-            error = ""
-            public_notify = False
             try:
-                await user.send(tools.format_pundm('destrike', reason, ctx.author, details=removedStrikes))
+                await user.send(tools.format_pundm('strike', reason, interaction.user, details=count))
+
             except discord.Forbidden:
-                error = 'I was not able to DM them about this action'
+                error = '. I was not able to DM them about this action'
                 public_notify = True
+
+            if activeStrikes == 16:
+                error += '.\n:exclamation: You may want to consider a ban'
 
             docID = await tools.issue_pun(
                 user.id,
-                ctx.author.id,
-                'destrike',
-                reason=reason,
-                active=False,
-                strike_count=removedStrikes,
+                interaction.user.id,
+                'strike',
+                reason,
+                strike_count=count,
+                public=True,
                 public_notify=public_notify,
             )
+
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
-                'destrike',
+                'strike',
                 docID,
                 reason,
                 user=user,
-                moderator=ctx.author,
-                extra_author=(removedStrikes),
+                moderator=interaction.user,
+                extra_author=count,
                 public=True,
             )
 
-            if not tools.mod_cmd_invoke_delete(ctx.channel):
-                await ctx.send(
-                    f'{config.greenTick} {user} ({user.id}) has had {removedStrikes} strikes removed, '
-                    f'they now have {count} strike{"s" if count > 1 else ""} '
-                    f'({activeStrikes} - {removedStrikes}) {error}'
-                )
+            userDB.update_one({'_id': user.id}, {'$set': {'strike_check': time.time() + (60 * 60 * 24 * 7)}})  # 7 days
+            self.schedule_task(60 * 60 * 12, docID, interaction.guild.id)
 
-            else:
-                return await ctx.message.delete()
+            await interaction.followup.send(
+                f'{config.greenTick} {user} ({user.id}) has been successfully struck, they now have '
+                f'{activeStrikes} strike{"s" if activeStrikes > 1 else ""} ({activeStrikes-count} + {count}){error}',
+            )
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if not ctx.command:

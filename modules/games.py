@@ -12,6 +12,7 @@ import discord
 import pymongo
 import token_bucket
 from dateutil import parser
+from discord import app_commands
 from discord.ext import commands, tasks
 from fuzzywuzzy import fuzz
 
@@ -48,7 +49,7 @@ class GiantBomb:
 
     async def fetch_items(
         self, path: Literal['games', 'releases'], after: datetime = None
-    ) -> Generator[dict, None, None]:
+    ) -> Generator[dict, None, None]:  # type: ignore
         if path not in ['games', 'releases']:
             raise ValueError(f'invalid path: {path}')
 
@@ -123,6 +124,32 @@ class Games(commands.Cog, name='Games'):
         self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
         self.db.create_index([("game.id", pymongo.ASCENDING)])
 
+        # Generate the pipeline
+        self.pipeline = [
+            {'$match': {'_type': 'game'}},  # Select games
+            {
+                '$graphLookup': {
+                    'from': 'games',
+                    'startWith': '$id',
+                    'connectFromField': 'id',
+                    'connectToField': 'game.id',
+                    'as': '_releases',
+                    'restrictSearchWithMatch': {'_type': 'release'},
+                }
+            },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
+            {
+                '$project': {
+                    'guid': 1,
+                    'name': 1,
+                    'aliases': 1,
+                    'original_release_date': 1,
+                    '_releases.name': 1,
+                    '_releases.release_date': 1,
+                }
+            },  # Filter to only stuff we want
+        ]
+        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
+
         if AUTO_SYNC:
             self.sync_db.start()  # pylint: disable=no-member
 
@@ -154,12 +181,22 @@ class Games(commands.Cog, name='Games'):
         count = {}
         for type, path in [('game', 'games'), ('release', 'releases')]:
             count[path] = 0
-            async for game in self.GiantBomb.fetch_items(path, None if full else after):
-                if full:
-                    game['_full_sync_updated'] = True
+            try:
+                async for game in self.GiantBomb.fetch_items(path, None if full else after):
+                    if full:
+                        game['_full_sync_updated'] = True
 
-                self.update_item_in_db(type, game)
-                count[path] += 1
+                    self.update_item_in_db(type, game)
+                    count[path] += 1
+
+            except aiohttp.ClientResponseError as e:
+                if e.status in [429, 420]:  # Giantbomb uses 420 as ratelimiting
+                    logging.error('[Games] Ratelimited with GiantBomb, attempting retry at next loop')
+                    raise RatelimitException
+
+            except Exception as e:
+                logging.error(f'[Games] Exception while syncing games: {e}')
+                raise
 
         if full:
             self.db.delete_many({'_full_sync_updated': False})  # If items were not updated, delete them
@@ -170,6 +207,7 @@ class Games(commands.Cog, name='Games'):
             'count': count,
             'running': False,
         }
+        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
 
         return count, detail_str
 
@@ -198,32 +236,7 @@ class Games(commands.Cog, name='Games'):
 
     def search(self, query: str) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
-
-        pipeline = [
-            {'$match': {'_type': 'game'}},  # Select games
-            {
-                '$graphLookup': {
-                    'from': 'games',
-                    'startWith': '$id',
-                    'connectFromField': 'id',
-                    'connectToField': 'game.id',
-                    'as': '_releases',
-                    'restrictSearchWithMatch': {'_type': 'release'},
-                }
-            },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
-            {
-                '$project': {
-                    'guid': 1,
-                    'name': 1,
-                    'aliases': 1,
-                    'original_release_date': 1,
-                    '_releases.name': 1,
-                    '_releases.release_date': 1,
-                }
-            },  # Filter to only stuff we want
-        ]
-
-        for game in self.db.aggregate(pipeline):
+        for game in self.aggregatePipeline:
             names = collections.Counter([game['name']])
             if game['aliases']:
                 names.update(game['aliases'])
@@ -352,21 +365,45 @@ class Games(commands.Cog, name='Games'):
 
         return developers, publishers
 
-    @commands.group(name='games', aliases=['game'], invoke_without_command=True)
-    async def _games(self, ctx):
-        '''Search for games or check search database status'''
-        return await ctx.send_help(self._games)
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    class GamesCommand(app_commands.Group):
+        pass
 
-    @commands.cooldown(2, 60, type=commands.BucketType.user)
-    @_games.command(name='search')
-    async def _games_search(self, ctx, *, query: str):
-        '''Search for Nintendo Switch games'''
-        result = self.search(query)
+    games_group = GamesCommand(name='game', description='Find out information about games for the Nintendo Switch!')
 
-        if result and result['guid']:
-            game = self.db.find_one({'_type': 'game', 'guid': result['guid']})
+    async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
+        if current:
+            game = self.search(current)
+
         else:
-            game = None
+            # Current textbox is empty
+            return []
+
+        if game:
+            return [app_commands.Choice(name=game['name'], value=game['guid'])]
+
+        else:
+            return []
+
+    @games_group.command(name='search')
+    @app_commands.describe(query='The term you want to search for a game')
+    @app_commands.autocomplete(query=_games_search_autocomplete)
+    @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
+    async def _games_search(self, interaction: discord.Interaction, query: str):
+        '''Search for Nintendo Switch games'''
+        await interaction.response.defer()
+        user_guid = self.db.find_one({'guid': query.strip()})
+        game = None
+
+        if user_guid:
+            game = user_guid  # User clicked an autocomplete, giving us the exact guid
+            result = {'guid': user_guid['guid'], 'score': 100.0, 'name': user_guid['name']}
+
+        else:
+            result = self.search(query)
+
+        if not user_guid and result and result['guid']:
+            game = self.db.find_one({'_type': 'game', 'guid': result['guid']})
 
         if game:
             name = self.get_preferred_name(result['guid'])
@@ -493,14 +530,16 @@ class Games(commands.Cog, name='Games'):
 
                 embed.add_field(name=f'Nintendo Switch Releases', value=switch_desc, inline=False)
 
-            return await ctx.send(embed=embed)
+            return await interaction.followup.send(embed=embed)
 
         else:
-            return await ctx.send(f'{config.redTick} No results found.')
+            return await interaction.followup.send(f'{config.redTick} No results found.')
 
-    @_games.command(name='info', aliases=['information'])
-    async def _games_info(self, ctx):
+    @games_group.command(name='info', description='Check the status of the games search database')
+    @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
+    async def _games_info(self, interaction: discord.Interaction):
         '''Check search database status'''
+        await interaction.response.defer()
         releases_url = f'https://www.giantbomb.com/games?game_filter[platform]={GIANTBOMB_NSW_ID}'
         embed = discord.Embed(
             title='Game Search Database Status',
@@ -528,52 +567,24 @@ class Games(commands.Cog, name='Games'):
 
             embed.add_field(name=f'Last {string} Sync', value=value, inline=False)
 
-        return await ctx.send(embed=embed)
+        return await interaction.followup.send(embed=embed)
 
-    @_games.command(name='sync', aliases=['synchronize'])
-    @commands.is_owner()
-    async def _games_sync(self, ctx, full: bool = False):
+    @games_group.command(name='sync', description='Manually force a database games sync')
+    @app_commands.describe(full='Determines if it should be a full sync, or a partial')
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _games_sync(self, interaction: discord.Interaction, full: bool):
         '''Force a database sync'''
-        await ctx.reply('Running sync...')
+        await interaction.response.send_message('Running sync...')
         try:
             c, detail = await self.sync_db(full)
             message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
-            return await ctx.reply(message)
+            return await interaction.edit_original_message(content=message)
 
         except RatelimitException:
-            return await ctx.reply(f'{config.redTick} Unable to complete sync, ratelimiting')
-
-    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if not ctx.command:
-            return
-
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(
-                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
+            return await interaction.edit_original_message(
+                content=f'{config.redTick} Unable to complete sync, ratelimited'
             )
-
-        elif isinstance(error, commands.BadArgument):
-            return await ctx.send(
-                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
-
-        elif isinstance(error, commands.CommandOnCooldown):
-            return await ctx.send(
-                f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=15
-            )
-
-        elif isinstance(error, commands.CheckFailure):
-            return await ctx.send(f'{config.redTick} You do not have permission to run this command', delete_after=15)
-
-        else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
 
 
 async def setup(bot):
