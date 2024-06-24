@@ -1163,10 +1163,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         name='edit', description='Run this command for help with editing your profile and what the other commands do'
     )
     async def _profile_edit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
         u = db.find_one({'_id': interaction.user.id})
         embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
-        await interaction.response.send_message(embed=embed, file=card, ephemeral=True)
+        await interaction.followup.send(embed=embed, file=card)
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
