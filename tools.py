@@ -747,7 +747,7 @@ class PaginatedEmbed(discord.ui.View):
 
         # Find the page character cap
         footer_max_length = (
-            len(self.PAGE_TEMPLATE) + max(len(self.FOOTER_ENDED_BY.format('-' * 37))) + 4
+            len(self.PAGE_TEMPLATE) + len(self.FOOTER_ENDED_BY.format('-' * 37)) + 4
         )  # 37 = max len(discordtag...#0000)
         title_max_length = len(title) + 1
         description_length = 0 if not description else len(description)
