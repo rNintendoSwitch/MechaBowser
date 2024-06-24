@@ -261,7 +261,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             )
 
         if count >= 100:
-            view = tools.RiskyConfirmation(timeout=15)
+            view = tools.RiskyConfirmation(timeout=15.0)
             view.message = await interaction.followup.send(
                 f'This action will scan and delete up to {count} messages, are you sure you want to proceed?',
                 view=view,
