@@ -955,7 +955,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     class ManageTagCommand(app_commands.Group):
         pass
 
-    manage_tag_group = ManageTagCommand(name='update', description='Update components of the bot')
+    manage_tag_group = ManageTagCommand(name='manage-tag', description='Update components of the bot')
 
     @manage_tag_group.command(name='edit', description='Edit an existing tag, or create a new one with a given name')
     @app_commands.describe(name='Name of the tag to modify or create')
