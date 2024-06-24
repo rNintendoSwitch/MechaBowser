@@ -569,20 +569,16 @@ class Games(commands.Cog, name='Games'):
 
         return await interaction.followup.send(embed=embed)
 
-    @games_group.command(name='sync', description='Manually force a database games sync')
-    @app_commands.describe(full='Determines if it should be a full sync, or a partial')
-    @app_commands.default_permissions(view_audit_log=True)
-    @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _games_sync(self, interaction: discord.Interaction, full: bool):
+    async def games_sync(self, interaction: discord.Interaction, full: bool):
         '''Force a database sync'''
         await interaction.response.send_message('Running sync...')
         try:
             c, detail = await self.sync_db(full)
             message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
-            return await interaction.edit_original_message(content=message)
+            return await interaction.edit_original_response(content=message)
 
         except RatelimitException:
-            return await interaction.edit_original_message(
+            return await interaction.edit_original_response(
                 content=f'{config.redTick} Unable to complete sync, ratelimited'
             )
 
