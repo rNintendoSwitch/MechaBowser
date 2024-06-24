@@ -189,18 +189,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await self._profile_view(interaction, member)
 
     async def _profile_view(self, interaction: discord.Interaction, member: discord.Member):
-        # If channel can be ratelimited
-        if interaction.channel.id not in [config.commandsChannel, config.debugChannel]:
-            channel_being_rate_limited = not self.profile_bucket.consume(str(interaction.channel.id))
-            if channel_being_rate_limited:
-                #  Moderators consume a ratelimit token but are not limited
-                if not interaction.guild.get_role(config.moderator) in interaction.user.roles:
-                    await interaction.response.send_message(
-                        f'{config.redTick} That command is being used too often, try again in a few seconds.',
-                        ephemeral=True,
-                    )
-                    return
-
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -218,6 +206,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         else:
+            # If channel can be ratelimited
+            if interaction.channel.id not in [config.commandsChannel, config.debugChannel]:
+                channel_being_rate_limited = not self.profile_bucket.consume(str(interaction.channel.id))
+                if channel_being_rate_limited:
+                    #  Moderators consume a ratelimit token but are not limited
+                    if not interaction.guild.get_role(config.moderator) in interaction.user.roles:
+                        await interaction.response.send_message(
+                            f'{config.redTick} That command is being used too often, try again in a few seconds.',
+                            ephemeral=True,
+                        )
+                        return
+
             await interaction.response.defer()
             card = await self._generate_profile_card_from_member(member)
             await interaction.followup.send(file=card)
