@@ -192,7 +192,7 @@ class Games(commands.Cog, name='Games'):
             except aiohttp.ClientResponseError as e:
                 if e.status in [429, 420]:  # Giantbomb uses 420 as ratelimiting
                     logging.error('[Games] Ratelimited with GiantBomb, attempting retry at next loop')
-                    raise RatelimitException
+                    return
 
             except Exception as e:
                 logging.error(f'[Games] Exception while syncing games: {e}')
