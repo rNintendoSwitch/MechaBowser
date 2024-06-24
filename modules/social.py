@@ -1168,10 +1168,15 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
         await interaction.response.send_message(embed=embed, file=card, ephemeral=True)
 
-    @social_group.command(name='validate', description='Validate a new background with selected opacity')
-    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ProfileManageCommand(app_commands.Group):
+        pass
+
+    profile_manage_group = ProfileManageCommand(name='manage-profile', description='Higher level commands to manage the profile system')
+
+    @profile_manage_group.command(name='validate', description='Validate a new background with selected opacity')
     async def _profile_validate(
         self,
         interaction: discord.Interaction,
@@ -1348,7 +1353,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             content=f'{config.greenTick} Trivia trophy revocation complete.', embed=embed
         )
 
-    @social_group.command(name='grant', description='Grants a specified item, background, or trophy to a member')
+    @profile_manage_group.command(name='grant', description='Grants a specified item, background, or trophy to a member')
     @app_commands.describe(
         members='The user or users you wish to grant items. Must be user ids separated by a space',
         item='Which profile element you wish to modify',
@@ -1412,7 +1417,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 content=f'{config.greenTick} {item.title()} `{name}` granted to {len(users) - failCount}/{len(users)} member(s).'
             )
 
-    @social_group.command(name='revoke', description='Revokes a specified item, background, or trophy from a member')
+    @profile_manage_group.command(name='revoke', description='Revokes a specified item, background, or trophy from a member')
     @app_commands.describe(
         members='The user or users you wish to revoke items. Must be user ids separated by a space',
         item='Which profile element you wish to modify',

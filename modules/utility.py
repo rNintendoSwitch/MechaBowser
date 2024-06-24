@@ -949,7 +949,15 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     f'{config.greenTick} The **{self.tag}** tag has been created'
                 )
 
-    @tag_group.command(name='edit', description='Edit an existing tag, or create a new one with a given name')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ManageTagCommand(app_commands.Group):
+        pass
+
+    manage_tag_group = ManageTagCommand(name='update', description='Update components of the bot')
+
+    @manage_tag_group.command(name='edit', description='Edit an existing tag, or create a new one with a given name')
     @app_commands.describe(name='Name of the tag to modify or create')
     @app_commands.autocomplete(name=_tag_autocomplete)
     @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
@@ -960,10 +968,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         modal = self.TagEdit(name.lower())
         return await interaction.response.send_modal(modal)
 
-    @tag_group.command(name='delete', description='Delete an existing tag')
+    @manage_tag_group.command(name='delete', description='Delete an existing tag')
     @app_commands.describe(name='Name of the tag to delete')
     @app_commands.autocomplete(name=_tag_autocomplete)
-    @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_delete(self, interaction: discord.Interaction, name: str):
         db = mclient.bowser.tags
         name = name.lower()
@@ -989,13 +996,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @tag_group.command(name='description', description='Change the description flavor text of a tag')
+    @manage_tag_group.command(name='description', description='Change the description flavor text of a tag')
     @app_commands.describe(
         name='Name of the tag which to update the description for',
         content='The new description for the tag. Leave blank to clear the existing description',
     )
     @app_commands.autocomplete(name=_tag_autocomplete)
-    @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_setdesc(self, interaction: discord.Interaction, name: str, content: typing.Optional[str] = ''):
         db = mclient.bowser.tags
         name = name.lower()
@@ -1014,14 +1020,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @tag_group.command(name='image', description='Change the active images displayed on tags')
+    @manage_tag_group.command(name='image', description='Change the active images displayed on tags')
     @app_commands.describe(
         name='The name of the tag which to update an image',
         option='Which image should be changed',
         url='The URL of the image to use. Leave blank to clear it',
     )
     @app_commands.autocomplete(name=_tag_autocomplete)
-    @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_setimg(
         self,
         interaction: discord.Interaction,
@@ -1057,10 +1062,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         else:
             return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @tag_group.command(name='source', description='Retrieve the raw source of a tag for easier')
+    @manage_tag_group.command(name='source', description='Retrieve the raw source of a tag for easier')
     @app_commands.describe(name='Name of the tag to retrieve the raw source')
     @app_commands.autocomplete(name=_tag_autocomplete)
-    @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
     async def _tag_source(self, interaction: discord.Interaction, name: str):
         db = mclient.bowser.tags
         name = name.lower()
