@@ -1349,7 +1349,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
 
     @social_group.command(name='grant', description='Grants a specified item, background, or trophy to a member')
-    @app_commands.describe(members='The user or users you wish to grant items. Must be user ids separated by a space')
+    @app_commands.describe(members='The user or users you wish to grant items. Must be user ids separated by a space', item='Which profile element you wish to modify', name='Name of the element to modify')
     async def _profile_grant(
         self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str
     ):
@@ -1409,7 +1409,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
     @social_group.command(name='revoke', description='Revokes a specified item, background, or trophy from a member')
-    @app_commands.describe(members='The user or users you wish to revoke items. Must be user ids separated by a space')
+    @app_commands.describe(members='The user or users you wish to revoke items. Must be user ids separated by a space', item='Which profile element you wish to modify', name='Name of the element to modify')
     async def _profile_revoke(
         self, interaction: discord.Interaction, members: str, item: typing.Literal['background', 'trophy'], name: str
     ):
