@@ -545,8 +545,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @app_commands.command(name='history', description='Get detailed information on a user\'s infraction history')
     @app_commands.describe(user='The user you wish to get infractions for. If left blank, get your own history')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
-    @app_commands.default_permissions(view_audit_log=True)
-    @app_commands.checks.has_any_role(config.moderator, config.eh)
     async def _history(self, interaction: discord.Interaction, user: typing.Optional[discord.User]):
         if not user:
             user = interaction.user
