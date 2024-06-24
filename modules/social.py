@@ -44,6 +44,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.bucket_storage = token_bucket.MemoryStorage()
         self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
 
+        # Add context menus to command tree
+        self.profileContextMenu = app_commands.ContextMenu(
+            name='View Profile Card', callback=self._profile_view, type=discord.AppCommandType.user
+        )
+        self.bot.tree.add_command(self.profileContextMenu, guild=discord.Object(id=config.nintendoswitch))
+
         # Profile generation
         self.twemojiPath = 'resources/twemoji/assets/72x72/'
         self.bot_contributors = [
@@ -180,6 +186,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not member:
             member = interaction.user
 
+        await self._profile_view(interaction, member)
+
+    async def _profile_view(self, interaction: discord.Interaction, member: discord.Member):
         # If channel can be ratelimited
         if interaction.channel.id not in [config.commandsChannel, config.debugChannel]:
             channel_being_rate_limited = not self.profile_bucket.consume(str(interaction.channel.id))
