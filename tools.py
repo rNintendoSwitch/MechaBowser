@@ -722,8 +722,7 @@ class PaginatedEmbed(discord.ui.View):
     Interactions should be deferred with `thinking=True` before instantiating.
     '''
 
-    PAGE_TEMPLATE = '(Page {0}/{1})'
-    FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
+    PAGE_TEMPLATE = 'Page {0}/{1}'
     FOOTER_ENDED_BY = 'Ended by {0}'
     MESSAGE: discord.WebhookMessage | None = None
 
@@ -748,9 +747,9 @@ class PaginatedEmbed(discord.ui.View):
 
         # Find the page character cap
         footer_max_length = (
-            len(self.PAGE_TEMPLATE) + max(len(self.FOOTER_INSTRUCTION), len(self.FOOTER_ENDED_BY.format('-' * 37))) + 4
+            len(self.PAGE_TEMPLATE) + len(self.FOOTER_ENDED_BY.format('-' * 37)) + 4
         )  # 37 = max len(discordtag...#0000)
-        title_max_length = len(title) + len(self.FOOTER_INSTRUCTION) + 1
+        title_max_length = len(title) + 1
         description_length = 0 if not description else len(description)
         author_length = 0 if not author else len(author['name'])
 
@@ -785,10 +784,10 @@ class PaginatedEmbed(discord.ui.View):
     def ui_setup(self):
         # Create components and assign them callbacks
         self.add_item(discord.ui.Button(label='⬅️ Previous', disabled=True, style=discord.ButtonStyle.success))
-        self.add_item(discord.ui.Button(label='⏹️', style=discord.ButtonStyle.secondary))
         self.add_item(discord.ui.Button(label='Next ➡️', style=discord.ButtonStyle.success))
+        self.add_item(discord.ui.Button(label='⏹️ End', style=discord.ButtonStyle.secondary))
 
-        callbacks = [self.regress_page, self.end_pagination, self.progress_page]
+        callbacks = [self.regress_page, self.progress_page, self.end_pagination]
 
         for index, child in enumerate(self.children):
             child.callback = callbacks[index]
@@ -896,7 +895,7 @@ class PaginatedEmbed(discord.ui.View):
             self.embed.set_footer(text=page_text)
 
         else:
-            self.embed.set_footer(text=f'{page_text}    {self.FOOTER_INSTRUCTION}', icon_url=self.embed.footer.icon_url)
+            self.embed.set_footer(text=page_text, icon_url=self.embed.footer.icon_url)
 
         return self.embed
 
