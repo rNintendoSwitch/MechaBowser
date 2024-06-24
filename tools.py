@@ -787,7 +787,7 @@ class PaginatedEmbed(discord.ui.View):
         self.add_item(discord.ui.Button(label='Next ➡️', style=discord.ButtonStyle.success))
         self.add_item(discord.ui.Button(label='⏹️ End', style=discord.ButtonStyle.secondary))
 
-        callbacks = [self.regress_page, self.end_pagination, self.progress_page]
+        callbacks = [self.regress_page, self.progress_page, self.end_pagination]
 
         for index, child in enumerate(self.children):
             child.callback = callbacks[index]
