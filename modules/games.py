@@ -387,7 +387,7 @@ class Games(commands.Cog, name='Games'):
 
     @games_group.command(name='search')
     @app_commands.describe(query='The term you want to search for a game')
-    #@app_commands.autocomplete(query=_games_search_autocomplete)
+    # @app_commands.autocomplete(query=_games_search_autocomplete)
     @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
     async def _games_search(self, interaction: discord.Interaction, query: str):
         '''Search for Nintendo Switch games'''
