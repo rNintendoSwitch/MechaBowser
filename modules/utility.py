@@ -406,8 +406,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name='Messages', value=str(msgCount), inline=True)
-        if inServer:
+        if inServer and isinstance(user, discord.Member):
             embed.add_field(name='Join date', value=f'<t:{int(user.joined_at.timestamp())}:f>', inline=True)
+
+        elif inServer and dbUser['leaves']:
+            embed.add_field(name='Left server', value=f'<t:{int(max(dbUser['leaves']))}:f>', inline=True)
+
         roleList = []
         if inServer:
             for role in reversed(user.roles):
