@@ -1241,7 +1241,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'joindate': "Jan. 01, 1970",
             'usertime': "Not specified",
             'trophies': [None] * 18,
-            'games': ['3030-88442', '3030-87348', '3030-89546', '3030-84825', '3030-89623'],  # Games with really long titles
+            'games': [
+                '3030-88442',
+                '3030-87348',
+                '3030-89546',
+                '3030-84825',
+                '3030-89623',
+            ],  # Games with really long titles
         }
 
         card = await self._generate_profile_card(profile, background)
