@@ -722,9 +722,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             data = io.BytesIO()
             await attachment.save(data)
             files.append(discord.File(data, attachment.filename))
-        await message.reply(text, files=files)
+        msg = await message.reply(text, files=files)
 
-        return await interaction.followup.send('Done')
+        return await interaction.followup.send(f'[Done]({msg.jump_url})')
 
     @app_commands.command(
         name='echo', description='Use the bot to send a message. Must provide either text, attachment, or both'
@@ -756,9 +756,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             data = io.BytesIO()
             await attachment.save(data)
             files.append(discord.File(data, attachment.filename))
-        await channel.send(text, files=files)
+        msg = await channel.send(text, files=files)
 
-        return await interaction.followup.send('Done')
+        return await interaction.followup.send(f'[Done]({msg.jump_url})')
 
     @app_commands.command(name='roles', description='Get a list of all server roles and their IDs')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))

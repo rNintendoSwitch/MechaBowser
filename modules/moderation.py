@@ -743,7 +743,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @app_commands.command(name='strike', description='Issue 1 to 16 strikes to a user')
     @app_commands.describe(
         user='The user id you wish to strike',
-        count='The number of strikes you want to issue. Must be between 1 and 16; total active strikes cannot exceed 16',
+        count='The number of strikes you want to issue. Must be between 1-16 if adding or 0-16 if setting',
         reason='The reason for issuing the strike(s)',
         mode='Determines if strikes are being added or set to a level. Valid options: \'add\' or \'set\'. Defaults to add',
     )
