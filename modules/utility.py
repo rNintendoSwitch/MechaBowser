@@ -413,7 +413,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             embed.add_field(name='Left server', value=f'<t:{int(max(dbUser['leaves']))}:f>', inline=True)
 
         roleList = []
-        if inServer:
+        if inServer and isinstance(user, discord.Member):
             for role in reversed(user.roles):
                 if role.id == user.guild.id:
                     continue
