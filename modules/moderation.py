@@ -754,12 +754,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         self,
         interaction: discord.Interaction,
         user: discord.User,
-        count: app_commands.Range[int, 1, 16],
+        count: app_commands.Range[int, 0, 16],
         reason: app_commands.Range[str, None, 990],
         mode: typing.Literal['add', 'set'] = 'add',
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        if count <= 0:
+        if count <= 0 and mode != 'set':
             return await interaction.followup.send(
                 f'{config.redTick} You cannot issue less than one strike. If you need to reset this user\'s strikes to zero instead use `/strike set`',
             )
