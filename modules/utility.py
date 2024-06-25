@@ -369,6 +369,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         inServer = True
         dbUser = mclient.bowser.users.find_one({'_id': user.id})
+        if interaction.guild.get_member(user.id):
+            user = interaction.guild.get_member(user.id)
 
         if not dbUser:
             inServer = False
@@ -428,7 +430,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             roles = '*User has no roles*'
 
         else:
-            if not inServer:
+            if not inServer or isinstance(user, discord.User):
                 tempList = []
                 for x in reversed(roleList):
                     y = interaction.guild.get_role(x)
