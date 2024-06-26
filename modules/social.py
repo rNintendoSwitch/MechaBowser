@@ -769,7 +769,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         commandStr = f'</profile view:{command.extras["id"]}>'
         await ctx.message.reply(
             f':repeat: Hi there! I no longer use text commands. Instead, please repeat your command using {commandStr} as a slash command instead',
-            delete_after=10
+            delete_after=10,
         )
 
     async def _profile_friendcode_autocomplete(
