@@ -771,6 +771,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f':repeat: Hi there! I no longer use text commands. Instead, please repeat your command using {commandStr} as a slash command instead',
             delete_after=10,
         )
+        await ctx.message.delete()
 
     async def _profile_friendcode_autocomplete(
         self, interaction: discord.Interaction, current: str
