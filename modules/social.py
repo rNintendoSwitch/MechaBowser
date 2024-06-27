@@ -775,7 +775,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @_old_profile_redirect_edit.command(name='edit')
     async def _old_profile_redirect(self, ctx):
-         for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
+        for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
             # Iterate over commands in the tree so we can get the profile command ID
             if command.name == 'profile':
                 break
