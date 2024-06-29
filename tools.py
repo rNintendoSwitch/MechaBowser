@@ -796,8 +796,8 @@ class PaginatedEmbed(discord.ui.View):
         if self.current_page - 1 <= 1:
             self.children[0].disabled = True
 
-        if self.children[2].disabled:
-            self.children[2].disabled = False
+        if self.children[1].disabled:
+            self.children[1].disabled = False
 
         self.current_page -= 1
         await self.process_response(self.generate_new_embed(), interaction=interaction, button_interact=True)
@@ -817,7 +817,7 @@ class PaginatedEmbed(discord.ui.View):
 
     async def progress_page(self, interaction: discord.Interaction):
         if self.current_page + 1 >= len(self.pages):
-            self.children[2].disabled = True
+            self.children[1].disabled = True
 
         if self.children[0].disabled:
             self.children[0].disabled = False
