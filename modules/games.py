@@ -22,7 +22,7 @@ import tools  # type: ignore
 mclient = pymongo.MongoClient(config.mongoURI)
 
 GIANTBOMB_NSW_ID = 157
-AUTO_SYNC = True
+AUTO_SYNC = False
 SEARCH_RATIO_THRESHOLD = 50
 
 
