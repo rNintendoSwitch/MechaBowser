@@ -354,7 +354,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             member = interaction.guild.get_member(user)
             userid = user
-            username = userid if (type(member) is int) else str(member)
+            username = userid if (type(member) is int) or not member else str(member)
 
             # If not a user, manually contruct a user object
             user = discord.Object(id=userid) if (type(user) is int) else user
