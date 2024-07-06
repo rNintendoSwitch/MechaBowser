@@ -354,8 +354,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
                 except discord.NotFound:
                     return await interaction.followup.send(
-                    f'{config.redTick} A user provided in users is invalid: `{ban_id}`. Make sure you are providing user ids'
-                )
+                        f'{config.redTick} A user provided in users is invalid: `{ban_id}`. Make sure you are providing user ids'
+                    )
 
             username = user.name
             userStr = f'{username} ({ban_id})'
@@ -370,9 +370,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             if (usr_role_pos >= interaction.guild.me.top_role.position) or (
                 usr_role_pos >= interaction.user.top_role.position
             ):
-                return await interaction.followup.send(
-                    f'{config.redTick} Insufficent permissions to ban {userStr}'
-                )
+                return await interaction.followup.send(f'{config.redTick} Insufficent permissions to ban {userStr}')
 
             if len(users) == 1:
                 try:
@@ -399,7 +397,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             if len(users) == 1:
                 try:
-                    await interaction.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
+                    await interaction.guild.ban(
+                        user, reason=f'Ban action performed by moderator', delete_message_days=3
+                    )
 
                 except discord.NotFound:
                     # User does not exist
@@ -439,9 +439,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             successes, failures = await interaction.guild.bulk_ban(banList, reason='Ban action performed by moderator')
             resp = f'{config.greenTick} **{len(successes)}** users have been successfully banned'
             if failures:
-                resp += (
-                    f'. Failed to ban **{len(failures)}** from the provided list:\n```{" ".join([str(f.id) for f in failures])}```'
-                )
+                resp += f'. Failed to ban **{len(failures)}** from the provided list:\n```{" ".join([str(f.id) for f in failures])}```'
 
             return await interaction.followup.send(resp)
 
