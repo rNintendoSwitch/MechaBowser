@@ -938,11 +938,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     @social_group.command(name='games', description='Pick up-to 5 of your fav Nintendo Switch games to show them off')
     @app_commands.describe(
-        game1='You need to pick at least one game. Search by name and use autocomplete to help!',
-        game2='Optionally pick a 2nd game to show on your profile as well. Search by name and use autocomplete to help!',
-        game3='Optionally pick a 3rd game to show on your profile as well. Search by name and use autocomplete to help!',
-        game4='Optionally pick a 4th game to show on your profile as well. Search by name and use autocomplete to help!',
-        game5='Optionally pick a 5th game to show on your profile as well. Search by name and use autocomplete to help!',
+        game1='You need to pick at least one game. Search by name',
+        game2='Optionally pick a 2nd game to show on your profile as well. Search by name',
+        game3='Optionally pick a 3rd game to show on your profile as well. Search by name',
+        game4='Optionally pick a 4th game to show on your profile as well. Search by name',
+        game5='Optionally pick a 5th game to show on your profile as well. Search by name',
     )
     # @app_commands.autocomplete(
     #   game1=_profile_games_autocomplete,
@@ -1525,8 +1525,14 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         if not contains_code:
             return
         if message.channel.id not in [config.commandsChannel]:
+            for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
+                # Iterate over commands in the tree so we can get the profile command ID
+                if command.name == 'profile':
+                    break
+
+            commandID = command.extras['id']
             await message.channel.send(
-                f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the `!profile` command. To set details such as your friend code on your profile, use `!profile edit` in <#{config.commandsChannel}>. You can even see the profiles of other users with `!profile @user`'
+                f'{message.author.mention} Hi! It appears you\'ve sent a **friend code**. An easy way to store and share your friend code is with our server profile system. To view your profile use the </profile view:{commandID}> command. For help on setting up your profile, including adding your friend code, use the </profile edit:{commandID}> command. You can even see the profiles of other users with `/profile view @user`'
             )
 
     async def cog_command_error(self, ctx, error: commands.CommandError):
