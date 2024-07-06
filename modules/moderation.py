@@ -338,7 +338,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         failedBans = []
         couldNotDM = False
 
-        users = list(set(users.split())) # Remove dupes
+        users = list(set(users.split()))  # Remove dupes
         multiban = len(users) > 1
         for u in users:
             try:
