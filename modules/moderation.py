@@ -4,6 +4,7 @@ import logging
 import time
 import typing
 from datetime import datetime, timedelta, timezone
+from itertools import batched
 
 import config
 import discord
@@ -334,17 +335,24 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         banList = []
+        failedBans = []
         couldNotDM = False
 
+
         users = users.split()
+        multiban = len(users) > 1
         for u in users:
             try:
                 ban_id = int(u)
 
             except ValueError:
-                return await interaction.followup.send(
-                    f'{config.redTick} An argument provided in users is invalid: `{user}`. Make sure you are providing user ids'
-                )
+                if multiban:
+                    failedBans.append(u)
+
+                else:
+                    return await interaction.followup.send(
+                        f'{config.redTick} An argument provided in users is invalid: `{user}`. Make sure you are providing user ids'
+                    )
 
             user = interaction.client.get_user(ban_id)
             if not user:
@@ -353,9 +361,13 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     username = None
 
                 except discord.NotFound:
-                    return await interaction.followup.send(
-                        f'{config.redTick} A user provided in users is invalid: `{ban_id}`. Make sure you are providing user ids'
-                    )
+                    if multiban:
+                        failedBans.append(u)
+
+                    else:
+                        return await interaction.followup.send(
+                            f'{config.redTick} A user provided in users is invalid: `{ban_id}`. Make sure you are providing user ids'
+                        )
 
             username = user.name
             userStr = f'{username} ({ban_id})'
@@ -372,7 +384,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             ):
                 return await interaction.followup.send(f'{config.redTick} Insufficent permissions to ban {userStr}')
 
-            if len(users) == 1:
+            if not multiban:
                 try:
                     await interaction.guild.fetch_ban(user)
 
@@ -395,7 +407,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 couldNotDM = True
                 pass
 
-            if len(users) == 1:
+            if not multiban:
                 try:
                     await interaction.guild.ban(
                         user, reason=f'Ban action performed by moderator', delete_message_days=3
@@ -414,10 +426,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             banList.append(user)
 
         for user in banList:
-            if len(banList) > 1:
+            if multiban:
                 try:
                     # Temp timeout to prevent message sends until bulk_ban fires
-                    await user.edit(timed_out_until=datetime.now() + timedelta(hours=2))
+                    await user.edit(timed_out_until=datetime.now() + timedelta(hours=1))
 
                 except:
                     pass
@@ -435,13 +447,50 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 public=True,
             )
 
-        if interaction.user.id != self.bot.user.id and len(banList) > 1:  # Command invoke, i.e. anything not automod
-            successes, failures = await interaction.guild.bulk_ban(banList, reason='Ban action performed by moderator')
-            resp = f'{config.greenTick} **{len(successes)}** users have been successfully banned'
-            if failures:
-                resp += f'. Failed to ban **{len(failures)}** from the provided list:\n```{" ".join([str(f.id) for f in failures])}```'
+        if not multiban:
+            return
 
-            return await interaction.followup.send(resp)
+        successes = []
+        failures = []
+        for batch in list(batched(set(banList), 200)):
+            # Discord.py / Discord restricts us to 200 bans per bulk ban
+            try:
+                s, f = await interaction.guild.bulk_ban(batch, reason='Ban action performed by moderator')
+
+            except discord.HTTPException as e:
+                if e.status == 400:
+                    # This can happen in such cases as a moderator bans a list of users that are ALL already banned
+                    logging.error(f'[Moderation] bulk_ban failed with http 400. User set: {batch}')
+                    failures += batch
+                    continue
+
+                else:
+                    raise
+
+            successes += s
+            failures += f
+
+        if interaction.user.id != self.bot.user.id and len(banList) > 1:  # Command invoke, i.e. anything not automod
+            failedBans += [str(f.id) for f in failures]
+            if successes:
+                resp = f'{config.greenTick} **{len(successes)}** users have been successfully banned'
+
+            else:
+                resp = f'{config.redTick} **0** users were banned'
+
+            if failures:
+                resp += f'. Failed to ban **{len(failures)}** from the provided list:\n```{" ".join(failedBans)}```'
+
+            await interaction.followup.send(resp)
+
+        # Edge case cleanup to ensure failed bans for users in server are untimed out
+        for f in failures:
+            m = interaction.guild.get_member(f.id)
+            try:
+                if m: await m.edit(timed_out_until=None)
+
+            except:
+                pass
 
     @app_commands.command(name='unban', description='Unban a specified user from the server')
     @app_commands.describe(user='The user id to unban', reason='The reason for unbanning the user')
