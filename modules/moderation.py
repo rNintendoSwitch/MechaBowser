@@ -338,7 +338,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         failedBans = []
         couldNotDM = False
 
-
         users = users.split()
         multiban = len(users) > 1
         for u in users:
@@ -487,7 +486,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         for f in failures:
             m = interaction.guild.get_member(f.id)
             try:
-                if m: await m.edit(timed_out_until=None)
+                if m:
+                    await m.edit(timed_out_until=None)
 
             except:
                 pass
