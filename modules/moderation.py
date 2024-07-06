@@ -338,7 +338,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         failedBans = []
         couldNotDM = False
 
-        users = users.split()
+        users = list(set(users.split())) # Remove dupes
         multiban = len(users) > 1
         for u in users:
             try:
@@ -350,7 +350,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
                 else:
                     return await interaction.followup.send(
-                        f'{config.redTick} An argument provided in users is invalid: `{user}`. Make sure you are providing user ids'
+                        f'{config.redTick} The user provided is invalid: `{u}`. Make sure you are providing a user id'
                     )
 
             user = interaction.client.get_user(ban_id)
@@ -365,7 +365,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
                     else:
                         return await interaction.followup.send(
-                            f'{config.redTick} A user provided in users is invalid: `{ban_id}`. Make sure you are providing user ids'
+                            f'{config.redTick} The user provided is invalid: `{ban_id}`. Make sure you are providing user ids'
                         )
 
             username = user.name
@@ -420,38 +420,32 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 if couldNotDM:
                     resp += '. I was not able to DM them about this action'
 
-                await interaction.followup.send(resp)
+                docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
+                await tools.send_modlog(
+                    self.bot,
+                    self.modLogs,
+                    'ban',
+                    docID,
+                    reason,
+                    username=username,
+                    userid=ban_id,
+                    moderator=interaction.user,
+                    public=True,
+                )
+                return await interaction.followup.send(resp)
+
+            try:
+                # Temp timeout to prevent message sends until bulk_ban fires
+                await user.edit(timed_out_until=datetime.now() + timedelta(minutes=10))
+
+            except:
+                pass
 
             banList.append(user)
 
-        for user in banList:
-            if multiban:
-                try:
-                    # Temp timeout to prevent message sends until bulk_ban fires
-                    await user.edit(timed_out_until=datetime.now() + timedelta(hours=1))
-
-                except:
-                    pass
-
-            docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
-            await tools.send_modlog(
-                self.bot,
-                self.modLogs,
-                'ban',
-                docID,
-                reason,
-                username=username,
-                userid=ban_id,
-                moderator=interaction.user,
-                public=True,
-            )
-
-        if not multiban:
-            return
-
         successes = []
         failures = []
-        for batch in list(batched(set(banList), 200)):
+        for batch in list(batched(banList, 200)):
             # Discord.py / Discord restricts us to 200 bans per bulk ban
             try:
                 s, f = await interaction.guild.bulk_ban(batch, reason='Ban action performed by moderator')
@@ -468,6 +462,21 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             successes += s
             failures += f
+
+        successIDs = [s.id for s in successes]
+        for user in [u for u in banList if u.id in successIDs]:
+            docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
+            await tools.send_modlog(
+                self.bot,
+                self.modLogs,
+                'ban',
+                docID,
+                reason,
+                username=username,
+                userid=ban_id,
+                moderator=interaction.user,
+                public=True,
+            )
 
         if interaction.user.id != self.bot.user.id and len(banList) > 1:  # Command invoke, i.e. anything not automod
             failedBans += [str(f.id) for f in failures]
