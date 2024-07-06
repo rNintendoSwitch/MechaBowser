@@ -393,7 +393,7 @@ class MainEvents(commands.Cog):
                     audited = entry
                     break
 
-            if audited:
+            if audited and audited.user != self.bot.user:
                 reason = audited.reason or '-No reason specified-'
                 docID = await tools.issue_pun(audited.target.id, audited.user.id, 'ban', reason)
 

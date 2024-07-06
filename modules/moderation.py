@@ -3,7 +3,7 @@ import copy
 import logging
 import time
 import typing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import config
 import discord
@@ -333,31 +333,33 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         reason: app_commands.Range[str, None, 990],
     ):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-
-        banCount = 0
-        failedBans = []
+        banList = []
         couldNotDM = False
 
         users = users.split()
-        for user in users:
+        for u in users:
             try:
-                user = int(user)
+                ban_id = int(u)
 
             except ValueError:
-                if len(users) == 1:
+                return await interaction.followup.send(
+                    f'{config.redTick} An argument provided in users is invalid: `{user}`. Make sure you are providing user ids'
+                )
+
+            user = interaction.client.get_user(ban_id)
+            if not user:
+                try:
+                    user = await self.bot.fetch_user(ban_id)
+                    username = None
+
+                except discord.NotFound:
                     return await interaction.followup.send(
-                        f'{config.redTick} An argument provided in users is invalid: `{user}`'
-                    )
-                else:
-                    failedBans.append(user)
-                    continue
+                    f'{config.redTick} A user provided in users is invalid: `{ban_id}`. Make sure you are providing user ids'
+                )
 
-            member = interaction.guild.get_member(user)
-            userid = user
-            username = userid if (type(member) is int) or not member else str(member)
-
-            # If not a user, manually contruct a user object
-            user = discord.Object(id=userid) if (type(user) is int) else user
+            username = user.name
+            userStr = f'{username} ({ban_id})'
+            member = interaction.guild.get_member(ban_id)
 
             if member:
                 usr_role_pos = member.top_role.position
@@ -368,30 +370,23 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             if (usr_role_pos >= interaction.guild.me.top_role.position) or (
                 usr_role_pos >= interaction.user.top_role.position
             ):
-                if len(users) == 1:
-                    return await interaction.followup.send(
-                        f'{config.redTick} Insufficent permissions to ban {username}'
-                    )
-                else:
-                    failedBans.append(str(userid))
-                    continue
+                return await interaction.followup.send(
+                    f'{config.redTick} Insufficent permissions to ban {userStr}'
+                )
 
-            try:
-                await interaction.guild.fetch_ban(user)
-                if len(users) == 1:
+            if len(users) == 1:
+                try:
+                    await interaction.guild.fetch_ban(user)
+
+                    # If we are here, the user is already banned
                     if interaction.user.id == self.bot.user.id:  # Non-command invoke, such as automod
                         # We could do custom exception types, but the whole "automod context" is already a hack anyway.
                         raise ValueError
                     else:
-                        return await interaction.followup.send(f'{config.redTick} {username} is already banned')
+                        return await interaction.followup.send(f'{config.redTick} {userStr} is already banned')
 
-                else:
-                    # If a many-user ban, don't exit if a user is already banned
-                    failedBans.append(str(userid))
-                    continue
-
-            except discord.NotFound:
-                pass
+                except discord.NotFound:
+                    pass
 
             try:
                 await user.send(
@@ -402,20 +397,32 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 couldNotDM = True
                 pass
 
-            member = discord.Object(id=userid) if not member else member
+            if len(users) == 1:
+                try:
+                    await interaction.guild.ban(user, reason=f'Ban action performed by moderator', delete_message_days=3)
 
-            try:
-                await interaction.guild.ban(member, reason=f'Ban action performed by moderator', delete_message_days=3)
+                except discord.NotFound:
+                    # User does not exist
+                    return await interaction.followup.send(f'{config.redTick} User {userStr} does not exist')
 
-            except discord.NotFound:
-                # User does not exist
-                if len(users) == 1:
-                    return await interaction.followup.send(f'{config.redTick} User {userid} does not exist')
+                resp = f'{config.greenTick} {userStr} has been successfully banned'
+                if couldNotDM:
+                    resp += '. I was not able to DM them about this action'
 
-                failedBans.append(str(userid))
-                continue
+                await interaction.followup.send(resp)
 
-            docID = await tools.issue_pun(userid, interaction.user.id, 'ban', reason=reason)
+            banList.append(user)
+
+        for user in banList:
+            if len(banList) > 1:
+                try:
+                    # Temp timeout to prevent message sends until bulk_ban fires
+                    await user.edit(timed_out_until=datetime.now() + timedelta(hours=2))
+
+                except:
+                    pass
+
+            docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
@@ -423,24 +430,18 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 docID,
                 reason,
                 username=username,
-                userid=userid,
+                userid=ban_id,
                 moderator=interaction.user,
                 public=True,
             )
-            banCount += 1
 
-        if interaction.user.id != self.bot.user.id:  # Command invoke, i.e. anything not automod
-            if len(users) == 1:
-                resp = f'{config.greenTick} {users[0]} has been successfully banned'
-                if couldNotDM:
-                    resp += '. I was not able to DM them about this action'
-
-            else:
-                resp = f'{config.greenTick} **{banCount}** users have been successfully banned'
-                if failedBans:
-                    resp += (
-                        f'. Failed to ban **{len(failedBans)}** from the provided list:\n```{" ".join(failedBans)}```'
-                    )
+        if interaction.user.id != self.bot.user.id and len(banList) > 1:  # Command invoke, i.e. anything not automod
+            successes, failures = await interaction.guild.bulk_ban(banList, reason='Ban action performed by moderator')
+            resp = f'{config.greenTick} **{len(successes)}** users have been successfully banned'
+            if failures:
+                resp += (
+                    f'. Failed to ban **{len(failures)}** from the provided list:\n```{" ".join([str(f.id) for f in failures])}```'
+                )
 
             return await interaction.followup.send(resp)
 
