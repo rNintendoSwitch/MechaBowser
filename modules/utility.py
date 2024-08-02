@@ -53,6 +53,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         )
         self.bot.tree.add_command(self.historyContextMenu, guild=discord.Object(id=config.nintendoswitch))
 
+        # Ensure reaction ttl index is created
+        self.reactDB = mclient.bowser.reactions
+        self.reactDB.create_index([("timestamp", pymongo.DESCENDING)], expireAfterSeconds=3600)
+
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
         if message.type == discord.MessageType.premium_guild_subscription:
@@ -153,9 +157,39 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     embed_message = await message.channel.send(embed=embed)
                     await embed_message.add_reaction('🗑️')
 
-    # Handle :wastebasket: reactions for user deletions on messages reposted on a user's behalf
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
+        await self.process_affiliate_reactions(payload)
+        await self.log_reaction(payload)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload):
+        await self.log_reaction(payload)
+
+    async def log_reaction(self, payload):
+        if not payload.guild_id or payload.guild_id != config.nintendoswitch:
+            return
+        if payload.user_id == self.bot.user.id:
+            return
+        if not payload.emoji.name:
+            return
+
+        self.reactDB.insert_one({
+            'type': payload.event_type,
+            'emoji': str(payload.emoji),
+            'emoji_id': payload.emoji.id,
+            'burst': payload.burst,
+            'is_custom_emoji': payload.emoji.is_custom_emoji(),
+            'message': payload.message_id,
+            'message_author': payload.message_author_id,
+            'user': payload.user_id,
+            'channel': payload.channel_id,
+            'guild': payload.guild_id,
+            'timestamp': datetime.now(timezone.utc)
+        })
+
+    # Handle :wastebasket: reactions for user deletions on messages reposted on a user's behalf
+    async def process_affiliate_reactions(self, payload):
         if not payload.member:
             return  # Not in a guild
         if payload.emoji.name != '🗑️':
