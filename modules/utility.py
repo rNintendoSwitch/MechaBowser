@@ -174,19 +174,21 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if not payload.emoji.name:
             return
 
-        self.reactDB.insert_one({
-            'type': payload.event_type,
-            'emoji': str(payload.emoji),
-            'emoji_id': payload.emoji.id,
-            'burst': payload.burst,
-            'is_custom_emoji': payload.emoji.is_custom_emoji(),
-            'message': payload.message_id,
-            'message_author': payload.message_author_id,
-            'user': payload.user_id,
-            'channel': payload.channel_id,
-            'guild': payload.guild_id,
-            'timestamp': datetime.now(timezone.utc)
-        })
+        self.reactDB.insert_one(
+            {
+                'type': payload.event_type,
+                'emoji': str(payload.emoji),
+                'emoji_id': payload.emoji.id,
+                'burst': payload.burst,
+                'is_custom_emoji': payload.emoji.is_custom_emoji(),
+                'message': payload.message_id,
+                'message_author': payload.message_author_id,
+                'user': payload.user_id,
+                'channel': payload.channel_id,
+                'guild': payload.guild_id,
+                'timestamp': datetime.now(timezone.utc),
+            }
+        )
 
     # Handle :wastebasket: reactions for user deletions on messages reposted on a user's behalf
     async def process_affiliate_reactions(self, payload):
