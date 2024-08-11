@@ -263,36 +263,32 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     async def _react_stats(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
 
-        docs = list(self.reactDB.find({})) 
+        docs = list(self.reactDB.find({}))
         users = {}
-        
+
         for d in docs:
             if d['user'] not in users:
-                users[d['user']] = {
-                    'count': 1,
-                    'emojis': [d['emoji']]
-                }
+                users[d['user']] = {'count': 1, 'emojis': [d['emoji']]}
 
             else:
                 users[d['user']]["count"] += 1
                 emojiList = users[d['user']]["emojis"]
 
                 if d['emoji'] not in emojiList:
-                    emojiList.append(d['emoji']) 
+                    emojiList.append(d['emoji'])
 
-
-        embed = discord.Embed(color=0xff08bd, title = "Stat Overview")
+        embed = discord.Embed(color=0xFF08BD, title="Stat Overview")
         embed.description = "Here's a list of most frequent reactors."
         embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
-        
+
         unsortedList = [{'user': key, 'values': value} for key, value in users.items()]
         sortedList = sorted(unsortedList, key=lambda u: u['values']['count'], reverse=True)
         for x in sortedList[0:6]:
-            embed.add_field(name=x['user'], value=f'reaction count: {x["values"]["count"]}\n{", ".join(x["values"]["emojis"])}')
-
+            embed.add_field(
+                name=x['user'], value=f'reaction count: {x["values"]["count"]}\n{", ".join(x["values"]["emojis"])}'
+            )
 
         await interaction.followup.send(embed=embed)
-
 
     # Then sort this list by highest to lowest count
 
