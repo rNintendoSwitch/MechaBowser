@@ -54,15 +54,15 @@ class BotCache(commands.Cog):
             for rc, lc in zip(remote, local):  # We are pulling command IDs from server-side, then storing the mentions
                 lc.extras['id'] = rc.id
 
-            #logging.info('[Cache] Performing initial user database synchronization')
+            # logging.info('[Cache] Performing initial user database synchronization')
             # self.READY = True
             # return
-            #db = mclient.bowser.users
-            #NS = self.bot.get_guild(config.nintendoswitch)
+            # db = mclient.bowser.users
+            # NS = self.bot.get_guild(config.nintendoswitch)
 
-            #guildCount = len(NS.members)
-            #userCount = 0
-            #for member in NS.members:
+            # guildCount = len(NS.members)
+            # userCount = 0
+            # for member in NS.members:
             #    await asyncio.sleep(0.5)
             #    userCount += 1
             #    logging.debug(f'[Cache] Syncronizing user {userCount}/{guildCount}')
@@ -81,7 +81,7 @@ class BotCache(commands.Cog):
 
             #    db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
 
-            #logging.info('[Cache] Inital user database syncronization complete')
+            # logging.info('[Cache] Inital user database syncronization complete')
             self.READY = True
 
 
