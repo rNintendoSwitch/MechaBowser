@@ -138,6 +138,10 @@ everybody-votes:
     theme: light
     trophy-bg-opacity: 30
 
+trivia-zeldaechoes:
+    theme: dark
+    trophy-bg-opacity: 50
+
 trivia-emio:
     theme: dark
     trophy-bg-opacity: 40
