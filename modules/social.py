@@ -861,7 +861,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         otherUsers.append(f'> **{user}** ({u["_id"]})')
 
                 if hasPuns:
-                    admin_channel = self.bot.get_channel(config.nintendoswitch)
+                    admin_channel = self.bot.get_channel(config.adminChannel)
                     others = '\n'.join(otherUsers)
                     plural = "that of another user" if (len(otherUsers) == 1) else "those of other users"
                     await admin_channel.send(
