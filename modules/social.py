@@ -853,7 +853,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     if punsDB.count_documents({'user': u['_id']}):
                         hasPuns = True
 
-                    if interaction.user.id != u['id']:
+                    if interaction.user.id != u['_id']:
                         user = interaction.guild.get_member(u['_id'])
                         if not user:
                             user = await self.bot.fetch_user(u['_id'])
