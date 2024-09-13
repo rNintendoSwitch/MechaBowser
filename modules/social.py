@@ -842,32 +842,31 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             msg = f'{config.greenTick} Your friend code has been successfully updated on your profile card! Here\'s how it looks:'
 
             # Duplicate friend code detection
-            if db.count_documents({'friendcode': friendcode}) > 1:
-                duplicates = db.find({'$and': {{'_id': {'$ne': interaction.user.id}}, {'friendcode': friendcode}}})
+            duplicates = db.find({'_id': {'$ne': interaction.user.id}, 'friendcode': friendcode})
 
-                if duplicates:
-                    # Check if accounts with matching friend codes have infractions on file
-                    punsDB = mclient.bowser.puns
-                    hasPuns = False
-                    otherUsers = []
-                    for u in duplicates:
-                        if punsDB.count_documents({'user': u['_id']}):
-                            hasPuns = True
+            if duplicates:
+                # Check if accounts with matching friend codes have infractions on file
+                punsDB = mclient.bowser.puns
+                hasPuns = False
+                otherUsers = []
+                for u in duplicates:
+                    if punsDB.count_documents({'user': u['_id']}):
+                        hasPuns = True
 
-                        if interaction.user.id != u['id']:
-                            user = interaction.guild.get_member(u['_id'])
-                            if not user:
-                                user = await self.bot.fetch_user(u['_id'])
+                    if interaction.user.id != u['id']:
+                        user = interaction.guild.get_member(u['_id'])
+                        if not user:
+                            user = await self.bot.fetch_user(u['_id'])
 
-                            otherUsers.append(f'> **{user}** ({u["_id"]})')
+                        otherUsers.append(f'> **{user}** ({u["_id"]})')
 
-                    if hasPuns:
-                        admin_channel = self.bot.get_channel(config.nintendoswitch)
-                        others = '\n'.join(otherUsers)
-                        plural = "that of another user" if (len(otherUsers) == 1) else "those of other users"
-                        await admin_channel.send(
-                            f'🕵️ **{interaction.user}** ({interaction.user.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
-                        )
+                if hasPuns:
+                    admin_channel = self.bot.get_channel(config.nintendoswitch)
+                    others = '\n'.join(otherUsers)
+                    plural = "that of another user" if (len(otherUsers) == 1) else "those of other users"
+                    await admin_channel.send(
+                        f'🕵️ **{interaction.user}** ({interaction.user.id}) has set a friend code (`{friendcode}`) that matches {plural}: \n{others}'
+                    )
 
         else:
             return await interaction.followup.send(
