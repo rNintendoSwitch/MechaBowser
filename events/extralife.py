@@ -27,8 +27,8 @@ class ExtraLife(commands.Cog):
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
         # Role adding consts
-        self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 1059140680682844160
+        self.CHAT_CHANNEL = self.EXTRA_LIFE
+        self.CHAT_ROLE = 1192235490309570560
         self.DONOR_ROLE = 1192235806551716044
 
         # Trophy and Background consts
@@ -38,6 +38,8 @@ class ExtraLife(commands.Cog):
         # Donation incentive ID consts
         self.INCENTIVES = {
             # 'uuiduuid-uuid-uuid-uuiduuiduuiduuid': 'Friendly Name',
+            '2F30C4A5-A947-7BFD-0300CAA167485690': 'Series 1 & 2 sticker sheets (Physical)',
+            '2F44162E-F391-10C4-DBE0155A125CBE9D': 'Enamel pin & Sticker sheets (Physical)'
         }
 
         ################################################################################################################################
