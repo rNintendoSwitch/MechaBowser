@@ -27,7 +27,7 @@ class ExtraLife(commands.Cog):
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
         # Role adding consts
-        self.CHAT_CHANNEL = self.EXTRA_LIFE
+        self.CHAT_CHANNEL = 654018662860193830
         self.CHAT_ROLE = 1192235490309570560
         self.DONOR_ROLE = 1192235806551716044
 
@@ -78,14 +78,15 @@ class ExtraLife(commands.Cog):
         self.lastDonationID = id
         return await interaction.response.send_message(content=f'Last donation id set to `{id}`')
 
-    @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of users')
-    @app_commands.describe(members='A list of member IDs to grant extra life perks to')
+    @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of user ids')
+    @app_commands.describe(members='A space separated list of member IDs to grant extra life perks to')
     async def perks_grant(self, interaction: discord.Interaction, members: str):
         errors = []
+        member_list = members.split()
         await interaction.response.send_message(
-            f'{config.loading} Granting Extra Life perks to {len(members)} member(s)...'
+            f'{config.loading} Granting Extra Life perks to {len(member_list)} member(s)...'
         )
-        for member in members.split():
+        for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
                 await self._assign_properties(obj)
@@ -93,24 +94,28 @@ class ExtraLife(commands.Cog):
             except (ValueError, AttributeError):
                 errors.append(member)
 
-        if len(errors) == len(members):
+        if len(errors) == len(member_list):
             return await interaction.edit_original_response(
                 content=f'{config.redTick} Failed to grant Extra Life perks all provided members'
             )
 
         else:
+            content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
+            if errors:
+                content += f'.\nFailed users: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(
-                content=f'{config.greenTick} Extra Life perks granted to {len(members) - len(errors)}/{len(members)} member(s).\nFailed users: ```{" ".join(errors)}```'
+                content=content
             )
 
-    @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of users')
-    @app_commands.describe(members='A list of member IDs to revoke extra life perks from')
+    @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
+    @app_commands.describe(members='A space separated list of member IDs to revoke extra life perks from')
     async def perks_revoke(self, interaction: discord.Interaction, members: str):
         errors = []
+        member_list = members.split()
         await interaction.response.send_message(
-            f'{config.loading} Revoking Extra Life perks to {len(members)} member(s)...'
+            f'{config.loading} Revoking Extra Life perks from {len(member_list)} member(s)...'
         )
-        for member in members.split():
+        for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
                 await self._remove_properties(obj)
@@ -118,14 +123,17 @@ class ExtraLife(commands.Cog):
             except (ValueError, AttributeError):
                 errors.append(member)
 
-        if len(errors) == len(members):
+        if len(errors) == len(member_list):
             return await interaction.edit_original_response(
                 content=f'{config.redTick} Extra Life perks revoked from 0 members'
             )
 
         else:
+            content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
+            if errors:
+                content += f'.\nFailed users: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(
-                content=f'{config.greenTick} Extra Life perks revoked from {len(members) - len(errors)}/{len(members)} member(s).\nFailed users: ```{" ".join(errors)}```'
+                content=content
             )
 
     @commands.Cog.listener()
