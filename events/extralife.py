@@ -39,7 +39,7 @@ class ExtraLife(commands.Cog):
         self.INCENTIVES = {
             # 'uuiduuid-uuid-uuid-uuiduuiduuiduuid': 'Friendly Name',
             '2F30C4A5-A947-7BFD-0300CAA167485690': 'Series 1 & 2 sticker sheets (Physical)',
-            '2F44162E-F391-10C4-DBE0155A125CBE9D': 'Enamel pin & Sticker sheets (Physical)'
+            '2F44162E-F391-10C4-DBE0155A125CBE9D': 'Enamel pin & Sticker sheets (Physical)',
         }
 
         ################################################################################################################################
