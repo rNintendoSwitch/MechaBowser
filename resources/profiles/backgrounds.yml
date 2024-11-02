@@ -138,6 +138,10 @@ everybody-votes:
     theme: light
     trophy-bg-opacity: 30
 
+trivia-brothership:
+    theme: light
+    trophy-bg-opacity: 50
+
 trivia-jamboree:
     theme: light
     trophy-bg-opacity: 50
