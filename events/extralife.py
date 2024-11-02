@@ -103,9 +103,7 @@ class ExtraLife(commands.Cog):
             content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
                 content += f'.\nFailed users: ```{" ".join(errors)}```'
-            return await interaction.edit_original_response(
-                content=content
-            )
+            return await interaction.edit_original_response(content=content)
 
     @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
     @app_commands.describe(members='A space separated list of member IDs to revoke extra life perks from')
@@ -132,9 +130,7 @@ class ExtraLife(commands.Cog):
             content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
                 content += f'.\nFailed users: ```{" ".join(errors)}```'
-            return await interaction.edit_original_response(
-                content=content
-            )
+            return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()
     async def on_message(self, message):
