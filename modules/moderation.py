@@ -630,7 +630,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         if interaction.user.id != self.bot.user.id:  # Non-command invoke, such as automod
             if len(users.split()) == 1:
-                resp = f'{config.greenTick} {users[0]} has been successfully kicked'
+                resp = f'{config.greenTick} {users} has been successfully kicked'
                 if failedDMs:
                     resp += '. I was not able to DM them about this action'
 
