@@ -336,7 +336,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         banList = []
         failedBans = []
-        couldNotDM = False
+        failedDMs = []
 
         users = list(set(users.split()))  # Remove dupes
         multiban = len(users) > 1
@@ -397,14 +397,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 except discord.NotFound:
                     pass
 
-            try:
-                await user.send(
-                    tools.format_pundm('ban', reason, interaction.user, auto=interaction.user.id == self.bot.user.id)
-                )
+            if member:
+                # Don't waste an API call with a DM if we don't have the user as a guild member
+                try:
+                    await member.send(
+                        tools.format_pundm('ban', reason, interaction.user, auto=interaction.user.id == self.bot.user.id)
+                    )
 
-            except (discord.Forbidden, AttributeError):
-                couldNotDM = True
-                pass
+                except (discord.Forbidden, AttributeError):
+                    failedDMs.append(user)
+                    pass
 
             if not multiban:
                 try:
@@ -417,7 +419,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     return await interaction.followup.send(f'{config.redTick} User {userStr} does not exist')
 
                 resp = f'{config.greenTick} {userStr} has been successfully banned'
-                if couldNotDM:
+                if failedDMs:
                     resp += '. I was not able to DM them about this action'
 
                 docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
@@ -486,8 +488,12 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             else:
                 resp = f'{config.redTick} **0** users were banned'
 
+            if failedDMs:
+                resp += f'\nFailed to DM an infraction message to the following **{len(failedDMs)}** member(s):\n'
+                resp += f'```{" ".join(failedDMs)}```'
+
             if failures:
-                resp += f'. Failed to ban **{len(failures)}** from the provided list:\n```{" ".join(failedBans)}```'
+                resp += f'\nFailed to ban **{len(failures)}** from the provided list:\n```{" ".join(failedBans)}```'
 
             await interaction.followup.send(resp)
 
@@ -564,7 +570,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         kickCount = 0
         failedKicks = []
-        couldNotDM = False
+        failedDMs = []
 
         for user in users.split():
             try:
@@ -605,9 +611,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     continue
 
             try:
-                await user.send(tools.format_pundm('kick', reason, interaction.user))
+                await member.send(tools.format_pundm('kick', reason, interaction.user))
             except (discord.Forbidden, AttributeError):
-                couldNotDM = True
+                failedDMs.append(member.id)
                 pass
 
             try:
@@ -623,15 +629,18 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             kickCount += 1
 
         if interaction.user.id != self.bot.user.id:  # Non-command invoke, such as automod
-            if len(users) == 1:
+            if len(users.split()) == 1:
                 resp = f'{config.greenTick} {users[0]} has been successfully kicked'
-                if couldNotDM:
+                if failedDMs:
                     resp += '. I was not able to DM them about this action'
 
             else:
                 resp = f'{config.greenTick} **{kickCount}** users have been successfully kicked'
+                if failedDMs:
+                    resp += f'\nFailed to DM an infraction message to the following **{len(failedDMs)}** member(s):\n'
+                    resp += f'```{" ".join(failedDMs)}```'
                 if failedKicks:
-                    resp += f'. Failed to kick **{len(failedKicks)}** from the provided list:\n```{" ".join(failedKicks)}```'
+                    resp += f'\nFailed to kick **{len(failedKicks)}** from the provided list:\n```{" ".join(failedKicks)}```'
 
             return await interaction.followup.send(resp)
 
