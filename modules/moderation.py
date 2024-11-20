@@ -401,7 +401,9 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 # Don't waste an API call with a DM if we don't have the user as a guild member
                 try:
                     await member.send(
-                        tools.format_pundm('ban', reason, interaction.user, auto=interaction.user.id == self.bot.user.id)
+                        tools.format_pundm(
+                            'ban', reason, interaction.user, auto=interaction.user.id == self.bot.user.id
+                        )
                     )
 
                 except (discord.Forbidden, AttributeError):
