@@ -142,6 +142,14 @@ everybody-votes:
     theme: light
     trophy-bg-opacity: 30
 
+trivia-effect-light:
+    theme: light
+    trophy-bg-opacity: 50
+
+trivia-effect-dark:
+    theme: dark
+    trophy-bg-opacity: 50
+
 trivia-brothership:
     theme: light
     trophy-bg-opacity: 50
