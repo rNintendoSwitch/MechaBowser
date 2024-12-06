@@ -126,6 +126,10 @@ the-game-awards-2023:
     theme: dark
     trophy-bg-opacity: 10
 
+the-game-awards-2024:
+    theme: dark
+    trophy-bg-opacity: 10
+
 trivia-sonic:
     theme: dark
     trophy-bg-opacity: 30
