@@ -283,6 +283,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         userList = None if not deleteUsers else [x.id for x in deleteUsers]
 
+        count += 1 # We want to account for the command message adding one.
         def message_filter(message):
             return True if not userList or message.author.id in userList else False
 
