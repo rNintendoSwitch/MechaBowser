@@ -281,25 +281,26 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 logging.error(f'[Moderation] _infraction_duration: {e}')
 
         error = ''
-        try:
-            member = await interaction.guild.fetch_member(doc['user'])
-            if duration:
-                await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
+        if doc['type'] != 'note':
+            try:
+                member = await interaction.guild.fetch_member(doc['user'])
+                if duration:
+                    await member.send(tools.format_pundm('duration-update', reason, details=(doc['type'], expireStr)))
 
-            else:
-                await member.send(
-                    tools.format_pundm(
-                        'reason-update',
-                        reason,
-                        details=(
-                            doc['type'],
-                            f'<t:{int(doc["timestamp"])}:f>',
-                        ),
+                else:
+                    await member.send(
+                        tools.format_pundm(
+                            'reason-update',
+                            reason,
+                            details=(
+                                doc['type'],
+                                f'<t:{int(doc["timestamp"])}:f>',
+                            ),
+                        )
                     )
-                )
 
-        except (discord.NotFound, discord.Forbidden, AttributeError):
-            error = '. I was not able to DM them about this action'
+            except (discord.NotFound, discord.Forbidden, AttributeError):
+                error = '. I was not able to DM them about this action'
 
         await interaction.followup.send(
             f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}',
