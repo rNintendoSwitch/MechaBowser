@@ -199,7 +199,7 @@ class ExtraLife(commands.Cog):
                 # If an incentive, double check it matches what we know
                 embed.add_field(name="Incentive claimed", value=self.INCENTIVES[donation['incentiveID']])
 
-            embed.add_field(name="\uFEFF", value=self.FOOTER_LINKS, inline=False)  # ZERO WIDTH NO-BREAK SPACE (U+FEFF)
+            embed.add_field(name="\ufeff", value=self.FOOTER_LINKS, inline=False)  # ZERO WIDTH NO-BREAK SPACE (U+FEFF)
             donation_embeds.append(embed)
             logging.info(f'Sending donation {donation["donationID"]} from {donor_name}')
 

@@ -921,7 +921,7 @@ def convert_list_to_fields(lines: str, codeblock: bool = True) -> typing.List[ty
             value = staged
 
         value += '```' if codeblock else ''
-        fields.append({'name': '\uFEFF', 'value': value, 'inline': False})  # \uFEFF = ZERO WIDTH NO-BREAK SPACE
+        fields.append({'name': '\ufeff', 'value': value, 'inline': False})  # \uFEFF = ZERO WIDTH NO-BREAK SPACE
 
     return fields
 

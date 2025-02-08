@@ -682,9 +682,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     def check_flag(self, emoji: str) -> typing.Optional[typing.Iterable[int]]:
         # For some reason emoji emoji_data.is_emoji_tag_sequence() does not return correctly, so we have to write our own function
         def is_valid_tag_flag(sequence: emoji_data.EmojiSequence) -> bool:
-            BLACK_FLAG_EMOJI = u'\U0001F3F4'
-            TAG_CHARACTERS = [chr(c) for c in range(ord('\U000E0020'), ord('\U000E007E') + 1)]
-            TAG_TERMINATOR = u'\U000E007F'
+            BLACK_FLAG_EMOJI = u'\U0001f3f4'
+            TAG_CHARACTERS = [chr(c) for c in range(ord('\U000e0020'), ord('\U000e007e') + 1)]
+            TAG_TERMINATOR = u'\U000e007f'
 
             if seq.string[0] != BLACK_FLAG_EMOJI:  # First character
                 return False
