@@ -160,7 +160,10 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
         else:
             return await interaction.response.send_message(content, ephemeral=True)
 
-    if isinstance(exception, discord.app_commands.MissingRole) or isinstance(
+    if isinstance(exception, discord.app_commands.CommandNotFound):
+        pass
+
+    elif isinstance(exception, discord.app_commands.MissingRole) or isinstance(
         exception, discord.app_commands.MissingAnyRole
     ):
         return await send_followup(f'{config.redTick} You do not have permission to run this command')
