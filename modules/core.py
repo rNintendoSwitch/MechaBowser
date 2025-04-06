@@ -470,6 +470,7 @@ class MainEvents(commands.Cog):
             'parent_channel': None,
             'content': message.content,
             'timestamp': timestamp,
+            'deleted': False,
             'sanitized': False,
         }
 
@@ -488,6 +489,8 @@ class MainEvents(commands.Cog):
             return
 
         await asyncio.sleep(10)  # Give chance for clean command to finish and discord to process delete
+        mclient.bowser.messages.update_many({'_id': {'$in': [m.id for m in messages]}}, {'$set': {'deleted': True}})
+
         db = mclient.bowser.archive
         checkStamp = int(
             time.time() - 600
@@ -509,6 +512,7 @@ class MainEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
+        db = mclient.bowser.messages
         if payload.cached_message:
             if (
                 payload.cached_message.type not in [discord.MessageType.default, discord.MessageType.reply]
@@ -523,14 +527,15 @@ class MainEvents(commands.Cog):
             if not payload.cached_message.content and not payload.cached_message.attachments:
                 return  # Blank or null content (could be embed)
 
+            db.update_one({'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}})
+
             user = payload.cached_message.author
             jump_url = payload.cached_message.jump_url
             content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
 
         else:
             # Message is not in ram cache, pull from DB or ignore if missing
-            db = mclient.bowser.messages
-            dbMessage = db.find_one({'_id': payload.message_id, 'channel': payload.channel_id})
+            dbMessage = db.find_one_and_update({'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}})
             if not dbMessage:
                 logging.warning(
                     f'[Core] Missing message metadata for deletion of {payload.channel_id}/{payload.message_id}'
