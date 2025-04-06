@@ -333,10 +333,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 return interaction.followup.send(f'{config.redTick} You cannot set the duration greater than six hours')
 
         except KeyError:
-            return await interaction.send(f'{config.redTick} Invalid duration passed')
+            return await interaction.followup.send(f'{config.redTick} Invalid duration passed')
 
         if channel.slowmode_delay == seconds:
-            return await interaction.send(f'{config.redTick} The slowmode is already set to {time}')
+            return await interaction.followup.send(f'{config.redTick} The slowmode is already set to {time}')
 
         await channel.edit(slowmode_delay=seconds, reason=f'{interaction.user} has changed the slowmode delay')
         await channel.send(
