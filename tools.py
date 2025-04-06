@@ -311,10 +311,10 @@ def resolve_duration(data, include_seconds=False):
     value = 0
     digits = ''
 
-    try: # Check if any time characters exist in the data str, and raise if not
+    try:  # Check if any time characters exist in the data str, and raise if not
         int(data)
         raise KeyError('Time format not a valid entry')
-    
+
     except:
         pass
 

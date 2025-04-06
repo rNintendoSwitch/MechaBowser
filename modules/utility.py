@@ -339,7 +339,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await interaction.followup.send(f'{config.redTick} The slowmode is already set to {time}')
 
         await channel.edit(slowmode_delay=seconds, reason=f'{interaction.user} has changed the slowmode delay')
-        try: # We may not have permissions to send messages in the channel
+        try:  # We may not have permissions to send messages in the channel
             await channel.send(
                 f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
             )
