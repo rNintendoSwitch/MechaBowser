@@ -535,7 +535,9 @@ class MainEvents(commands.Cog):
 
         else:
             # Message is not in ram cache, pull from DB or ignore if missing
-            dbMessage = db.find_one_and_update({'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}})
+            dbMessage = db.find_one_and_update(
+                {'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}}
+            )
             if not dbMessage:
                 logging.warning(
                     f'[Core] Missing message metadata for deletion of {payload.channel_id}/{payload.message_id}'
