@@ -325,7 +325,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             time = tools.humanize_duration(time)
             seconds = int(seconds)
             if seconds < 1:
-                return interaction.followup.send(
+                return await interaction.followup.send(
                     f'{config.redTick} You cannot set the duration to less than one second. If you would like to clear the slowmode, use the `/slowmode clear` command'
                 )
 
@@ -339,9 +339,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await interaction.followup.send(f'{config.redTick} The slowmode is already set to {time}')
 
         await channel.edit(slowmode_delay=seconds, reason=f'{interaction.user} has changed the slowmode delay')
-        await channel.send(
-            f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
-        )
+        try: # We may not have permissions to send messages in the channel
+            await channel.send(
+                f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
+            )
+
+        except:
+            pass
 
         await interaction.followup.send(f'{config.greenTick} {channel.mention} now has a {time} slowmode')
 
