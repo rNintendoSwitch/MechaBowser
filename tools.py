@@ -13,7 +13,7 @@ import discord
 import pymongo
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 linkRe = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[#-_]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', re.I)
 reasonFilterLinkRe = re.compile(
@@ -39,6 +39,61 @@ timeUnits = {
 
 # Most NintenDeals code (decommissioned 4/25/2020) was removed on 12/09/2020
 # https://github.com/rNintendoSwitch/MechaBowser/commit/d1550f1f4951c35ca953e1ceacaae054fc9d4963
+
+
+class RiskyConfirmation(discord.ui.View):
+    message: discord.Message | None = None
+
+    def __init__(self, timeout=120.0):
+        super().__init__(timeout=timeout)
+        self.value = None
+
+    @discord.ui.button(label='Yes', style=discord.ButtonStyle.danger)
+    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.disable_buttons()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label='No', style=discord.ButtonStyle.primary)
+    async def no(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.disable_buttons()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    def disable_buttons(self):
+        for c in self.children:
+            c.disabled = True
+
+    async def on_timeout(self):
+        self.disable_buttons()
+        if self.message:
+            await self.message.edit(view=self)
+
+
+class NormalConfirmation(discord.ui.View):
+    message: discord.Message | None = None
+
+    def __init__(self, timeout=120.0):
+        super().__init__(timeout=timeout)
+        self.value = None
+
+    @discord.ui.button(label='Yes', style=discord.ButtonStyle.success)
+    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        await interaction.response.edit_message(view=None)
+        self.stop()
+
+    @discord.ui.button(label='No', style=discord.ButtonStyle.secondary)
+    async def no(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        await interaction.response.edit_message(view=None)
+        self.stop()
+
+    async def on_timeout(self):
+        if self.message:
+            await self.message.edit(view=None)
 
 
 async def message_archive(archive: typing.Union[discord.Message, list], edit=None):
@@ -256,6 +311,13 @@ def resolve_duration(data, include_seconds=False):
     value = 0
     digits = ''
 
+    try:  # Check if any time characters exist in the data str, and raise if not
+        int(data)
+        raise KeyError('Time format not a valid entry')
+
+    except:
+        pass
+
     for char in data:
         if char.isdigit():
             digits += char
@@ -326,7 +388,7 @@ def mod_cmd_invoke_delete(channel):
     return not (channel.id in config.showModCTX or channel.category_id in config.showModCTX)
 
 
-async def commit_profile_change(bot, user: discord.User, element: str, item: str, revoke=False):
+async def commit_profile_change(bot, user: discord.User, element: str, item: str, revoke=False, silent=False):
     '''Given a user, update the owned status of a particular element (trophy, background, etc.), "item"'''
     # Calling functions should be verifying availability of item
     db = mclient.bowser.users
@@ -345,7 +407,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
         db.update({'_id': user.id}, {'$push': {key: item}})
         dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)}!\nYou have received a new item for your profile on the r/NintendoSwitch Discord server!\n\nThe **{item.replace("-", " ")}** {element} is now yours, enjoy! '
         if element == 'background':
-            dmMsg += f'If you wish to use this background, use the `!profile edit` command in the <#{config.commandsChannel}> channel. Here\'s what your profile could look like:'
+            dmMsg += f'If you wish to use this background, use the `/profile background` command in our Discord server. Here\'s what your profile could look like:'
             generated_background = socialCog._generate_background_preview([item])
 
         else:
@@ -353,7 +415,8 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
             generated_background = await socialCog._generate_profile_card_from_member(user)
 
         try:
-            await user.send(dmMsg, file=generated_background)
+            if not silent:
+                await user.send(dmMsg, file=generated_background)
 
         except (discord.NotFound, discord.Forbidden):
             pass
@@ -366,11 +429,12 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
 
         dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)},\nA profile item has been revoked from you on the r/NintendoSwitch Discord server.\n\nThe **{item.replace("-", " ")}** {element} was revoked from you. '
         if element == 'background':
-            f'If you were using this as your current background then your background has been reset to default. Use the `!profile edit` command in the <#{config.commandsChannel}> channel if you\'d like to change it.'
+            f'If you were using this as your current background then your background has been reset to default. Use the `/profile background` command in our Discord server if you\'d like to change it.'
         dmMsg += f'If you have questions about this action, please feel free to reach out to us via modmail by DMing <@{config.parakarry}>.'
 
         try:
-            await user.send(dmMsg)
+            if not silent:
+                await user.send(dmMsg)
 
         except (discord.NotFound, discord.Forbidden):
             pass
@@ -508,7 +572,13 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
         embed.description = 'This is an automatic action'
 
     if doc['public_notify'] and member:
-        content = f'{user.mention}, I was unable to DM you for this infraction. Send `!history` in <#{config.commandsChannel}> for further details.'
+        for command in bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
+            # Iterate over commands in the tree so we can get the profile command ID
+            if command.name == 'profile':
+                break
+
+        commandID = command.extras['id']
+        content = f'{user.mention}, I was unable to DM you for this infraction. Use the </history:{commandID}> command in any channel for further details.'
     else:
         content = None
 
@@ -603,7 +673,10 @@ def format_pundm(_type, reason, moderator=None, details=None, auto=False):
     elif _type == 'ban':
         punDM += f'If you would like to appeal this ban, you may join our ban appeal server to dispute it with the moderation team: {config.banAppealInvite}\n'
 
-    else:
+    elif _type in ('strike', 'destrike'):
+        punDM += f'You can have a maximum of 16 active strikes, any infraction that would put you over this amount will lead to a ban. Strikes are not permanent and will decay at a rate of 1 per week. If you are struck again before all have expired, your count will be increased and the 1 week decay timer is reset.\n\n'
+
+    if _type != 'ban' and details != 'modmail':
         punDM += f'If you have questions concerning this matter you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>).\n'
 
     punDM += 'Please do not respond to this message, I cannot reply.'
@@ -656,162 +729,188 @@ def re_match_nonlink(pattern: typing.Pattern, string: str) -> typing.Optional[bo
     return any(not overlap for overlap in overlaps)
 
 
-async def send_paginated_embed(
-    bot: discord.ext.commands.Bot,
-    channel: discord.TextChannel,
-    fields: typing.List[typing.Dict],  # name: str , value: str, inline: optional bool
-    *,
-    owner: typing.Optional[discord.User] = None,
-    timeout: int = 600,
-    title: typing.Optional[str] = '',
-    description: typing.Optional[str] = None,
-    color: typing.Union[discord.Colour, int, None] = None,
-    author: typing.Optional[typing.Dict] = None,
-    page_character_limit: typing.Optional[int] = 6000,
-) -> discord.Message:  # author = name: str, icon_url: optional str
-    '''Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.'''
+class PaginatedEmbed(discord.ui.View):
+    '''
+    Displays an interactive paginated embed of given fields, with optional owner-locking, until timed out.
+    Interactions should be deferred with `thinking=True` before instantiating.
+    '''
 
-    PAGE_TEMPLATE = '(Page {0}/{1})'
-    FOOTER_INSTRUCTION = '⬅️ / ➡️ Change Page   ⏹️ End'
+    PAGE_TEMPLATE = 'Page {0}/{1}'
     FOOTER_ENDED_BY = 'Ended by {0}'
+    MESSAGE: discord.WebhookMessage | None = None
 
-    # Find the page character cap
-    footer_max_length = (
-        len(PAGE_TEMPLATE) + max(len(FOOTER_INSTRUCTION), len(FOOTER_ENDED_BY.format('-' * 37))) + 4
-    )  # 37 = max len(discordtag...#0000)
-    title_max_length = len(title) + len(FOOTER_INSTRUCTION) + 1
-    description_length = 0 if not description else len(description)
-    author_length = 0 if not author else len(author['name'])
+    def __init__(
+        self,
+        interaction: discord.Interaction,
+        fields: typing.List[typing.Dict],  # name: str , value: str, inline: optional bool
+        *,
+        title: typing.Optional[str] = '',
+        description: typing.Optional[str] = None,
+        color: typing.Union[discord.Colour, int, None] = None,
+        author: typing.Optional[typing.Dict] = None,
+        page_character_limit: typing.Optional[int] = 6000,
+        timeout: float = 120.0,
+    ):
+        super().__init__(timeout=timeout)
 
-    page_char_cap = page_character_limit - footer_max_length - title_max_length - description_length - author_length
+        self.initial_interaction = interaction
+        self.bot = interaction.client
+        self.owner = interaction.user
+        self.title = title
 
-    # Build pages
-    pages = []
-    while fields:
-        remaining_chars = page_char_cap
-        page = []
+        # Find the page character cap
+        footer_max_length = (
+            len(self.PAGE_TEMPLATE) + len(self.FOOTER_ENDED_BY.format('-' * 37)) + 4
+        )  # 37 = max len(discordtag...#0000)
+        title_max_length = len(title) + 1
+        description_length = 0 if not description else len(description)
+        author_length = 0 if not author else len(author['name'])
 
-        # Make sure a field won't max out this page
-        for field in fields.copy():
-            field_length = len(field['name']) + len(field['value'])
+        self.page_char_cap = (
+            page_character_limit - footer_max_length - title_max_length - description_length - author_length
+        )
 
-            if remaining_chars - field_length < 0:
-                break
-            remaining_chars -= field_length
+        self.embed = discord.Embed(description=None if not description else description, color=color)
+        if author:
+            self.embed.set_author(
+                name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url']
+            )
+        self.embed.set_footer(icon_url=None if not self.owner else self.owner.display_avatar.url)
 
-            page.append(fields.pop(0))
+        self.build_pages(interaction, fields)
+        embed = self.generate_new_embed()
+        if self.single_page:
+            interaction.client.loop.call_soon(
+                interaction.client.loop.create_task,
+                self.process_response(embed, interaction=interaction, button_interact=False),
+            )
 
-            if len(page) == 25:
-                break
+            self.stop()  # If one page is required, exit the view
 
-        pages.append(page)
+        else:
+            self.ui_setup()  # Create our UI elements
+            interaction.client.loop.call_soon(
+                interaction.client.loop.create_task,
+                self.process_response(embed, interaction=interaction, button_interact=False),
+            )
 
-    current_page = 1
-    ended_by = None
-    message = None
+    def ui_setup(self):
+        # Create components and assign them callbacks
+        self.add_item(discord.ui.Button(label='⬅️ Previous', disabled=True, style=discord.ButtonStyle.success))
+        self.add_item(discord.ui.Button(label='Next ➡️', style=discord.ButtonStyle.success))
+        self.add_item(discord.ui.Button(label='⏹️ End', style=discord.ButtonStyle.secondary))
 
-    single_page = len(pages) <= 1
-    dm_channel = not isinstance(channel, discord.TextChannel) and not isinstance(channel, discord.Thread)
+        callbacks = [self.regress_page, self.progress_page, self.end_pagination]
 
-    if not (single_page or dm_channel):
-        # Setup messages, we wait to update the embed later so users don't click reactions before we're setup
-        message = await channel.send('Please wait...')
-        await message.add_reaction('⬅')
-        await message.add_reaction('⏹')
-        await message.add_reaction('➡')
+        for index, child in enumerate(self.children):
+            child.callback = callbacks[index]
 
-    # Init embed
-    embed = discord.Embed(description=None if not description else description, colour=color)
-    if author:
-        embed.set_author(name=author['name'], icon_url=None if not 'icon_url' in author else author['icon_url'])
-    embed.set_footer(icon_url=None if not owner else owner.display_avatar.url)
+    async def regress_page(self, interaction: discord.Interaction):
+        if self.current_page - 1 <= 1:
+            self.children[0].disabled = True
 
-    # Main loop
-    while True:  # Loop end conditions: User request, reaction listening timeout, or only 1 page (short circuit)
-        # Add Fields
-        embed.clear_fields()
-        if len(pages) != 0:
-            for field in pages[current_page - 1]:
-                embed.add_field(
+        if self.children[1].disabled:
+            self.children[1].disabled = False
+
+        self.current_page -= 1
+        await self.process_response(self.generate_new_embed(), interaction=interaction, button_interact=True)
+
+    async def end_pagination(self, interaction: discord.Interaction | None):
+        page_text = self.PAGE_TEMPLATE.format(self.current_page, len(self.pages))
+        footer_text = 'Timed out' if not interaction else self.FOOTER_ENDED_BY.format(str(interaction.user))
+        self.embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=self.embed.footer.icon_url)
+
+        button_interact = True if interaction else False
+        interaction = self.initial_interaction if not interaction else interaction
+
+        await self.process_response(
+            self.embed, interaction=interaction, button_interact=button_interact, remove_view=True
+        )
+        self.stop()
+
+    async def progress_page(self, interaction: discord.Interaction):
+        if self.current_page + 1 >= len(self.pages):
+            self.children[1].disabled = True
+
+        if self.children[0].disabled:
+            self.children[0].disabled = False
+
+        self.current_page += 1
+        await self.process_response(self.generate_new_embed(), interaction=interaction, button_interact=True)
+
+    async def on_timeout(self):
+        await self.end_pagination(None)
+
+    async def process_response(
+        self,
+        embed: discord.Embed,
+        *,
+        interaction: discord.Interaction,
+        button_interact: bool,
+        remove_view: bool = False,
+    ):
+        if button_interact:
+            # Button interactions require us to perform another interaction.response
+            if remove_view:
+                await interaction.response.edit_message(embed=embed, view=None)
+
+            else:
+                await interaction.response.edit_message(embed=embed, view=self)
+
+        else:
+            if not self.MESSAGE:
+                self.MESSAGE = await interaction.original_response()
+
+            if remove_view:
+                await self.MESSAGE.edit(embed=embed, view=None)
+
+            else:
+                await self.MESSAGE.edit(embed=embed)
+
+    def build_pages(self, interaction: discord.Interaction, fields: typing.List[typing.Dict]):
+        self.pages = []
+        while fields:
+            remaining_chars = self.page_char_cap
+            page = []
+
+            # Make sure a field won't max out this page
+            for field in fields.copy():
+                field_length = len(field['name']) + len(field['value'])
+
+                if remaining_chars - field_length < 0:
+                    break
+                remaining_chars -= field_length
+
+                page.append(fields.pop(0))
+
+                if len(page) == 25:
+                    break
+
+            self.pages.append(page)
+
+        self.current_page = 1
+        self.ended_by = None
+
+        self.single_page = len(self.pages) <= 1
+
+    def generate_new_embed(self) -> discord.Embed:
+        self.embed.clear_fields()
+        if len(self.pages) != 0:
+            for field in self.pages[self.current_page - 1]:
+                self.embed.add_field(
                     name=field['name'], value=field['value'], inline=True if not 'inline' in field else field['inline']
                 )
 
-        page_text = PAGE_TEMPLATE.format(current_page, max(len(pages), 1))
-        embed.title = f'{title} {page_text}'
+        page_text = self.PAGE_TEMPLATE.format(self.current_page, max(len(self.pages), 1))
+        self.embed.title = f'{self.title} {page_text}'
 
-        if single_page or dm_channel:
-            embed.set_footer(text=page_text)
-            await channel.send(embed=embed)
-
-        if single_page:
-            break
-
-        elif dm_channel:
-            if current_page >= 10:
-                if len(pages) > 10:
-                    await channel.send(
-                        f'Limited to 10 pages in DM channel. {len(pages) - 10} page{"s were" if len(pages) != 1 else " was"} not sent'
-                    )
-                break
-
-            elif current_page == len(pages):
-                break
-
-            else:
-                current_page += 1
-                continue
+        if self.single_page:
+            self.embed.set_footer(text=page_text)
 
         else:
-            embed.set_footer(text=f'{page_text}    {FOOTER_INSTRUCTION}', icon_url=embed.footer.icon_url)
-            await message.edit(content='', embed=embed)
+            self.embed.set_footer(text=page_text, icon_url=self.embed.footer.icon_url)
 
-        # Check user reaction
-        def check(reaction, user):
-            if user.id == bot.user.id:
-                return False
-            if owner and user.id != owner.id:
-                return False
-
-            if reaction.message.id != message.id:
-                return False
-            if not reaction.emoji in ['⬅', '➡', '⏹']:
-                return False
-
-            return True
-
-        # Catch timeout
-        try:
-            reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
-        except asyncio.TimeoutError:
-            break
-
-        await reaction.remove(user)
-
-        # Change page
-        if reaction.emoji == '⬅':
-            if current_page == 1:
-                continue
-            current_page -= 1
-
-        elif reaction.emoji == '➡':
-            if current_page == len(pages):
-                continue
-            current_page += 1
-
-        else:
-            ended_by = user
-            break
-
-    if not (single_page or dm_channel):
-        # Generate ended footer
-        page_text = PAGE_TEMPLATE.format(current_page, len(pages))
-        footer_text = FOOTER_ENDED_BY.format(ended_by) if ended_by else 'Timed out'
-        embed.set_footer(text=f'{page_text}    {footer_text}', icon_url=embed.footer.icon_url)
-
-        await message.clear_reactions()
-        await message.edit(embed=embed)
-
-    return message
+        return self.embed
 
 
 def convert_list_to_fields(lines: str, codeblock: bool = True) -> typing.List[typing.Dict]:
@@ -829,7 +928,7 @@ def convert_list_to_fields(lines: str, codeblock: bool = True) -> typing.List[ty
             value = staged
 
         value += '```' if codeblock else ''
-        fields.append({'name': '\uFEFF', 'value': value, 'inline': False})  # \uFEFF = ZERO WIDTH NO-BREAK SPACE
+        fields.append({'name': '\ufeff', 'value': value, 'inline': False})  # \uFEFF = ZERO WIDTH NO-BREAK SPACE
 
     return fields
 

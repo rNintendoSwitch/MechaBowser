@@ -11,7 +11,7 @@ from discord import AsyncWebhookAdapter, Embed, File, NotFound, Webhook
 from discord.ext import commands
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class GooseGame(commands.Cog):

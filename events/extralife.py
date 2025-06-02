@@ -7,6 +7,7 @@ import config
 import discord
 import pymongo
 import requests
+from discord import app_commands
 from discord.ext import commands, tasks
 
 import tools
@@ -22,26 +23,28 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://extra-life.org/api/participants/508644/donations'
+        self.DONATIONS_URL = 'https://extra-life.org/api/participants/531641/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 1059140680682844160
-        self.DONOR_ROLE = 1059140691864854588
+        self.CHAT_ROLE = 1192235490309570560
+        self.DONOR_ROLE = 1192235806551716044
 
         # Trophy and Background consts
-        self.TROPHY = 'extra-life-2023'
+        self.TROPHY = 'extra-life-2024'
         self.BACKGROUND = 'extra-life'
 
         # Donation incentive ID consts
         self.INCENTIVES = {
             # 'uuiduuid-uuid-uuid-uuiduuiduuiduuid': 'Friendly Name',
+            '2F30C4A5-A947-7BFD-0300CAA167485690': 'Series 1 & 2 sticker sheets (Physical)',
+            '2F44162E-F391-10C4-DBE0155A125CBE9D': 'Enamel pin & Sticker sheets (Physical)',
         }
 
         ################################################################################################################################
 
-        self.mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+        self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
         self.guild = self.bot.get_guild(self.GUILD)
         self.extra_life_admin = self.guild.get_channel(self.EXTRA_LIFE_ADMIN)
@@ -54,58 +57,80 @@ class ExtraLife(commands.Cog):
 
         self.donation_check.start()
 
-    @commands.command(name='ldi')
-    @commands.check_any(commands.is_owner(), commands.has_guild_permissions(administrator=True))
-    async def lastdonorid(self, ctx, string: str = None):
-        if string is None:
-            return await ctx.send(content=f'Last donation id is `{self.lastDonationID}`')
-
-        self.lastDonationID = string
-        return await ctx.send(content=f'Last donation id set to `{string}`')
-
-    @commands.group(name='elperks', invoke_without_command=False)
-    async def _perks(self, ctx):
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ExtralifeCommand(app_commands.Group):
         pass
 
-    @_perks.command(name='grant')
-    @commands.check_any(commands.is_owner(), commands.has_guild_permissions(view_audit_log=True))
-    async def perks_grant(self, ctx, members: commands.Greedy[tools.ResolveUser]):
-        errors = 0
-        msg = await ctx.send(f'{config.loading} Granting Extra Life perks to {len(members)} member(s)...')
-        for member in members:
+    extralife_group = ExtralifeCommand(
+        name='extralife', description='Manage components of the extralife event in the server'
+    )
+
+    @extralife_group.command(
+        name='ldi', description='Fetch the last donation id stored, and optionally set one manually'
+    )
+    @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
+    async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+        if id is None:
+            return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
+
+        self.lastDonationID = id
+        return await interaction.response.send_message(content=f'Last donation id set to `{id}`')
+
+    @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of user ids')
+    @app_commands.describe(members='A space separated list of member IDs to grant extra life perks to')
+    async def perks_grant(self, interaction: discord.Interaction, members: str):
+        errors = []
+        member_list = members.split()
+        await interaction.response.send_message(
+            f'{config.loading} Granting Extra Life perks to {len(member_list)} member(s)...'
+        )
+        for member in member_list:
             try:
-                await self._assign_properties(member)
+                obj = interaction.guild.get_member(int(member))
+                await self._assign_properties(obj)
 
-            except ValueError:
-                errors += 1
+            except (ValueError, AttributeError):
+                errors.append(member)
 
-        if errors == len(members):
-            return await msg.edit(content=f'{config.redTick} Extra Life perks granted to 0 members')
-
-        else:
-            return await msg.edit(
-                content=f'{config.greenTick} Extra Life perks granted to {len(members) - errors}/{len(members)} member(s).'
+        if len(errors) == len(member_list):
+            return await interaction.edit_original_response(
+                content=f'{config.redTick} Failed to grant Extra Life perks all provided members'
             )
 
-    @_perks.command(name='revoke')
-    @commands.check_any(commands.is_owner(), commands.has_guild_permissions(view_audit_log=True))
-    async def perks_revoke(self, ctx, members: commands.Greedy[tools.ResolveUser]):
-        errors = 0
-        msg = await ctx.send(f'{config.loading} Revoking Extra Life perks to {len(members)} member(s)...')
-        for member in members:
+        else:
+            content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
+            if errors:
+                content += f'.\nFailed users: ```{" ".join(errors)}```'
+            return await interaction.edit_original_response(content=content)
+
+    @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
+    @app_commands.describe(members='A space separated list of member IDs to revoke extra life perks from')
+    async def perks_revoke(self, interaction: discord.Interaction, members: str):
+        errors = []
+        member_list = members.split()
+        await interaction.response.send_message(
+            f'{config.loading} Revoking Extra Life perks from {len(member_list)} member(s)...'
+        )
+        for member in member_list:
             try:
-                await self._remove_properties(member)
+                obj = interaction.guild.get_member(int(member))
+                await self._remove_properties(obj)
 
-            except ValueError:
-                errors += 1
+            except (ValueError, AttributeError):
+                errors.append(member)
 
-        if errors == len(members):
-            return await msg.edit(content=f'{config.redTick} Extra Life perks revoked from 0 members')
+        if len(errors) == len(member_list):
+            return await interaction.edit_original_response(
+                content=f'{config.redTick} Extra Life perks revoked from 0 members'
+            )
 
         else:
-            return await msg.edit(
-                content=f'{config.greenTick} Extra Life perks revoked from {len(members) - errors}/{len(members)} member(s).'
-            )
+            content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
+            if errors:
+                content += f'.\nFailed users: ```{" ".join(errors)}```'
+            return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -139,7 +164,7 @@ class ExtraLife(commands.Cog):
                 break
 
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
-            match = re.match(r'[\s\S]+#\d{4}|[a-z0-9._]+', donor_name)
+            match = re.match(r'[\s\S]+#\d{4}|[a-z0-9._]+', donor_name.lower())
             if match:
                 # Donor name format matches a Discord username
                 member = discord.utils.find(lambda m: str(m) == match.group(0), self.guild.members)
@@ -174,7 +199,7 @@ class ExtraLife(commands.Cog):
                 # If an incentive, double check it matches what we know
                 embed.add_field(name="Incentive claimed", value=self.INCENTIVES[donation['incentiveID']])
 
-            embed.add_field(name="\uFEFF", value=self.FOOTER_LINKS, inline=False)  # ZERO WIDTH NO-BREAK SPACE (U+FEFF)
+            embed.add_field(name="\ufeff", value=self.FOOTER_LINKS, inline=False)  # ZERO WIDTH NO-BREAK SPACE (U+FEFF)
             donation_embeds.append(embed)
             logging.info(f'Sending donation {donation["donationID"]} from {donor_name}')
 
@@ -197,7 +222,7 @@ class ExtraLife(commands.Cog):
         await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY, revoke=True)
         await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND, revoke=True)
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
 
 
