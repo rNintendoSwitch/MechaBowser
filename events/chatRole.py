@@ -63,7 +63,7 @@ class ChatRoleEvent(commands.Cog):
         self.role = role.id
         self.ids = {'text': [], 'cat': []}
 
-        for channel in channel_or_catagories:
+        for channel in [channel_or_catagories]:
             if isinstance(channel, discord.channel.TextChannel):
                 self.ids['text'].append(channel.id)
             elif isinstance(channel, discord.channel.CategoryChannel):
