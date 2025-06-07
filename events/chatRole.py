@@ -53,7 +53,7 @@ class ChatRoleEvent(commands.Cog):
         self,
         interaction: discord.Interaction,
         role: discord.Role,
-        channel_or_catagories: typing.Union[discord.TextChannel, discord.CategoryChannel],
+        channel_or_catagory: typing.Union[discord.TextChannel, discord.CategoryChannel],
         notify_users: bool,
     ):
         if self.active:
@@ -63,13 +63,12 @@ class ChatRoleEvent(commands.Cog):
         self.role = role.id
         self.ids = {'text': [], 'cat': []}
 
-        for channel in [channel_or_catagories]:
-            if isinstance(channel, discord.channel.TextChannel):
-                self.ids['text'].append(channel.id)
-            elif isinstance(channel, discord.channel.CategoryChannel):
-                self.ids['cat'].append(channel.id)
-            else:
-                return await interaction.response.send_message(f'{config.redTick} Invalid channel type: {channel}')
+        if isinstance(channel_or_catagory, discord.channel.TextChannel):
+            self.ids['text'].append(channel_or_catagory.id)
+        elif isinstance(channel_or_catagory, discord.channel.CategoryChannel):
+            self.ids['cat'].append(channel_or_catagory.id)
+        else:
+            return await interaction.response.send_message(f'{config.redTick} Invalid channel type: {channel}')
 
         self.active = True
         return await interaction.response.send_message(
