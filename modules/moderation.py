@@ -1097,7 +1097,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             punGuild = self.bot.get_guild(guild)
             member = punGuild.get_member(doc['user'])
             public_notify = False
-            if member: # It's possible the member left or was banned. Still expire the action but skip notifs
+            if member:  # It's possible the member left or was banned. Still expire the action but skip notifs
                 await member.edit(timed_out_until=None, reason='Automatic: Mute has expired')
                 try:
                     await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
