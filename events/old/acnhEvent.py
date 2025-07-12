@@ -12,7 +12,7 @@ import pytz
 from discord.ext import commands, tasks
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class AnimalGame(commands.Cog):
@@ -509,7 +509,7 @@ class AnimalGame(commands.Cog):
         await self.discussionChannel.send(embed=embed)
         db.update_one({"_type": "server"}, {"$inc": {"day": 1}})
 
-    def cog_unload(self):
+    async def cog_unload(self):
         db = mclient.bowser.animalEvent
         newDura = {str(x): y for x, y in self.durabilities.items()}
         newCom = {str(x): y for x, y in self.completedQuests.items()}

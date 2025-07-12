@@ -12,13 +12,14 @@ import aiohttp
 import config
 import discord
 import pymongo
-from discord import Webhook, WebhookType
+from discord import Webhook, WebhookType, app_commands
 from discord.ext import commands, tasks
+from fuzzywuzzy import process
 
 import tools
 
 
-mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
+mclient = pymongo.MongoClient(config.mongoURI)
 
 serverLogs = None
 modLogs = None
@@ -45,6 +46,12 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             "tigerdirect.com": ["affiliateid", "srccode"],
             "walmart.*": ["sourceid", "veh", "wmlspartner"],
         }
+
+        # Add context menus to command tree
+        self.historyContextMenu = app_commands.ContextMenu(
+            name='View History', callback=self._pull_history, type=discord.AppCommandType.user
+        )
+        self.bot.tree.add_command(self.historyContextMenu, guild=discord.Object(id=config.nintendoswitch))
 
     # Called after automod filter finished, because of the affilite link reposter. We also want to wait for other items in this function to complete to call said reposter.
     async def on_automod_finished(self, message):
@@ -146,7 +153,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     embed_message = await message.channel.send(embed=embed)
                     await embed_message.add_reaction('🗑️')
 
-    # Handle :wastebasket: reactions for user deletions on messages reposed on a user's behalf
+    # Handle :wastebasket: reactions for user deletions on messages reposted on a user's behalf
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         if not payload.member:
@@ -208,130 +215,186 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     #    async def _archive(self, ctx, members: commands.Greey[discord.Member], channels: commands.Greedy[discord.Channel], limit: typing.Optional[int] = 200, channel_limiter: typing.Greedy[discord.Channel]):
     #        pass
 
-    @commands.command(name='clean')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _clean(self, ctx, messages: int, members: commands.Greedy[discord.Member]):
-        if messages > 2000 or messages <= 0:
-            return await ctx.send(
-                f'{config.redTick} Invalid message count {messages}. Must be greater than 0 and not more than 2000'
+    @app_commands.command(name='clean', description='Delete upto 2000 messages, optionally only from 1 or more users')
+    @app_commands.describe(
+        count='The number of messages to search for and delete that match the user filter',
+        users='One or more space separated user IDs that are the target of the clean',
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _clean(
+        self,
+        interaction: discord.Interaction,
+        count: app_commands.Range[int, 1, 2000],
+        users: typing.Optional[str] = '',
+    ):
+        await interaction.response.defer()
+        users = users.split()
+        deleteUsers = []
+        invalidUsers = []
+        for u in users:
+            try:
+                u = int(u)
+
+            except ValueError:
+                # Bad ID passed
+                invalidUsers.append(u)
+                continue
+
+            user = self.bot.get_user(u)
+            if not user:
+                try:
+                    user = await self.bot.fetch_user(u)
+
+                except (discord.NotFound, discord.HTTPException):
+                    invalidUsers.append(u)
+                    continue
+
+            deleteUsers.append(user)
+
+        if len(invalidUsers) == len(users) and len(users) > 0:
+            # All provided users are invalid, raise to user
+            return await interaction.followup.send(
+                f'{config.redTick} All users provided are invalid. Please check your input and try again',
+                ephemeral=True,
             )
 
-        if messages >= 100:
+        if count >= 100:
+            view = tools.RiskyConfirmation(timeout=15.0)
+            view.message = await interaction.followup.send(
+                f'This action will scan and delete up to {count} messages, are you sure you want to proceed?',
+                view=view,
+                wait=True,
+            )
+            timedOut = await view.wait()
 
-            def confirm_check(reaction, member):
-                return member == ctx.author and str(reaction.emoji) in [config.redTick, config.greenTick]
+            if timedOut:
+                await view.message.edit(content='Confirmation timed out, clean action canceled.', view=view)
+                return await view.message.delete(delay=5)
 
-            confirmMsg = await ctx.send(f'This action will delete up to {messages}, are you sure you want to proceed?')
-            await confirmMsg.add_reaction(config.greenTick)
-            await confirmMsg.add_reaction(config.redTick)
-            try:
-                reaction = await self.bot.wait_for('reaction_add', timeout=15, check=confirm_check)
-                if str(reaction[0]) != config.greenTick:
-                    await confirmMsg.edit(content='Clean action canceled.')
-                    return await confirmMsg.clear_reactions()
-
-            except asyncio.TimeoutError:
-                await confirmMsg.edit(content='Confirmation timed out, clean action canceled.')
-                return await confirmMsg.clear_reactions()
+            if not view.value:
+                # Canceled by user
+                await view.message.edit(content='Clean action canceled.')
+                return await view.message.delete(delay=5)
 
             else:
-                await confirmMsg.delete()
+                await view.message.delete()
 
-        memberList = None if not members else [x.id for x in members]
+        userList = None if not deleteUsers else [x.id for x in deleteUsers]
+
+        count += 1  # We want to account for the command message adding one.
 
         def message_filter(message):
-            return True if not memberList or message.author.id in memberList else False
+            return True if not userList or message.author.id in userList else False
 
-        await ctx.message.delete()
-        deleted = await ctx.channel.purge(limit=messages, check=message_filter, bulk=True)
+        deleted = await interaction.channel.purge(limit=count, check=message_filter, bulk=True)
 
-        m = await ctx.send(f'{config.greenTick} Clean action complete')
+        try:
+            await interaction.delete_original_response()
+
+        except:
+            # Message may not exist
+            pass
+
+        m = await interaction.channel.send(f'{config.greenTick} Clean action complete')
         return await m.delete(delay=5)
 
-    @commands.group(name='slowmode', invoke_without_command=True)
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _slowmode(self, ctx, duration, channel: typing.Optional[discord.TextChannel]):
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class SlowmodeCommand(app_commands.Group):
+        pass
+
+    slowmode_group = SlowmodeCommand(name='slowmode', description='Change slowmode settings for a channel')
+
+    @slowmode_group.command(name='set', description='Enable a slowmode in a channel for a given duration')
+    @app_commands.describe(
+        duration='The slowmode message duration',
+        channel='The channel to set in slowmode. If left blank, defaults to the channel the command is run in',
+    )
+    async def _slowmode(
+        self, interaction: discord.Interaction, duration: str, channel: typing.Optional[discord.TextChannel]
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not channel:
-            channel = ctx.channel
+            channel = interaction.channel
 
         try:
             time, seconds = tools.resolve_duration(duration, include_seconds=True)
             time = tools.humanize_duration(time)
             seconds = int(seconds)
             if seconds < 1:
-                return ctx.send(
-                    f'{config.redTick} You cannot set the duration to less than one second. If you would like to clear the slowmode, use the `{ctx.prefix}slowmode clear` command'
+                return await interaction.followup.send(
+                    f'{config.redTick} You cannot set the duration to less than one second. If you would like to clear the slowmode, use the `/slowmode clear` command'
                 )
 
             elif seconds > 60 * 60 * 6:  # Six hour API limit
-                return ctx.send(f'{config.redTick} You cannot set the duration greater than six hours')
+                return interaction.followup.send(f'{config.redTick} You cannot set the duration greater than six hours')
 
         except KeyError:
-            return await ctx.send(f'{config.redTick} Invalid duration passed')
+            return await interaction.followup.send(f'{config.redTick} Invalid duration passed')
 
         if channel.slowmode_delay == seconds:
-            return await ctx.send(f'{config.redTick} The slowmode is already set to {time}')
+            return await interaction.followup.send(f'{config.redTick} The slowmode is already set to {time}')
 
-        await channel.edit(slowmode_delay=seconds, reason=f'{ctx.author} has changed the slowmode delay')
-        await channel.send(
-            f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
-        )
-        if channel.id == ctx.channel.id or tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
+        await channel.edit(slowmode_delay=seconds, reason=f'{interaction.user} has changed the slowmode delay')
+        try:  # We may not have permissions to send messages in the channel
+            await channel.send(
+                f':stopwatch: This channel now has a **{time}** slowmode in effect. Please be mindful of spam per the server rules'
+            )
 
-        await ctx.send(f'{config.greenTick} {channel.mention} now has a {time} slowmode')
+        except:
+            pass
 
-    @_slowmode.command(name='clear')
+        await interaction.followup.send(f'{config.greenTick} {channel.mention} now has a {time} slowmode')
+
+    @slowmode_group.command(name='clear', description='Remove any active slowmode in a given channel')
     @commands.has_any_role(config.moderator, config.eh)
-    async def _slowmode_clear(self, ctx, channel: typing.Optional[discord.TextChannel]):
+    async def _slowmode_clear(self, interaction: discord.Interaction, channel: typing.Optional[discord.TextChannel]):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         if not channel:
-            channel = ctx.channel
+            channel = interaction.channel
 
         if channel.slowmode_delay == 0:
-            return await ctx.send(f'{config.redTick} {channel.mention} is not under a slowmode')
+            return await interaction.followup.send(f'{config.redTick} {channel.mention} is not under a slowmode')
 
-        await channel.edit(slowmode_delay=0, reason=f'{ctx.author} has removed the slowmode delay')
+        await channel.edit(slowmode_delay=0, reason=f'{interaction.user} has removed the slowmode delay')
         await channel.send(
             f':stopwatch: Slowmode for this channel is no longer in effect. Please be mindful of spam per the server rules'
         )
-        if channel.id == ctx.channel.id or tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
 
-        return await ctx.send(f'{config.greenTick} {channel.mention} no longer has slowmode')
+        return await interaction.followup.send(f'{config.greenTick} {channel.mention} no longer has slowmode')
 
-    @commands.command(name='info')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _info(self, ctx, user: typing.Union[discord.Member, int]):
+    @app_commands.command(name='info', description='Get an overview of a user')
+    @app_commands.describe(user='The user you wish to grab info on')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _info(self, interaction: discord.Interaction, user: discord.User):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         inServer = True
-        if type(user) == int:
-            # User doesn't share the ctx server, fetch it instead
-            dbUser = mclient.bowser.users.find_one({'_id': user})
+        dbUser = mclient.bowser.users.find_one({'_id': user.id})
+        if interaction.guild.get_member(user.id):
+            user = interaction.guild.get_member(user.id)
+
+        if not dbUser:
             inServer = False
-            try:
-                user = await self.bot.fetch_user(user)
+            desc = (
+                f'Fetched information about {user.mention} from the API because they are not in this server. '
+                'There is little information to display as they have not been recorded joining the server before'
+            )
 
-            except discord.NotFound:
-                return await ctx.send(f'{config.redTick} User does not exist')
+            infractions = mclient.bowser.puns.find({'user': user.id}).count()
+            if infractions:
+                desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `/history {user.id}` to view'
 
-            if not dbUser:
-                desc = (
-                    f'Fetched information about {user.mention} from the API because they are not in this server. '
-                    'There is little information to display as they have not been recorded joining the server before'
-                )
+            embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
+            embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
+            embed.set_thumbnail(url=user.display_avatar.url)
+            embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
 
-                infractions = mclient.bowser.puns.find({'user': user.id}).count()
-                if infractions:
-                    desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `{ctx.prefix}history {user.id}` to view'
-
-                embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
-                embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
-                embed.set_thumbnail(url=user.display_avatar.url)
-                embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
-
-                return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
-
-        else:
-            dbUser = mclient.bowser.users.find_one({'_id': user.id})
+            return await interaction.followup.send(embed=embed)
 
         # Member object, loads of info to work with
         messages = mclient.bowser.messages.find({'author': user.id})
@@ -351,10 +414,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name='Messages', value=str(msgCount), inline=True)
-        if inServer:
+        if inServer and isinstance(user, discord.Member):
             embed.add_field(name='Join date', value=f'<t:{int(user.joined_at.timestamp())}:f>', inline=True)
+
+        elif inServer and dbUser['leaves']:
+            embed.add_field(name='Left server', value=f'<t:{int(max(dbUser['leaves']))}:f>', inline=True)
+
         roleList = []
-        if inServer:
+        if inServer and isinstance(user, discord.Member):
             for role in reversed(user.roles):
                 if role.id == user.guild.id:
                     continue
@@ -369,10 +436,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             roles = '*User has no roles*'
 
         else:
-            if not inServer:
+            if not inServer or isinstance(user, discord.User):
                 tempList = []
                 for x in reversed(roleList):
-                    y = ctx.guild.get_role(x)
+                    y = interaction.guild.get_role(x)
                     name = '*deleted role*' if not y else y.mention
                     tempList.append(name)
 
@@ -410,11 +477,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
         punishments = ''
         punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
+        puns = 0
         if not punsCol.count():
             punishments = '__*No punishments on record*__'
 
         else:
-            puns = 0
             activeStrikes = 0
             totalStrikes = 0
             activeMute = None
@@ -450,7 +517,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
             punishments = (
                 f'Showing {puns}/{punsCol.count()} punishment entries. '
-                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history {user.id}`'
+                f'For a full history including responsible moderator, active status, and more use `/history {user.id}`'
                 f'\n\n{punishments}'
             )
 
@@ -461,42 +528,59 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 embed.description += f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
         embed.add_field(name='Punishments', value=punishments, inline=False)
-        return await ctx.send(embed=embed)
+        if puns != 0:
+            await interaction.followup.send(embed=embed, view=self.SuggestHistCommand(interaction, self))
 
-    @commands.command(name='history')
-    async def _history(self, ctx, user: typing.Union[discord.User, int, None] = None):
+        else:
+            await interaction.followup.send(embed=embed)
+
+    class SuggestHistCommand(discord.ui.View):
+        def __init__(self, interaction: discord.Interaction, ChatCog: commands.Cog):
+            super().__init__(timeout=600.0)
+            self.INTERACTION = interaction
+            self.ChatCog = ChatCog
+
+        @discord.ui.button(label='Pull User History', style=discord.ButtonStyle.primary)
+        async def pull_history(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # Pull user ID from embed author of the interaction message, then pass to history to interact
+            userid = int(re.search(r'\| (\d+)', interaction.message.embeds[0].author.name).group(1))
+            user = interaction.client.get_user(userid)
+            if not user:
+                user = interaction.client.fetch_user(userid)
+
+            self.INTERACTION = interaction
+            await self.ChatCog._pull_history(interaction, user)
+
+        async def on_timeout(self):
+            await self.INTERACTION.edit_original_response(view=None)
+
+    @app_commands.command(name='history', description='Get detailed information on a user\'s infraction history')
+    @app_commands.describe(user='The user you wish to get infractions for. If left blank, get your own history')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    async def _history(self, interaction: discord.Interaction, user: typing.Optional[discord.User]):
+        if not user:
+            user = interaction.user
+        return await self._pull_history(interaction, user)
+
+    async def _pull_history(self, interaction: discord.Interaction, user: discord.User):
         if user is None:
-            user = ctx.author
-
-        if type(user) == int:
-            # User doesn't share the ctx server, fetch it instead
-            try:
-                user = await self.bot.fetch_user(user)
-
-            except discord.NotFound:
-                return await ctx.send(f'{config.redTick} User does not exist')
+            user = interaction.user
 
         if (
-            ctx.guild.get_role(config.moderator) not in ctx.author.roles
-            and ctx.guild.get_role(config.eh) not in ctx.author.roles
+            interaction.guild.get_role(config.moderator) not in interaction.user.roles
+            and interaction.guild.get_role(config.eh) not in interaction.user.roles
         ):
+            await interaction.response.defer(ephemeral=True)
             self_check = True
 
             #  If they are not mod and not running on themselves, they do not have permssion.
-            if user != ctx.author:
-                await ctx.message.delete()
-                return await ctx.send(
-                    f'{config.redTick} You do not have permission to run this command on other users', delete_after=15
-                )
-
-            if ctx.channel.id != config.commandsChannel:
-                await ctx.message.delete()
-                return await ctx.send(
-                    f'{config.redTick} {ctx.author.mention} Please use bot commands in <#{config.commandsChannel}>, not {ctx.channel.mention}',
-                    delete_after=15,
+            if user != interaction.user:
+                return await interaction.followup.send(
+                    f'{config.redTick} You do not have permission to run this command on other users'
                 )
 
         else:
+            await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
             self_check = False
 
         db = mclient.bowser.puns
@@ -532,7 +616,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             'unban': 'Unban',
             'blacklist': 'Blacklist ({})',
             'unblacklist': 'Unblacklist ({})',
-            'appealdeny': 'Denied ban appeal (until {})',
+            'appealdeny': 'Denied ban appeal ({})',
             'note': 'User note',
         }
 
@@ -548,7 +632,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         totalStrikes = 0
         for pun in puns.sort('timestamp', pymongo.DESCENDING):
             datestamp = f'<t:{int(pun["timestamp"])}:f>'
-            moderator = ctx.guild.get_member(pun['moderator'])
+            moderator = interaction.guild.get_member(pun['moderator'])
             if not moderator:
                 moderator = await self.bot.fetch_user(pun['moderator'])
 
@@ -565,7 +649,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 inf = punNames[pun['type']].format(pun['context'])
 
             elif pun['type'] == 'appealdeny':
-                inf = punNames[pun['type']].format(f'<t:{int(pun["expiry"])}:D>')
+                inf = punNames[pun['type']].format(
+                    f'until <t:{int(pun["expiry"])}:D>' if pun["expiry"] else "permanently"
+                )
 
             else:
                 inf = punNames[pun['type']]
@@ -597,96 +683,162 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if totalStrikes:
             desc = deictic_language['total_strikes'][self_check].format(activeStrikes, totalStrikes) + desc
 
-        try:
-            channel = ctx.author if self_check else ctx.channel
+        author = {'name': f'{user} | {user.id}', 'icon_url': user.display_avatar.url}
+        view = tools.PaginatedEmbed(
+            interaction=interaction,
+            fields=fields,
+            title='Infraction History',
+            description=desc,
+            color=0x18EE1C,
+            author=author,
+        )
 
-            if self_check:
-                await channel.send(
-                    'You requested the following copy of your current infraction history. If you have questions concerning your history,'
-                    + f' you may contact the moderation team by sending a DM to our modmail bot, Parakarry (<@{config.parakarry}>)'
-                )
-                await ctx.message.add_reaction('📬')
+        await interaction.edit_original_response(content='Here is the requested user history:', view=view)
 
-            author = {'name': f'{user} | {user.id}', 'icon_url': user.display_avatar.url}
-            await tools.send_paginated_embed(
-                self.bot, channel, fields, title='Infraction History', description=desc, color=0x18EE1C, author=author
+    @app_commands.command(
+        name='echoreply', description='Use the bot to reply to a message. Must provide either text, attachment, or both'
+    )
+    @app_commands.describe(
+        message='The message link that you want to reply to',
+        text='The text to use in the reply',
+        attachment='An attachment to reply with',
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _reply(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+        text: typing.Optional[str],
+        attachment: typing.Optional[discord.Attachment],
+    ):
+        if not text and not attachment:
+            # User didn't provide anything
+            await interaction.response.send_message(
+                f'{config.redTick} No attributes were provided. You must provide either `text`, `attachment`, or both in the command'
             )
 
-        except discord.Forbidden:
-            if self_check:
-                await ctx.send(
-                    f'{config.redTick} {ctx.author.mention} I was unable to DM you. Please make sure your DMs are open and try again',
-                    delete_after=10,
-                )
-            else:
-                raise
+        await interaction.response.defer()
+        elements = message.split('/')
+        try:
+            message = (
+                await self.bot.get_guild(int(elements[4])).get_channel(int(elements[5])).fetch_message(int(elements[6]))
+            )
 
-    @commands.command(name='echoreply')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _reply(self, ctx: commands.Context, message: discord.Message, *, text: str = ""):
+        except (discord.NotFound, discord.Forbidden):
+            return await interaction.followup.send(f'{config.redTick} The provided message link to reply to is invalid')
+
         files = []
-        for file in ctx.message.attachments:
+        if attachment:
             data = io.BytesIO()
-            await file.save(data)
-            files.append(discord.File(data, file.filename))
-        await message.reply(text, files=files)
+            await attachment.save(data)
+            files.append(discord.File(data, attachment.filename))
+        msg = await message.reply(text, files=files)
 
-    @commands.command(name='echo')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _echo(self, ctx: commands.Context, channel: discord.TextChannel, *, text: str = ""):
+        return await interaction.followup.send(f'[Done]({msg.jump_url})')
+
+    @app_commands.command(
+        name='echo', description='Use the bot to send a message. Must provide either text, attachment, or both'
+    )
+    @app_commands.describe(
+        channel='The channel to send a message in',
+        text='The text to use in the reply',
+        attachment='An attachment to reply with',
+    )
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _echo(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+        text: typing.Optional[str],
+        attachment: typing.Optional[discord.Attachment],
+    ):
+        if not text and not attachment:
+            # User didn't provide anything
+            await interaction.response.send_message(
+                f'{config.redTick} No attributes were provided. You must provide either `text`, `attachment`, or both in the command'
+            )
+
+        await interaction.response.defer()
         files = []
-        for file in ctx.message.attachments:
+        if attachment:
             data = io.BytesIO()
-            await file.save(data)
-            files.append(discord.File(data, file.filename))
-        await channel.send(text, files=files)
+            await attachment.save(data)
+            files.append(discord.File(data, attachment.filename))
+        msg = await channel.send(text, files=files)
 
-    @commands.command(name='roles')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _roles(self, ctx):
+        return await interaction.followup.send(f'[Done]({msg.jump_url})')
+
+    @app_commands.command(name='roles', description='Get a list of all server roles and their IDs')
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    async def _roles(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         lines = []
-        for role in reversed(ctx.guild.roles):
+        for role in reversed(interaction.guild.roles):
             lines.append(f'{role.name} ({role.id})')
 
         fields = tools.convert_list_to_fields(lines, codeblock=True)
-        return await tools.send_paginated_embed(
-            self.bot,
-            ctx.channel,
-            fields,
-            owner=ctx.author,
+        view = tools.PaginatedEmbed(
+            interaction=interaction,
+            fields=fields,
             title='List of roles in guild:',
             description='',
             page_character_limit=1500,
         )
 
-    @commands.group(name='tag', aliases=['tags'], invoke_without_command=True)
-    async def _tag(self, ctx, *, query=None):
+        await interaction.followup.send('Here is the requested role list:', view=view)
+
+    async def _tag_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> typing.List[app_commands.Choice[str]]:
+        db = mclient.bowser.tags
+        tags = db.find({'active': True})
+        tagList = [tag['_id'] for tag in tags]
+        if current == '':
+            return [app_commands.Choice(name=t, value=t) for t in tagList[0:10]]
+
+        extraction = process.extract(current.lower(), tagList, limit=10)
+        return [app_commands.Choice(name=e[0], value=e[0]) for e in extraction] or []
+
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    class TagCommand(app_commands.Group):
+        pass
+
+    tag_group = TagCommand(name='tag', description='View and update text tags!')
+
+    @tag_group.command(name='show', description='Show a stored tag')
+    @app_commands.describe(query='The name of the tag you wish to pull up')
+    @app_commands.autocomplete(query=_tag_autocomplete)
+    async def _tag(self, interaction: discord.Interaction, query: str):
         db = mclient.bowser.tags
 
-        if query:
-            query = query.lower()
-            tag = db.find_one({'_id': query, 'active': True})
+        query = query.lower()
+        tag = db.find_one({'_id': query, 'active': True})
 
-            if not tag:
-                return await ctx.send(f'{config.redTick} A tag with that name does not exist', delete_after=10)
+        if not tag:
+            return await interaction.response.send_message(
+                f'{config.redTick} A tag with that name does not exist', ephemeral=True
+            )
 
-            await ctx.message.delete()
+        embed = discord.Embed(title=tag['_id'], description=tag['content'])
+        embed.set_footer(text=f'Requested by {interaction.user}', icon_url=interaction.user.display_avatar.url)
 
-            embed = discord.Embed(title=tag['_id'], description=tag['content'])
-            embed.set_footer(text=f'Requested by {ctx.author}', icon_url=ctx.author.display_avatar.url)
+        if 'img_main' in tag and tag['img_main']:
+            embed.set_image(url=tag['img_main'])
+        if 'img_thumb' in tag and tag['img_thumb']:
+            embed.set_thumbnail(url=tag['img_thumb'])
 
-            if 'img_main' in tag and tag['img_main']:
-                embed.set_image(url=tag['img_main'])
-            if 'img_thumb' in tag and tag['img_thumb']:
-                embed.set_thumbnail(url=tag['img_thumb'])
+        return await interaction.response.send_message(embed=embed)
 
-            return await ctx.send(embed=embed)
-
-        else:
-            await self._tag_list(ctx)
-
-    @_tag.command(name='list', aliases=['search'])
-    async def _tag_list(self, ctx, *, search: typing.Optional[str] = ''):
+    @tag_group.command(name='list', description='Get a list of all available tags')
+    @app_commands.describe(search='A query to narrow down tags by')
+    @app_commands.autocomplete(search=_tag_autocomplete)
+    async def _tag_list(self, interaction: discord.Interaction, search: typing.Optional[str]):
         db = mclient.bowser.tags
 
         tagList = []
@@ -697,149 +849,170 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         tagList.sort(key=lambda x: x['name'])
 
         if not tagList:
-            return await ctx.send('{config.redTick} This server has no tags!')
+            return await interaction.response.send_message(f'{config.redTick} This server has no tags', ephemeral=True)
 
-        # Called from the !tag command instead of !tag list, so we print the simple list
-        if ctx.invoked_with.lower() in ['tag', 'tags']:
-            tags = ', '.join([tag['name'] for tag in tagList])
-
-            embed = discord.Embed(
-                title='Tag List',
-                description=(
-                    f'Here is a list of tags you can access:\n\n> {tags}\n\nType `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag list` to view tags with their descriptions'
-                ),
-            )
-            return await ctx.send(embed=embed)
-
-        else:  # Complex list
-            # If the command is being not being run in commands channel, they must be a mod or helpful user to run it.
-            if ctx.channel.id != config.commandsChannel:
-                if not (
-                    ctx.guild.get_role(config.moderator) in ctx.author.roles
-                    or ctx.guild.get_role(config.helpfulUser) in ctx.author.roles
-                    or ctx.guild.get_role(config.trialHelpfulUser) in ctx.author.roles
-                ):
-                    return await ctx.send(
-                        f'{config.redTick} {ctx.author.mention} Please use this command in <#{config.commandsChannel}>, not {ctx.channel.mention}',
-                        delete_after=15,
-                    )
-
-            if search:
-                embed_desc = f'Here is a list of tags you can access matching query `{search}`:\n*(Type `{ctx.prefix}tag <name>` to request a tag)*'
-            else:
-                embed_desc = f'Here is a list of all tags you can access:\n*(Type `{ctx.prefix}tag <name>` to request a tag or `{ctx.prefix}tag {ctx.invoked_with} <search>` to search tags)*'
-
-            if search:
-                search = search.lower()
-                searchRanks = [0] * len(tagList)  # Init search rankings to 0
-
-                # Search name first
-                for i, name in enumerate([tag['name'] for tag in tagList]):
-                    if name.startswith(search):
-                        searchRanks[i] = 1000
-                    elif search in name:
-                        searchRanks[i] = 800
-
-                # Search descriptions and tag bodies next
-                for i, tag in enumerate(tagList):
-                    # add 15 * number of matches in desc
-                    searchRanks[i] += tag['desc'].lower().count(search) * 15
-                    # add 1 * number of matches in content
-                    searchRanks[i] += tag['content'].lower().count(search) * 1
-
-                sort_joined_list = [(searchRanks[i], tagList[i]) for i in range(0, len(tagList))]
-                sort_joined_list.sort(key=lambda e: e[0], reverse=True)  # Sort from highest rank to lowest
-
-                matches = list(filter(lambda x: x[0] > 0, sort_joined_list))  # Filter to those with matches
-
-                tagList = [x[1] for x in matches]  # Resolve back to tags
-
-            if tagList:
-                longest_name = len(max([tag['name'] for tag in tagList], key=len))
-                lines = []
-
-                for tag in tagList:
-                    name = tag['name'].ljust(longest_name)
-                    desc = '*No description*' if not tag['desc'] else tag['desc']
-
-                    lines.append(f'`{name}` {desc}')
+        # If the command is being not being run in commands channel and not a mod or helpful user, use ephemeral
+        if interaction.channel.id != config.commandsChannel:
+            if not (
+                interaction.guild.get_role(config.moderator) in interaction.user.roles
+                or interaction.guild.get_role(config.helpfulUser) in interaction.user.roles
+                or interaction.guild.get_role(config.trialHelpfulUser) in interaction.user.roles
+            ):
+                await interaction.response.defer(ephemeral=True)
 
             else:
-                lines = ['*No results found*']
+                await interaction.response.defer()
 
-            fields = tools.convert_list_to_fields(lines, codeblock=False)
-            return await tools.send_paginated_embed(
-                self.bot,
-                ctx.channel,
-                fields,
-                owner=ctx.author,
-                title='Tag List',
-                description=embed_desc,
-                page_character_limit=1500,
-            )
+        if search:
+            embed_desc = f'Here is a list of tags you can access matching query `{search}`:\n*(Type `/tag show <name>` to request a tag)*'
+        else:
+            embed_desc = 'Here is a list of all tags you can access:\n*(Type `/tag show <name>` to request a tag or `/tag list <search>` to search tags)*'
 
-    @_tag.command(name='edit')
-    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
-    async def _tag_create(self, ctx, name, *, content):
-        db = mclient.bowser.tags
-        name = name.lower()
-        tag = db.find_one({'_id': name})
+        if search:
+            search = search.lower()
+            searchRanks = [0] * len(tagList)  # Init search rankings to 0
+
+            # Search name first
+            for i, name in enumerate([tag['name'] for tag in tagList]):
+                if name.startswith(search):
+                    searchRanks[i] = 1000
+                elif search in name:
+                    searchRanks[i] = 800
+
+            # Search descriptions and tag bodies next
+            for i, tag in enumerate(tagList):
+                # add 15 * number of matches in desc
+                searchRanks[i] += tag['desc'].lower().count(search) * 15
+                # add 1 * number of matches in content
+                searchRanks[i] += tag['content'].lower().count(search) * 1
+
+            sort_joined_list = [(searchRanks[i], tagList[i]) for i in range(0, len(tagList))]
+            sort_joined_list.sort(key=lambda e: e[0], reverse=True)  # Sort from highest rank to lowest
+
+            matches = list(filter(lambda x: x[0] > 0, sort_joined_list))  # Filter to those with matches
+
+            tagList = [x[1] for x in matches]  # Resolve back to tags
+
+        if tagList:
+            longest_name = len(max([tag['name'] for tag in tagList], key=len))
+            lines = []
+
+            for tag in tagList:
+                name = tag['name'].ljust(longest_name)
+                desc = '*No description*' if not tag['desc'] else tag['desc']
+
+                lines.append(f'`{name}` {desc}')
+
+        else:
+            lines = ['*No results found*']
+
+        fields = tools.convert_list_to_fields(lines, codeblock=False)
+        view = tools.PaginatedEmbed(
+            interaction=interaction, fields=fields, title='Tag List', description=embed_desc, page_character_limit=1500
+        )
+
+        await interaction.edit_original_response(content='Here is the requested list of tags:', view=view)
+
+    class TagEdit(discord.ui.Modal):
+        textbox = discord.ui.TextInput(
+            label='What should be the text for this tag?',
+            style=discord.TextStyle.long,
+            required=True,
+            min_length=1,
+            max_length=4000,
+        )
+
+        def __init__(self, tag):
+            super().__init__(title=f'Editing Tag: "{tag}"')
+            self.tag = tag
+            self.textbox.placeholder = 'Write some text! __Discord markdown is supported.__'
+
+            self.db = mclient.bowser.tags
+            self.doc = self.db.find_one({'_id': self.tag})
+            if self.doc:
+                self.textbox.default = self.doc['content']
+
+        async def on_submit(self, interaction: discord.Interaction):
+            if self.doc:
+                self.db.update_one(
+                    {'_id': self.tag},
+                    {
+                        '$push': {
+                            'revisions': {
+                                str(int(time.time())): {'content': self.doc['content'], 'user': interaction.user.id}
+                            }
+                        },
+                        '$set': {'content': self.textbox.value, 'active': True},
+                    },
+                )
+
+                msg = (
+                    f'{config.greenTick} The **{self.tag}** tag has been ' + 'updated'
+                    if self.doc['active']
+                    else 'created'
+                )
+                await interaction.response.send_message(msg)
+
+            else:
+                self.db.insert_one({'_id': self.tag, 'content': self.textbox.value, 'revisions': [], 'active': True})
+                return await interaction.response.send_message(
+                    f'{config.greenTick} The **{self.tag}** tag has been created'
+                )
+
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class ManageTagCommand(app_commands.Group):
+        pass
+
+    manage_tag_group = ManageTagCommand(name='manage-tag', description='Update components of the bot')
+
+    @manage_tag_group.command(name='edit', description='Edit an existing tag, or create a new one with a given name')
+    @app_commands.describe(name='Name of the tag to modify or create')
+    @app_commands.autocomplete(name=_tag_autocomplete)
+    @app_commands.checks.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
+    async def _tag_create(self, interaction: discord.Interaction, name: str):
         if name in ['list', 'search', 'edit', 'delete', 'source', 'setdesc', 'setimg']:  # Name blacklist
-            return await ctx.send(f'{config.redTick} You cannot use that name for a tag', delete_after=10)
+            return await interaction.response.send_message(f'{config.redTick} You cannot use that name for a tag')
 
-        if tag:
-            db.update_one(
-                {'_id': tag['_id']},
-                {
-                    '$push': {'revisions': {str(int(time.time())): {'content': tag['content'], 'user': ctx.author.id}}},
-                    '$set': {'content': content, 'active': True},
-                },
-            )
-            msg = f'{config.greenTick} The **{name}** tag has been '
-            msg += 'updated' if tag['active'] else 'created'
-            await ctx.message.delete()
-            return await ctx.send(msg, delete_after=10)
+        modal = self.TagEdit(name.lower())
+        return await interaction.response.send_modal(modal)
 
-        else:
-            db.insert_one({'_id': name, 'content': content, 'revisions': [], 'active': True})
-            return await ctx.send(f'{config.greenTick} The **{name}** tag has been created', delete_after=10)
-
-    @_tag.command(name='delete')
-    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
-    async def _tag_delete(self, ctx, *, name):
+    @manage_tag_group.command(name='delete', description='Delete an existing tag')
+    @app_commands.describe(name='Name of the tag to delete')
+    @app_commands.autocomplete(name=_tag_autocomplete)
+    async def _tag_delete(self, interaction: discord.Interaction, name: str):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-        await ctx.message.delete()
         if tag:
+            view = tools.RiskyConfirmation(timeout=20)
+            await interaction.response.send_message(
+                f'This action will delete the tag "{name}", are you sure you want to proceed?', view=view
+            )
+            view.message = await interaction.original_response()
+            timedOut = await view.wait()
 
-            def confirm_check(reaction, member):
-                return member == ctx.author and str(reaction.emoji) in [config.redTick, config.greenTick]
+            if timedOut:
+                await view.message.edit(content='Deletion timed out. Rerun command to try again', view=view)
 
-            confirmMsg = await ctx.send(f'This action will delete the tag "{name}", are you sure you want to proceed?')
-            await confirmMsg.add_reaction(config.greenTick)
-            await confirmMsg.add_reaction(config.redTick)
-            try:
-                reaction = await self.bot.wait_for('reaction_add', timeout=15, check=confirm_check)
-                if str(reaction[0]) != config.greenTick:
-                    await confirmMsg.edit(content='Delete canceled')
-                    return await confirmMsg.clear_reactions()
-
-            except asyncio.TimeoutError:
-                await confirmMsg.edit(content='Reaction timed out. Rerun command to try again')
-                return await confirmMsg.clear_reactions()
+            if view.value:
+                db.update_one({'_id': name}, {'$set': {'active': False}})
+                await view.message.edit(content=f'{config.greenTick} The "{name}" tag has been deleted')
 
             else:
-                db.update_one({'_id': name}, {'$set': {'active': False}})
-                await confirmMsg.edit(content=f'{config.greenTick} The "{name}" tag has been deleted')
-                await confirmMsg.clear_reactions()
+                await view.message.edit(content=f'Deletion of tag "{name}" canceled')
 
         else:
-            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+            return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @_tag.command(name='setdesc')
-    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
-    async def _tag_setdesc(self, ctx, name, *, content: typing.Optional[str] = ''):
+    @manage_tag_group.command(name='description', description='Change the description flavor text of a tag')
+    @app_commands.describe(
+        name='Name of the tag which to update the description for',
+        content='The new description for the tag. Leave blank to clear the existing description',
+    )
+    @app_commands.autocomplete(name=_tag_autocomplete)
+    async def _tag_setdesc(self, interaction: discord.Interaction, name: str, content: typing.Optional[str] = ''):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
@@ -850,59 +1023,62 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             db.update_one({'_id': tag['_id']}, {'$set': {'desc': content}})
 
             status = 'updated' if content else 'cleared'
-            await ctx.message.delete()
-            return await ctx.send(
-                f'{config.greenTick} The **{name}** tag description has been {status}', delete_after=10
+            return await interaction.response.send_message(
+                f'{config.greenTick} The **{name}** tag description has been {status}'
             )
 
         else:
-            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+            return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @_tag.command(name='setimg')
-    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
-    async def _tag_setimg(self, ctx, name, img_type_arg, *, url: typing.Optional[str] = ''):
+    @manage_tag_group.command(name='image', description='Change the active images displayed on tags')
+    @app_commands.describe(
+        name='The name of the tag which to update an image',
+        option='Which image should be changed',
+        url='The URL of the image to use. Leave blank to clear it',
+    )
+    @app_commands.autocomplete(name=_tag_autocomplete)
+    async def _tag_setimg(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        option: typing.Literal['main', 'thumbnail'],
+        url: typing.Optional[str] = '',
+    ):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
 
         IMG_TYPES = {
             'main': {'key': 'img_main', 'name': 'main'},
-            'thumb': {'key': 'img_thumb', 'name': 'thumbnail'},
             'thumbnail': {'key': 'img_thumb', 'name': 'thumbnail'},
         }
 
-        if img_type_arg.lower() in IMG_TYPES:
-            img_type = IMG_TYPES[img_type_arg]
-        else:
-            return await ctx.send(
-                f'{config.redTick} An invalid image type, `{img_type_arg}`, was given. Image type must be: {", ". join(IMG_TYPES.keys())}'
-            )
+        img_type = IMG_TYPES[option]
 
         url = ' '.join(url.splitlines())
         match = tools.linkRe.match(url)
         if url and (
             not match or match.span()[0] != 0
         ):  # If url argument does not match or does not begin with a valid url
-            return await ctx.send(f'{config.redTick} An invalid url, `{url}`, was given')
+            return await interaction.response.send_message(f'{config.redTick} An invalid url, `{url}`, was given')
 
         if tag:
             db.update_one({'_id': tag['_id']}, {'$set': {img_type['key']: url}})
 
             status = 'updated' if url else 'cleared'
-            await ctx.message.delete()
-            return await ctx.send(
-                f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}', delete_after=10
+            return await interaction.response.send_message(
+                f'{config.greenTick} The **{name}** tag\'s {img_type["name"]} image has been {status}'
             )
         else:
-            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+            return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @_tag.command(name='source')
-    @commands.has_any_role(config.moderator, config.helpfulUser, config.trialHelpfulUser)
-    async def _tag_source(self, ctx, *, name):
+    @manage_tag_group.command(name='source', description='Retrieve the raw source of a tag for easier')
+    @app_commands.describe(name='Name of the tag to retrieve the raw source')
+    @app_commands.autocomplete(name=_tag_autocomplete)
+    async def _tag_source(self, interaction: discord.Interaction, name: str):
         db = mclient.bowser.tags
         name = name.lower()
         tag = db.find_one({'_id': name})
-        await ctx.message.delete()
 
         if tag:
             embed = discord.Embed(title=f'{name} source', description=f'```md\n{tag["content"]}\n```')
@@ -917,120 +1093,42 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             embed.add_field(name='Main Image', value='*No URL set*' if not img_main else img_main, inline=True)
             embed.add_field(name='Thumbnail Image', value='*No URL set*' if not img_thumb else img_thumb, inline=True)
 
-            return await ctx.send(embed=embed)
+            return await interaction.response.send_message(embed=embed)
 
         else:
-            return await ctx.send(f'{config.redTick} The tag "{name}" does not exist')
+            return await interaction.response.send_message(f'{config.redTick} The tag "{name}" does not exist')
 
-    @commands.command(name='blacklist')
-    @commands.has_any_role(config.moderator, config.eh)
-    async def _blacklist_set(
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    @app_commands.default_permissions(view_audit_log=True)
+    @app_commands.checks.has_any_role(config.moderator, config.eh)
+    class BlacklistCommand(app_commands.Group):
+        pass
+
+    blacklist_group = BlacklistCommand(
+        name='blacklist', description='Toggle permissions to allow or disallow a user to interact in some way'
+    )
+
+    async def _blacklist_execute(
         self,
-        ctx,
+        interaction: discord.Interaction,
+        status: str,
         member: discord.Member,
-        channel: typing.Union[discord.TextChannel, discord.CategoryChannel, str],
-        *,
-        reason='-No reason specified-',
+        reason: str,
+        context: str,
+        feature: str,
     ):
-        if len(reason) > 990:
-            return await ctx.send(
-                f'{config.redTick} Blacklist reason is too long, reduce it by at least {len(reason) - 990} characters'
-            )
-        statusText = ''
-        if type(channel) == str:
-            # Arg blacklist
-            if channel in ['mail', 'modmail']:
-                context = 'modmail'
-                mention = context
-                users = mclient.bowser.users
-                dbUser = users.find_one({'_id': member.id})
-
-                if dbUser['modmail']:
-                    users.update_one({'_id': member.id}, {'$set': {'modmail': False}})
-                    statusText = 'Blacklisted'
-
-                else:
-                    users.update_one({'_id': member.id}, {'$set': {'modmail': True}})
-                    statusText = 'Unblacklisted'
-
-            elif channel in ['reactions', 'reaction', 'react']:
-                context = 'reaction'
-                mention = 'reactions'
-                reactionsRole = ctx.guild.get_role(config.noReactions)
-                if reactionsRole in member.roles:  # Toggle role off
-                    await member.remove_roles(reactionsRole)
-                    statusText = 'Unblacklisted'
-
-                else:  # Toggle role on
-                    await member.add_roles(reactionsRole)
-                    statusText = 'Blacklisted'
-
-            elif channel in ['attach', 'attachments', 'embed', 'embeds']:
-                context = 'attachment/embed'
-                mention = 'attachments/embeds'
-                noEmbeds = ctx.guild.get_role(config.noEmbeds)
-                if noEmbeds in member.roles:  # Toggle role off
-                    await member.remove_roles(noEmbeds)
-                    statusText = 'Unblacklisted'
-
-                else:  # Toggle role on
-                    await member.add_roles(noEmbeds)
-                    statusText = 'Blacklisted'
-
-            else:
-                return await ctx.send(f'{config.redTick} You cannot blacklist a user from that function')
-
-        elif channel.id == config.suggestions:
-            context = channel.name
-            mention = channel.mention + ' channel'
-            suggestionsRole = ctx.guild.get_role(config.noSuggestions)
-            if suggestionsRole in member.roles:  # Toggle role off
-                await member.remove_roles(suggestionsRole)
-                statusText = 'Unblacklisted'
-
-            else:  # Toggle role on
-                await member.add_roles(suggestionsRole)
-                statusText = 'Blacklisted'
-
-        elif channel.id == config.spoilers:
-            context = channel.name
-            mention = channel.mention + ' channel'
-            spoilersRole = ctx.guild.get_role(config.noSpoilers)
-            if spoilersRole in member.roles:  # Toggle role off
-                await member.remove_roles(spoilersRole)
-                statusText = 'Unblacklisted'
-
-            else:  # Toggle role on
-                await member.add_roles(spoilersRole)
-                statusText = 'Blacklisted'
-
-        elif channel.category_id == config.eventCat:
-            context = 'events'
-            mention = 'event'
-            eventsRole = ctx.guild.get_role(config.noEvents)
-            if eventsRole in member.roles:  # Toggle role off
-                await member.remove_roles(eventsRole)
-                statusText = 'Unblacklisted'
-
-            else:  # Toggle role on
-                await member.add_roles(eventsRole)
-                statusText = 'Blacklisted'
-
-        else:
-            return await ctx.send(f'{config.redTick} You cannot blacklist a user from that channel')
+        db = mclient.bowser.puns
 
         public_notify = False
         try:
-            await member.send(tools.format_pundm(statusText.lower()[:-2], reason, ctx.author, mention))
+            await member.send(tools.format_pundm(status.lower()[:-2], reason, interaction.user, feature))
 
         except (discord.Forbidden, AttributeError):  # User has DMs off, or cannot send to Obj
             public_notify = True
 
-        db = mclient.bowser.puns
-
-        if statusText.lower() == 'blacklisted':
+        if status.lower() == 'blacklisted':
             docID = await tools.issue_pun(
-                member.id, ctx.author.id, 'blacklist', reason, context=context, public_notify=public_notify
+                member.id, interaction.user.id, 'blacklist', reason, context=context, public_notify=public_notify
             )
 
         else:
@@ -1040,7 +1138,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             )
             docID = await tools.issue_pun(
                 member.id,
-                ctx.author.id,
+                interaction.user.id,
                 'unblacklist',
                 reason,
                 active=False,
@@ -1051,51 +1149,116 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         await tools.send_modlog(
             self.bot,
             self.modLogs,
-            statusText.lower()[:-2],
+            status.lower()[:-2],
             docID,
             reason,
             user=member,
-            moderator=ctx.author,
+            moderator=interaction.user,
             extra_author=context,
             public=True,
         )
 
-        if tools.mod_cmd_invoke_delete(ctx.channel):
-            return await ctx.message.delete()
+        await interaction.followup.send(f'{config.greenTick} {member} has been {status.lower()} from {feature}')
 
-        await ctx.send(f'{config.greenTick} {member} has been {statusText.lower()} from {mention}')
+    @blacklist_group.command(
+        name='feature', description='Toggle permissions to allow or disallow a user to interact in some way'
+    )
+    @app_commands.describe(
+        member='The member you wish to toggle features on',
+        feature='The unique feature to toggle access to',
+        reason='The reason you are toggling the blacklist status for this user',
+    )
+    async def _blacklist_feature(
+        self,
+        interaction,
+        member: discord.Member,
+        feature: typing.Literal['modmail', 'reactions', 'attachments/embeds'],
+        reason: app_commands.Range[str, 1, 990],
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+        statusText = ''
+        if feature == 'modmail':
+            context = 'modmail'
+            users = mclient.bowser.users
+            dbUser = users.find_one({'_id': member.id})
 
-    async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if not ctx.command:
-            return
+            if dbUser['modmail']:
+                users.update_one({'_id': member.id}, {'$set': {'modmail': False}})
+                statusText = 'Blacklisted'
 
-        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        if isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(
-                f'{config.redTick} Missing one or more required arguments. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
+            else:
+                users.update_one({'_id': member.id}, {'$set': {'modmail': True}})
+                statusText = 'Unblacklisted'
 
-        elif isinstance(error, commands.CommandOnCooldown):
-            return await ctx.send(
-                f'{config.redTick} You are using that command too fast, try again in a few seconds', delete_after=15
-            )
+        elif feature == 'reactions':
+            context = 'reaction'
+            reactionsRole = interaction.guild.get_role(config.noReactions)
+            if reactionsRole in member.roles:  # Toggle role off
+                await member.remove_roles(reactionsRole)
+                statusText = 'Unblacklisted'
 
-        elif isinstance(error, commands.BadArgument):
-            return await ctx.send(
-                f'{config.redTick} One or more provided arguments are invalid. See `{ctx.prefix}help {cmd_str}`',
-                delete_after=15,
-            )
+            else:  # Toggle role on
+                await member.add_roles(reactionsRole)
+                statusText = 'Blacklisted'
 
-        elif isinstance(error, commands.CheckFailure):
-            return await ctx.send(f'{config.redTick} You do not have permission to run this command.', delete_after=15)
+        elif feature == 'attachments/embeds':
+            context = 'attachment/embed'
+            noEmbeds = interaction.guild.get_role(config.noEmbeds)
+            if noEmbeds in member.roles:  # Toggle role off
+                await member.remove_roles(noEmbeds)
+                statusText = 'Unblacklisted'
+
+            else:  # Toggle role on
+                await member.add_roles(noEmbeds)
+                statusText = 'Blacklisted'
+
+        await self._blacklist_execute(interaction, statusText, member, reason, context, feature)
+
+    @blacklist_group.command(
+        name='channel',
+        description='Toggle permissions to allow or disallow a user to interact with a channel or category',
+    )
+    @app_commands.describe(
+        member='The member you wish to toggle features on',
+        channel='The channel or category to toggle access to',
+        reason='The reason you are toggling the blacklist status for this user',
+    )
+    async def _blacklist_channel(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        channel: typing.Literal['suggestions', 'spoilers', 'server events'],
+        reason: app_commands.Range[str, 1, 990],
+    ):
+        await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+
+        channels = {
+            'suggestions': (
+                interaction.guild.get_role(config.noSuggestions),
+                interaction.guild.get_channel(config.suggestions),
+            ),
+            'spoilers': (interaction.guild.get_role(config.noSpoilers), interaction.guild.get_channel(config.spoilers)),
+            'server events': [interaction.guild.get_role(config.noEvents)],  # List for compat
+        }
+        statusText = ''
+
+        if channel == 'server events':
+            context = 'events'
+            mention = 'events'
 
         else:
-            await ctx.send(
-                f'{config.redTick} An unknown exception has occured, if this continues to happen contact the developer.',
-                delete_after=15,
-            )
-            raise error
+            context = channels[channel][1].name
+            mention = channels[channel][1].mention + ' channel'
+
+        if channels[channel][0] in member.roles:  # Toggle role off
+            await member.remove_roles(channels[channel][0])
+            statusText = 'Unblacklisted'
+
+        else:  # Toggle role on
+            await member.add_roles(channels[channel][0])
+            statusText = 'Blacklisted'
+
+        await self._blacklist_execute(interaction, statusText, member, reason, context, mention)
 
 
 async def setup(bot):
@@ -1110,5 +1273,5 @@ async def setup(bot):
 
 
 async def teardown(bot):
-    bot.remove_cog('ChatControl')
+    await bot.remove_cog('ChatControl')
     logging.info('[Extension] Utility module unloaded')

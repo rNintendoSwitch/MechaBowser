@@ -10,9 +10,7 @@ DSN = ''
 giantbomb = 'key'
 
 # Mongo Credentials
-mongoUser = 'user'
-mongoPass = 'password'
-mongoHost = 'host'
+mongoURI = 'MongoDB URI'
 
 # Users
 parakarry: int = bot
