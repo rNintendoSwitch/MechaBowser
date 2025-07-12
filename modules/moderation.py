@@ -1096,16 +1096,17 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
             punGuild = self.bot.get_guild(guild)
             member = punGuild.get_member(doc['user'])
-            if not member:
-                logging.debug(f'[Moderation] {doc["user"]} not in guild and has mute to be expired, ignoring')
-                return
-
             public_notify = False
-            try:
-                await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
+            if member:  # It's possible the member left or was banned. Still expire the action but skip notifs
+                await member.edit(timed_out_until=None, reason='Automatic: Mute has expired')
+                try:
+                    await member.send(tools.format_pundm('unmute', 'Mute expired', None, auto=True))
 
-            except discord.Forbidden:  # User has DMs off
-                public_notify = True
+                except discord.Forbidden:  # User has DMs off
+                    public_notify = True
+
+            else:
+                member = await self.bot.fetch_user(doc['user'])
 
             newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {'active': False}})
             docID = await tools.issue_pun(
@@ -1123,8 +1124,6 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     f'[Moderation] Expiry failed. Database failed to update user on pun expiration of {doc["_id"]}'
                 )
 
-            await member.edit(timed_out_until=None, reason='Automatic: Mute has expired')
-
             del self.taskHandles[_id]
             await tools.send_modlog(
                 self.bot,
@@ -1134,7 +1133,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 'Mute expired',
                 user=member,
                 moderator=self.bot.user,
-                public=True,
+                public=True if isinstance(member, discord.Member) else False,
             )
 
 

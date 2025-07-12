@@ -162,6 +162,10 @@ trivia-bananza-dark:
     theme: dark
     trophy-bg-opacity: 50
 
+trivia-mkw:
+    theme: light
+    trophy-bg-opacity: 50
+
 predictionpool:
     theme: dark
     trophy-bg-opacity: 50
