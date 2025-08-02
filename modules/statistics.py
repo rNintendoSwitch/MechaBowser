@@ -170,9 +170,8 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
         )
         embed.set_thumbnail(url=interaction.guild.icon.url)
         embed.add_field(
-            name='Guild features',
-            value=f'**Guild flags:** {", ".join(interaction.guild.features)}\n'
-            f'**Boost level:** {premiumTier}\n**Number of boosters:** {interaction.guild.premium_subscription_count}',
+            name='Guild information',
+            value=f'**Boost level:** {premiumTier}\n**Number of boosters:** {interaction.guild.premium_subscription_count}',
         )
 
         return await interaction.edit_original_response(content=None, embed=embed)
