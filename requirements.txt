@@ -1,6 +1,6 @@
 git+https://github.com/falconry/token-bucket
 discord.py==2.4.0
-pymongo[srv]<=3.12.3
+pymongo[srv]==4.13.2
 jishaku
 pylint
 fuzzywuzzy[speedup]
