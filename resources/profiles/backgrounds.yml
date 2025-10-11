@@ -158,6 +158,10 @@ trivia-dragxdrive:
     theme: dark
     trophy-bg-opacity: 50
 
+trivia-za:
+    theme: light
+    trophy-bg-opacity: 50
+
 trivia-silksong:
     theme: dark
     trophy-bg-opacity: 50
