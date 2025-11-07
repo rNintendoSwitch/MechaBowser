@@ -48,10 +48,6 @@ class ExtraLife(commands.Cog):
         self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
         self.guild = self.bot.get_guild(self.GUILD)
-        self.extra_life_admin = self.guild.get_channel(self.EXTRA_LIFE_ADMIN)
-        self.extra_life = self.guild.get_channel(self.EXTRA_LIFE)
-        self.general = self.guild.get_channel(self.GENERAL)
-        self.donations = self.guild.get_channel(self.DONATIONS)
         self.chatRole = self.guild.get_role(self.CHAT_ROLE)
         self.donorRole = self.guild.get_role(self.DONOR_ROLE)
         self.lastDonationID = None
@@ -73,6 +69,11 @@ class ExtraLife(commands.Cog):
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
     async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+        self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
+        self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
+        self.general = await self.bot.fetch_channel(self.GENERAL)
+        self.donations = await self.bot.fetch_channel(self.DONATIONS)
+
         if id is None:
             return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
 
@@ -146,6 +147,10 @@ class ExtraLife(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def donation_check(self):
+        # Exit event if there is no last donation programmed
+        if self.lastDonationID is None:
+            return
+
         donations_request = requests.get(self.DONATIONS_URL, timeout=8.0, headers=self.REQUEST_HEADERS)
 
         try:
