@@ -23,7 +23,7 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://extra-life.org/api/participants/531641/donations'
+        self.DONATIONS_URL = 'https://extra-life.org/api/participants/549812/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
 
         # Role adding consts
@@ -32,14 +32,14 @@ class ExtraLife(commands.Cog):
         self.DONOR_ROLE = 1192235806551716044
 
         # Trophy and Background consts
-        self.TROPHY = 'extra-life-2024'
+        self.TROPHY = 'extra-life-2025'
         self.BACKGROUND = 'extra-life'
 
         # Donation incentive ID consts
         self.INCENTIVES = {
             # 'uuiduuid-uuid-uuid-uuiduuiduuiduuid': 'Friendly Name',
-            '2F30C4A5-A947-7BFD-0300CAA167485690': 'Series 1 & 2 sticker sheets (Physical)',
-            '2F44162E-F391-10C4-DBE0155A125CBE9D': 'Enamel pin & Sticker sheets (Physical)',
+            '479328F2-089C-A2E0-EBD491D69CFF478C': 'Series 1 & 2 sticker sheets (Physical)',
+            '47989E42-CB98-0684-6BF8656B760A413E': 'Enamel pin & Sticker sheets (Physical)',
         }
 
         ################################################################################################################################
