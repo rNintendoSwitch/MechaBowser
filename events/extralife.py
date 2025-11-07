@@ -25,6 +25,7 @@ class ExtraLife(commands.Cog):
         self.DONATIONS = 774672505540968468
         self.DONATIONS_URL = 'https://extra-life.org/api/participants/549812/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
+        self.REQUEST_HEADERS = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
@@ -145,7 +146,7 @@ class ExtraLife(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def donation_check(self):
-        donations_request = requests.get(self.DONATIONS_URL, timeout=8.0)
+        donations_request = requests.get(self.DONATIONS_URL, timeout=8.0, headers=self.REQUEST_HEADERS)
 
         try:
             donations_request.raise_for_status()
