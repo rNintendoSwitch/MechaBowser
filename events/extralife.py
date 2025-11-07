@@ -29,8 +29,8 @@ class ExtraLife(commands.Cog):
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 1192235490309570560
-        self.DONOR_ROLE = 1192235806551716044
+        self.CHAT_ROLE = 1365349551929823242
+        self.DONOR_ROLE = 1365349619306987610
 
         # Trophy and Background consts
         self.TROPHY = 'extra-life-2025'
