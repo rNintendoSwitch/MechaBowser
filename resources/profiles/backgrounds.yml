@@ -158,6 +158,14 @@ trivia-dragxdrive:
     theme: dark
     trophy-bg-opacity: 50
 
+the-game-awards-2025:
+    theme: light
+    trophy-bg-opacity: 50
+
+trivia-prime4:
+    theme: dark
+    trophy-bg-opacity: 50
+
 trivia-airriders-dark:
     theme: dark
     trophy-bg-opacity: 50
