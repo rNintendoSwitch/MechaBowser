@@ -573,7 +573,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
 
     if doc['public_notify'] and member:
         content = f'{user.mention}, I was unable to DM you for this infraction. Use the /history command in any channel for further details.'
-    
+
     else:
         content = None
 
