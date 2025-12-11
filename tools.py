@@ -574,7 +574,7 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
     if doc['public_notify'] and member:
         for command in bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
             # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
+            if command.name == 'history':
                 break
 
         commandID = command.extras['id']
