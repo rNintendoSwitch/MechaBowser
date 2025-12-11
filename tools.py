@@ -572,13 +572,8 @@ async def send_public_modlog(bot, id, channel, mock_document=None):
         embed.description = 'This is an automatic action'
 
     if doc['public_notify'] and member:
-        for command in bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
-            # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'history':
-                break
-
-        commandID = command.extras['id']
-        content = f'{user.mention}, I was unable to DM you for this infraction. Use the </history:{commandID}> command in any channel for further details.'
+        content = f'{user.mention}, I was unable to DM you for this infraction. Use the /history command in any channel for further details.'
+    
     else:
         content = None
 
