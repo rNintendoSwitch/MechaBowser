@@ -445,7 +445,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
                 roleList = tempList
 
-            roles = ', '.join(roleList)
+            # concat roles into comma delimitered string
+            roles = str(roleList[0])
+            for i, role in enumerate(roleList[1:]):
+                if len(f"{roles}, {role}") > 1000:  # too big?
+                    roles += f", and {len(roleList) - i} more..."
+                    break
+
+                roles += f", {role}"
 
         embed.add_field(name='Roles', value=roles, inline=False)
 
