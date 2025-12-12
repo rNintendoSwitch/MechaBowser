@@ -306,9 +306,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}',
         )
 
+    def revoke_is_allowed_dev(interaction: discord.Interaction) -> bool:
+        return interaction.user.id in [
+            125233822760566784,  # MattBSG
+            123879073972748290  # Lyrus
+        ]
+
     @infraction_group.command(name='remove', description='Permanently delete an infraction. Dev-only')
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
-    @app_commands.checks.has_any_role(config.eh)
+    @app_commands.check.has_any_role(config.eh)
     async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         db = mclient.bowser.puns
