@@ -306,14 +306,14 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             f'{config.greenTick} The {doc["type"]} {"duration" if duration else "reason"} has been successfully updated for {user} ({user.id}){error}',
         )
 
-    def revoke_is_allowed_dev(interaction: discord.Interaction) -> bool:
-        return interaction.user.id in [125233822760566784, 123879073972748290]  # MattBSG, Lyrus
-
     @infraction_group.command(name='remove', description='Permanently delete an infraction. Dev-only')
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
-    @app_commands.check(revoke_is_allowed_dev)
     async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+        
+        if interaction.user.id not in [125233822760566784, 123879073972748290]:  # MattBSG, Lyrus
+            return await interaction.followup.send(f'{config.redTick} You do not have permission to run this command')
+            
         db = mclient.bowser.puns
         doc = db.find_one_and_delete({'_id': uuid})
         if not doc:  # Delete did nothing if doc is None
