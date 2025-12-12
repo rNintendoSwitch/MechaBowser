@@ -308,6 +308,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
     @infraction_group.command(name='remove', description='Permanently delete an infraction. Dev-only')
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
+    @app_commands.checks.has_any_role(config.eh)
     async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         db = mclient.bowser.puns
