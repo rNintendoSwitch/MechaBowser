@@ -310,10 +310,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
     async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
-        
+
         if interaction.user.id not in [125233822760566784, 123879073972748290]:  # MattBSG, Lyrus
             return await interaction.followup.send(f'{config.redTick} You do not have permission to run this command')
-            
+
         db = mclient.bowser.puns
         doc = db.find_one_and_delete({'_id': uuid})
         if not doc:  # Delete did nothing if doc is None
