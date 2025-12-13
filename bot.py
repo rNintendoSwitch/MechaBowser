@@ -115,7 +115,7 @@ class MechaBowser(commands.Bot):
         super().__init__(
             activity=discord.Activity(type=discord.ActivityType.watching, name='over the server'),
             case_insensitive=True,
-            command_prefix=config.command_prefixes,
+            command_prefix=commands.when_mentioned,
             chunk_guilds_at_startup=True,
             intents=discord.Intents(
                 guilds=True,
