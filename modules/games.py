@@ -62,29 +62,6 @@ class Games(commands.Cog, name='Games'):
         ]
         self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
 
-    def update_item_in_db(self, type: Literal['game', 'release'], game: dict):
-        if type not in ['game', 'release']:
-            raise ValueError(f'invalid type: {type}')
-
-        date_keys = {
-            'game': ['date_added', 'date_last_updated', 'original_release_date'],
-            'release': ['date_added', 'date_last_updated', 'release_date'],
-        }
-
-        for key in date_keys[type]:  # Parse dates
-            if game[key]:
-                game[key] = parser.parse(game[key])
-
-        if type == 'game' and game['aliases']:
-            game['aliases'] = game['aliases'].splitlines()
-
-        if type == 'release':
-            game['_gameid'] = game['game']['id']
-
-        game['_type'] = type
-
-        return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
-
     def search(self, query: str) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
         for game in self.aggregatePipeline:
