@@ -550,8 +550,8 @@ class Games(commands.Cog, name='Games'):
             ),
         )
 
-        game_count = self.db.find({'_type': 'game'}).count()
-        release_count = self.db.find({'_type': 'release'}).count()
+        game_count = self.db.count_documents({'_type': 'game'})
+        release_count = self.db.count_documents({'_type': 'release'})
         embed.add_field(name='Games Stored', value=game_count, inline=True)
         embed.add_field(name='Releases Stored', value=release_count, inline=True)
 

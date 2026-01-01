@@ -441,7 +441,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
             setGames = setGames[0:5]  # Limit to 5 results, just in case
 
-            message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
+            message_count = f'{mclient.bowser.messages.count_documents({"author": member.id}):,}'
 
         ## Get join date ##
         joins = dbUser['joins']

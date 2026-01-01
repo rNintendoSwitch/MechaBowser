@@ -220,9 +220,10 @@ class MainEvents(commands.Cog):
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',
             }
-            puns = punDB.find({'user': member.id, 'active': True})
             restoredPuns = []
-            if puns.count():
+            query = {'user': member.id, 'active': True}
+            if punDB.count_documents(query):
+                puns = punDB.find(query)
                 for x in puns:
                     if x['type'] == 'blacklist':
                         restoredPuns.append(punTypes[x['type']].format(x['context']))
@@ -347,13 +348,14 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         db = mclient.bowser.puns
-        puns = db.find({'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}})
 
         mclient.bowser.users.update_one(
             {'_id': member.id},
             {'$push': {'leaves': int(datetime.now(tz=timezone.utc).timestamp())}},
         )
-        if puns.count():
+        query = {'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}}
+        if db.count_documents(query):
+            puns = db.find(query)
             embed = discord.Embed(
                 description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:',
                 color=0xD62E44,
