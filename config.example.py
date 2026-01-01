@@ -30,7 +30,6 @@ switchHelp: int = switch_help
 spoilers: int = spoilers
 suggestions: int = suggestions
 commandsChannel: int = commands
-splatoon2Channel: int = splatoon2
 automodChannel: int = automod_alerts
 
 # Category IDs
@@ -51,7 +50,6 @@ submodemeritus: int = sub_moderator_emeritus
 eh: int = test_server_mod
 helpfulUser: int = helpful_user
 trialHelpfulUser: int = trial_helpful_user
-mute: int = timeout
 noSpoilers: int = spoiler_restricted
 noSuggestions: int = suggestion_restricted
 noReactions: int = reaction_restricted
