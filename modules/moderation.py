@@ -54,16 +54,21 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     continue  # We don't want to create many tasks when we only remove one
                 user = userDB.find_one({'_id': pun['user']})
                 trackedStrikes.append(pun['user'])
-                if user['strike_check'] > time.time():  # In the future
-                    tryTime = (
-                        twelveHr
-                        if user['strike_check'] - time.time() > twelveHr
-                        else user['strike_check'] - time.time()
-                    )
+                tryTime = 0 # Default to immediately
+                try:
+                    if user['strike_check'] > time.time():  # In the future
+                        tryTime = (
+                            twelveHr
+                            if user['strike_check'] - time.time() > twelveHr
+                            else user['strike_check'] - time.time()
+                        )
+
+                except KeyError: # Edge case for missing strike_check field
+                    userDB.update_one({'_id': pun['user']}, {'$set': {'strike_check': time.time()}})
+
+                finally:
                     self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
-                else:  # In the past
-                    self.schedule_task(0, pun['_id'], config.nintendoswitch)
 
             elif pun['type'] == 'mute':
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
