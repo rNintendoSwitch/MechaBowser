@@ -755,6 +755,31 @@ class MainEvents(commands.Cog):
         await self.bot.user.edit(username=name)
         return await interaction.followup.send('Done.')
 
+    @update_group.command(name='members', description='Syncronize members and their roles in the DB')
+    async def _update_members(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        logging.info('[Core] Starting db member sync')
+        db = mclient.bowser.users
+        guild = self.bot.get_guild(config.nintendoswitch)
+
+        for member in guild.members:
+           doc = db.find_one({'_id': member.id})
+           if not doc:
+               await tools.store_user(member)
+               continue
+           
+           roleList = []
+           for role in member.roles:
+               if role.id != guild.id: # Ignore @everyone
+                   roleList.append(role.id)
+
+           if roleList == doc['roles']:
+               continue
+           
+           db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
+        logging.info('[Core] User database syncronization complete')
+        return await interaction.followup.send('Done.')
+
     @update_group.command(
         name='cache', description='Update the database message cache for the entire server. API and resource intensive'
     )
