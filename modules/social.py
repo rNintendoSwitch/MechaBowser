@@ -624,7 +624,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 game_name_font = fonts['medium'][self._determine_cjk_font(gameName)]
 
-                # Word wrap logic
+                # Word wrap logic with overflow protection
                 words = gameName.split()
                 lines = []
                 current_line = []
@@ -637,7 +637,33 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 for word in words:
                     word_w = game_name_font.getsize(word)[0]
-                    if current_w + word_w <= max_w:
+
+                    # Handle massive words that don't fit on a single line
+                    if word_w > max_w:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = []
+                            current_w = 0
+
+                        # Split the long word by character
+                        partial_word = ""
+                        partial_w = 0
+                        for char in word:
+                            char_w = game_name_font.getsize(char)[0]
+                            if partial_w + char_w > max_w:
+                                lines.append(partial_word)
+                                partial_word = char
+                                partial_w = char_w
+                            else:
+                                partial_word += char
+                                partial_w += char_w
+                        
+                        if partial_word:
+                            current_line = [partial_word]
+                            current_w = partial_w + space_w
+
+                    # Handle normal words
+                    elif current_w + word_w <= max_w:
                         current_line.append(word)
                         current_w += word_w + space_w
                     else:
@@ -645,8 +671,24 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                             lines.append(' '.join(current_line))
                         current_line = [word]
                         current_w = word_w + space_w
+
                 if current_line:
                     lines.append(' '.join(current_line))
+
+                # Safety: Limit to 3 lines and trim for ellipsis
+                if len(lines) > 3:
+                    lines = lines[:3]
+                    ellipsis = "..."
+                    ellipsis_w = game_name_font.getsize(ellipsis)[0]
+
+                    # Shrink the last line until "..." fits
+                    while lines[-1]:
+                        current_line_w = game_name_font.getsize(lines[-1])[0]
+                        if current_line_w + ellipsis_w <= max_w:
+                            break
+                        lines[-1] = lines[-1][:-1]  # Remove last char
+                    
+                    lines[-1] += ellipsis
 
                 # Safety: Limit to 3 lines
                 if len(lines) > 3:
