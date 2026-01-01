@@ -932,9 +932,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc)'
         )
 
-    async def _profile_games_autocomplete(self, interaction: discord.Interaction, current: str):
-        return await self.Games._games_search_autocomplete(interaction, current)
-
     @social_group.command(name='games', description='Pick up-to 5 of your fav Nintendo Switch games to show them off')
     @app_commands.describe(
         game1='You need to pick at least one game. Search by name',
@@ -943,13 +940,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         game4='Optionally pick a 4th game to show on your profile as well. Search by name',
         game5='Optionally pick a 5th game to show on your profile as well. Search by name',
     )
-    # @app_commands.autocomplete(
-    #   game1=_profile_games_autocomplete,
-    #    game2=_profile_games_autocomplete,
-    #    game3=_profile_games_autocomplete,
-    #    game4=_profile_games_autocomplete,
-    #    game5=_profile_games_autocomplete,
-    # )
     async def _profile_games(
         self,
         interaction: discord.Interaction,

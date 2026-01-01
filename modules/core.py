@@ -811,12 +811,6 @@ class MainEvents(commands.Cog):
             f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
         )
 
-    @update_group.command(name='gamedb', description='Sync the games database with GiantBomb')
-    @app_commands.describe(full='Determines if it should be a full sync, or a partial')
-    @app_commands.default_permissions(view_audit_log=True)
-    async def _update_game_db(self, interaction: discord.Interaction, full: bool):
-        gamesCog = self.bot.get_cog('Games')
-        await gamesCog.games_sync(interaction, full)
 
     @app_commands.command(name='shutdown', description='Shutdown the bot and all modules')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
