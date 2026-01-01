@@ -1,12 +1,11 @@
 # type: ignore
 
 token = 'token'
-command_prefixes = ['!', ',', '.']
 
 # Sentry DSN
 DSN = ''
 
-# Api Creds
+# Giantbomb Api Credentials
 giantbomb = 'key'
 
 # Mongo Credentials
