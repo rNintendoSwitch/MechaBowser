@@ -811,7 +811,6 @@ class MainEvents(commands.Cog):
             f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
         )
 
-
     @app_commands.command(name='shutdown', description='Shutdown the bot and all modules')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(manage_guild=True)
