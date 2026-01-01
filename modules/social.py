@@ -87,7 +87,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'resources/profiles/layout/{theme}/pfp-background.png'
             ).convert('RGBA')
             self.themes[theme]['missingImage'] = (
-                Image.open(f'resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((45, 45))
+                Image.open(f'resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((120, 120))
             )
             self.themes[theme]['profileStatic'] = self._init_profile_static(theme)  # Do this last
 
@@ -712,11 +712,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return None
 
     async def generate_user_flow_embed(self, member: discord.Member, new_user: bool = False):
-        '''
+        """
         Generates a discord.Embed with information profile card editing flow and all subcommands.
 
         returns discord.Embed, discord.File
-        '''
+        """
 
         embed = discord.Embed(title='Setup Your Profile Card!', color=0x8BC062)
         embed.set_author(name=member.name, icon_url=member.display_avatar.url)
