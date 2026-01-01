@@ -194,5 +194,5 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
 
 
 if __name__ == '__main__':
-    logging.info('\033[94mMechaBowser by mattbsg & lyrus ©2019-2024\033[0m')
+    logging.info('\033[94mMechaBowser by mattbsg & lyrus ©2019-2026\033[0m')
     asyncio.run(bot.start(config.token))
