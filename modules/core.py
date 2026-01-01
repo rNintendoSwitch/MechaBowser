@@ -763,20 +763,20 @@ class MainEvents(commands.Cog):
         guild = self.bot.get_guild(config.nintendoswitch)
 
         for member in guild.members:
-           doc = db.find_one({'_id': member.id})
-           if not doc:
-               await tools.store_user(member)
-               continue
-           
-           roleList = []
-           for role in member.roles:
-               if role.id != guild.id: # Ignore @everyone
-                   roleList.append(role.id)
+            doc = db.find_one({'_id': member.id})
+            if not doc:
+                await tools.store_user(member)
+                continue
 
-           if roleList == doc['roles']:
-               continue
-           
-           db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
+            roleList = []
+            for role in member.roles:
+                if role.id != guild.id:  # Ignore @everyone
+                    roleList.append(role.id)
+
+            if roleList == doc['roles']:
+                continue
+
+            db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
         logging.info('[Core] User database syncronization complete')
         return await interaction.followup.send('Done.')
 
