@@ -321,7 +321,6 @@ class Games(commands.Cog, name='Games'):
     async def _games_info(self, interaction: discord.Interaction):
         '''Check search database status'''
         await interaction.response.defer()
-        # releases_url = f'https://www.giantbomb.com/games?game_filter[platform]={GIANTBOMB_NSW_ID}'
         embed = discord.Embed(
             title='Game Search Database Status',
             description=(
