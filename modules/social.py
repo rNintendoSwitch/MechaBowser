@@ -811,7 +811,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f'\n\n- **Add Your Friend Code**: </profile friendcode:{commandID}> Add your friend code to allow friend requests!'
             f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone. You can find yours by clicking [here](https://www.timezoneconverter.com/cgi-bin/findzone.tzc).'
             f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji on your card!'
-            f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.'
+            f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 5 of your Switch game faves.'
             f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. '
             'Earn more in events (like Trivia) to make your card pop!'
             '\n**Get Some Trophies**\nEarn a trophy when you participate in server events and Trivia!\n'
