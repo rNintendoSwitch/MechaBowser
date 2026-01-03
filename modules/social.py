@@ -624,24 +624,87 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 game_name_font = fonts['medium'][self._determine_cjk_font(gameName)]
 
-                lineNum = 1
-                lineHeight = gameTextLocations[gameCount]
-                for char in gameName:
-                    if nameW >= nameWMax:
-                        if lineNum == 3:
-                            draw.text((nameW, lineHeight), '...', tuple(theme["primary"]), font=game_name_font)
+                # Word wrap logic with overflow protection
+                words = gameName.split()
+                lines = []
+                current_line = []
+                current_w = 0
+                
+                # Use nameW as the starting X coordinate for all lines
+                start_x = nameW
+                max_w = nameWMax - start_x
+                space_w = game_name_font.getsize(' ')[0]
+
+                for word in words:
+                    word_w = game_name_font.getsize(word)[0]
+
+                    # Handle massive words that don't fit on a single line
+                    if word_w > max_w:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = []
+                            current_w = 0
+
+                        # Split the long word by character
+                        partial_word = ""
+                        partial_w = 0
+                        for char in word:
+                            char_w = game_name_font.getsize(char)[0]
+                            if partial_w + char_w > max_w:
+                                lines.append(partial_word)
+                                partial_word = char
+                                partial_w = char_w
+                            else:
+                                partial_word += char
+                                partial_w += char_w
+                        
+                        if partial_word:
+                            current_line = [partial_word]
+                            current_w = partial_w + space_w
+
+                    # Handle normal words
+                    elif current_w + word_w <= max_w:
+                        current_line.append(word)
+                        current_w += word_w + space_w
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                        current_line = [word]
+                        current_w = word_w + space_w
+
+                if current_line:
+                    lines.append(' '.join(current_line))
+
+                # Safety: Limit to 3 lines and trim for ellipsis
+                if len(lines) > 3:
+                    lines = lines[:3]
+                    ellipsis = "..."
+                    ellipsis_w = game_name_font.getsize(ellipsis)[0]
+
+                    # Shrink the last line until "..." fits
+                    while lines[-1]:
+                        current_line_w = game_name_font.getsize(lines[-1])[0]
+                        if current_line_w + ellipsis_w <= max_w:
                             break
+                        lines[-1] = lines[-1][:-1]  # Remove last char
+                    
+                    lines[-1] += ellipsis
 
-                        lineNum += 1
-                        lineHeight += 40  # px
-                        nameW = 1285
-                        if char == ' ':
-                            continue
+                # Safety: Limit to 3 lines
+                if len(lines) > 3:
+                    lines = lines[:3]
+                    lines[-1] += "..."
 
-                    draw.text((nameW, lineHeight), char, tuple(theme["primary"]), font=game_name_font)
-                    nameW += game_name_font.getsize(char)[0]
+                # Draw the wrapped lines
+                # Use gameTextLocations[gameCount] as the starting Y
+                y_pos = gameTextLocations[gameCount]
+                
+                for line in lines:
+                    # Draw text at the stored start_x
+                    draw.text((start_x, y_pos), line, tuple(theme["primary"]), font=game_name_font)
+                    y_pos += 40  # Increase height by 40px for next line
+
                 gameCount += 1
-
         if gameCount == 0:  # No games rendered
             self._draw_text(draw, (1150, 130), 'Not specified', theme["secondary_heading"], fonts['medium'])
 
