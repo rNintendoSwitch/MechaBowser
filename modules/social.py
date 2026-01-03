@@ -629,7 +629,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 lines = []
                 current_line = []
                 current_w = 0
-                
+
                 # Use nameW as the starting X coordinate for all lines
                 start_x = nameW
                 max_w = nameWMax - start_x
@@ -657,7 +657,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                             else:
                                 partial_word += char
                                 partial_w += char_w
-                        
+
                         if partial_word:
                             current_line = [partial_word]
                             current_w = partial_w + space_w
@@ -687,7 +687,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         if current_line_w + ellipsis_w <= max_w:
                             break
                         lines[-1] = lines[-1][:-1]  # Remove last char
-                    
+
                     lines[-1] += ellipsis
 
                 # Safety: Limit to 3 lines
@@ -698,7 +698,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 # Draw the wrapped lines
                 # Use gameTextLocations[gameCount] as the starting Y
                 y_pos = gameTextLocations[gameCount]
-                
+
                 for line in lines:
                     # Draw text at the stored start_x
                     draw.text((start_x, y_pos), line, tuple(theme["primary"]), font=game_name_font)
