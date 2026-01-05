@@ -53,7 +53,7 @@ class MainEvents(commands.Cog):
         guild = guild_db.find_one({'_id': config.nintendoswitch})
 
         if not guild:
-            guild_db.insert(
+            guild_db.insert_one(
                 {
                     "_id": config.nintendoswitch,
                     "inviteWhitelist": [config.nintendoswitch],
