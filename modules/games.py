@@ -24,6 +24,7 @@ mclient = pymongo.MongoClient(config.mongoURI)
 
 AUTO_SYNC = False
 SEARCH_RATIO_THRESHOLD = 50
+DEKU_UTM = "utm_campaign=rnintendoswitch&utm_medium=social&utm_source=discord"
 
 
 class DekuDeals:
@@ -34,7 +35,7 @@ class DekuDeals:
     async def fetch_games(self, platform: str):
         offset = 0
 
-        for _ in range(1, 5):  # TODO: change this to 1000 later or something
+        for _ in range(1, 1500):
             async with aiohttp.ClientSession() as session:
                 headers = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
                 params = {'api_key': self.api_key, 'offset': offset}
@@ -103,10 +104,7 @@ class Games(commands.Cog, name='Games'):
 
                     # Readd the release fields in a platform subset
                     for field in release_fields:
-                        if field not in filtered_update_dict:
-                            filtered_update_dict[field] = dict()
-
-                        filtered_update_dict[field][platform] = game[field] if field in game else None
+                        filtered_update_dict[f"{field}.{platform}"] = game[field] if field in game else None
 
                     self.db.update_one({'deku_id': game['deku_id']}, {'$set': filtered_update_dict}, upsert=True)
                     count += 1
@@ -156,78 +154,13 @@ class Games(commands.Cog, name='Games'):
 
         return match
 
-    def get_preferred_name(self, guid: str) -> Optional[str]:
-        game = self.db.find_one({'_type': 'game', 'guid': guid}, projection={'name': 1, 'id': 1})
-        if not game:
-            return None
-
-        releases_cursor = self.db.find({'_type': 'release', 'game.id': game['id']}, projection={'name': 1})
-        release_names = [release['name'] for release in list(releases_cursor)] if releases_cursor else []
-
-        if not release_names:
-            return game['name']
-
-        names = [re.sub('[^0-9a-zA-Z ]+', '', r.lower()) for r in release_names]  # Make lowercase and strip puncts.
-        words = [n.split(' ') for n in names]
-        shortest = min(words, key=len)
-
-        if any([name[: len(shortest)] != shortest for name in words]):
-            return game['name']
-
-        # Access the words in the name of a release to preserve casing and punctuation
-        str = ' '.join(release_names[0].split(' ')[: len(shortest)])
-        str = re.sub(r' \(Digital\)$', '', str)  # Remove end digital
-        str = re.sub(':$', '', str)  # Remove string end colons
-        return str
-
-    def parse_expected_release_date(self, item: dict, string: bool = False) -> Union[str, datetime, None]:
-        if item is None:
-            return None
-
-        if 'original_release_date' in item and item['original_release_date']:  # Games
-            return None
-
-        if 'release_date' in item and item['release_date']:  # Releases
-            return None
-
-        year = item['expected_release_year']
-        month = item['expected_release_month']
-        quarter = item['expected_release_quarter']
-        day = item['expected_release_day']
-
-        if not year:
-            return None
-
-        # Has year...
-        if not month:
-            if not quarter:
-                # Year only:
-                return f'{year}' if string else datetime(year, 12, 31)
-
-            # Year and quarter, but no month:
-            QUARTER_END_DATES = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
-            quarter_end = QUARTER_END_DATES[quarter]
-            return f'Q{quarter} {year}' if string else datetime(year, quarter_end[0], quarter_end[1])
-
-        # Has month and year...
-        if not day:
-            # Has year and month, but no day:
-            last_day = calendar.monthrange(year, month)[1]
-            return f'{calendar.month_abbr[month]}. {year}' if string else datetime(year, month, last_day)
-
-        # Has month, day, and year:
-        return f'{calendar.month_abbr[month]}. {day}, {year}' if string else datetime(year, month, day)
-
-    async def get_image(self, guid: str, type: str, as_url: bool = False) -> Union[str, None]:
-        game = self.db.find_one({'_type': 'game', 'guid': guid}, projection={'image': 1})
+    async def get_image(self, deku_id: str, as_url: bool = False) -> Union[str, None]:
+        game = self.db.find_one({'deku_id': deku_id}, projection={'image': 1})
 
         if not game or 'image' not in game or type not in game['image']:
             return None
 
-        url = game['image'][type]
-
-        if 'gb_default' in url:
-            return None
+        url = game['image']
 
         if as_url:
             return url
@@ -237,6 +170,7 @@ class Games(commands.Cog, name='Games'):
                 resp.raise_for_status()
                 data = await resp.read()
                 return io.BytesIO(data)
+            
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class GamesCommand(app_commands.Group):
         pass
@@ -249,102 +183,101 @@ class Games(commands.Cog, name='Games'):
     async def _games_search(self, interaction: discord.Interaction, query: str):
         '''Search for Nintendo Switch games'''
         await interaction.response.defer()
-        game = self.search(query)
+        result = self.search(query)
+
+        if result and result['deku_id']:
+            game = self.db.find_one({'deku_id': result['deku_id']})
 
         if game:
             embed = discord.Embed(
                 title=game['name'],
-                description=game["deck"],
-                url=f"https://web.archive.org/web/{game['site_detail_url']}",
-                timestamp=game['date_last_updated'],
+                url=f"{game['deku_link']}?{DEKU_UTM}&utm_content=mechabowser-game-search",
+                timestamp=self.get_db_last_update()
             )
+            embed.set_footer(text=f'Data last fetched')
+
             embed.set_author(
-                name='Data via GiantBomb',
-                url=f'https://www.giantbomb.com/api',
-                icon_url='https://avatars.githubusercontent.com/u/214028297',
+                name='Data provided by DekuDeals',
+                url=f'https://www.dekudeals.com/games?{DEKU_UTM}&utm_content=mechabowser-game-search',
+                icon_url='https://www.dekudeals.com/favicon-32x32.png'
             )
 
-            image = await self.get_image(result['guid'], 'small_url', as_url=True)
-            if image:
-                embed.set_thumbnail(url=image)
+            if game['image']:
+                embed.set_thumbnail(url=game['image'])
 
-            embed.set_footer(text=f'{result["score"] }% confident ⯁ Entry last updated')
+            # Release Dates
+            dates = {}
 
-            # TODO: publishers/developers
+            if game["release_date"] and "switch_1" in game["release_date"] and game["release_date"]["switch_1"]:
+                dates["Switch"] = game["release_date"]["switch_1"].date()
+            elif 'switch_1' in game['_last_synced']:
+                dates["Switch"] = "*Unknown*"
 
-            # Build release date line
-            if self.parse_expected_release_date(game):
-                game_desc = f'\n**Expected Release Date:** {self.parse_expected_release_date(game, True)}'
-            elif game["original_release_date"]:
-                game_desc = f'\n**Release Date:** {game["original_release_date"].strftime("%b. %d, %Y")}'
-            else:
-                game_desc = f'\n**Release Date:** *Unknown*'
+            if game["release_date"] and "switch_2" in game["release_date"] and game["release_date"]["switch_2"]:
+                dates["Switch 2"] = game["release_date"]["switch_2"].date()
+            elif 'switch_2' in game['_last_synced']:
+                dates["Switch 2"] = "*Unknown*"
+                
+            lines = []
+            for platform, date in dates.items():
+                lines.append(f"{platform}: {date}")
 
-            if name != game['name']:  # Our preferred name is not actual name
-                game_desc = f'**Common title:** {game["name"]}\n{game_desc}'
+            
+            s = "" if len(dates) == 1 else "s"
+            embed.add_field(name=f'Release Date{s}', value="\n".join(lines), inline=False)
 
-            embed.add_field(name=f'General Game Details', value=game_desc, inline=False)
+            # eShop Prices
+            if game["eshop_price"]:
+                prices = {}
 
-            # Build info about switch releases
-            release_count = self.db.count({'_type': 'release', 'game.id': game['id']})
-            if release_count:
-                releases = self.db.find({'_type': 'release', 'game.id': game['id']})
+                if "switch_1" in game["eshop_price"] and game["eshop_price"]["switch_1"]:
+                    if "us"  in game["eshop_price"]["switch_1"] and game["eshop_price"]["switch_1"]["us"]:
+                        prices["Switch"] = game["eshop_price"]["switch_1"]["us"]
 
-                dates = {'oldest': None, 'newest': None}
-                ratelimited = False
-                dev_counter = collections.Counter()
-                pub_counter = collections.Counter()
-
-                for release in releases:
-                    release['_date'] = release['release_date'] or self.parse_expected_release_date(release)
-
-                    if release['_date']:
-                        if not dates['oldest']:
-                            dates['oldest'] = release
-                            dates['newest'] = release
-
-                        if release['_date'] < dates['oldest']['_date']:
-                            dates['oldest'] = release
-
-                        if release['_date'] > dates['newest']['_date']:
-                            dates['newest'] = release
-
-                switch_desc = (
-                    f'[**{release_count} known Nintendo Switch release{("" if release_count == 1 else "s")}**]'
-                    f'(https://web.archive.org/web/{game["site_detail_url"]}releases)'
-                )
-
-                # Build release date line
-                date_strs = {}
-                for key, release in dates.items():
-                    if release:
-                        if self.parse_expected_release_date(release):
-                            date_strs[key] = self.parse_expected_release_date(release, True)
-                        elif release["release_date"]:
-                            date_strs[key] = release["release_date"].strftime("%b. %d, %Y")
-                        else:
-                            date_strs[key] = "*Unknown*"
+                if "switch_2" in game["eshop_price"] and game["eshop_price"]["switch_2"]:
+                    if "us"  in game["eshop_price"]["switch_2"] and game["eshop_price"]["switch_2"]["us"]:
+                        prices["Switch 2"] = game["eshop_price"]["switch_2"]["us"]
+                
+                lines = []
+                for platform, price in prices.items():
+                    msrp = price['msrp']/100
+                    curr = price['price']/100
+                    
+                    if curr < msrp:
+                        lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f}")
                     else:
-                        date_strs[key] = "*Unknown*"
+                        lines.append(f"{platform}: ${curr:.2f}")
 
-                if dates['newest'] == dates['oldest']:  # Only 1 date
-                    expected_prefix = 'Expected ' if self.parse_expected_release_date(dates['oldest']) else ""
-                    switch_desc += f'\n**{expected_prefix}Release Date:** {date_strs["oldest"]}'
+                if lines:
+                    s = "" if len(prices) == 1 else "s"
+                    embed.add_field(name=f'US eShop Price{s}', value="\n".join(lines), inline=False)
 
-                else:
-                    EXPECTED_PREFIXES = {0: '', 1: '(Expected) ', 2: 'Expected '}
-                    expected_count = [bool(self.parse_expected_release_date(x)) for _, x in dates.items()].count(True)
-                    expected_prefix = EXPECTED_PREFIXES[expected_count]
-                    date_str = f'{date_strs["oldest"]} - {date_strs["newest"]}'
+            # Devs and Pubs
+            if game['developers']:
+                s = "" if len(game['developers']) == 1 else "s"
+                embed.add_field(name=f'Developer{s}', value=" ,".join(game['developers']), inline=True)
 
-                    switch_desc += f'\n**{expected_prefix}Release Dates:** {date_str}'
-
-                embed.add_field(name=f'Nintendo Switch Releases', value=switch_desc, inline=False)
+            if game['publishers']:
+                s = "" if len(game['publishers']) == 1 else "s"
+                embed.add_field(name=f'Publisher{s}', value=" ,".join(game['publishers']), inline=True)
 
             return await interaction.followup.send(embed=embed)
 
         else:
             return await interaction.followup.send(f'{config.redTick} No results found.')
+        
+    def get_db_last_update(self):
+        if self.last_sync['at']:
+            return self.last_sync['at']
+        
+        else:
+            newest_sw1_update_game = self.db.find_one(sort=[("_last_synced.switch_1", -1)])
+            newest_sw2_update_game = self.db.find_one(sort=[("_last_synced.switch_2", -1)])
+
+            if newest_sw1_update_game['_last_synced']['switch_1'] > newest_sw2_update_game['_last_synced']['switch_2']:
+                return newest_sw1_update_game['_last_synced']['switch_1']
+            else:
+                return newest_sw2_update_game['_last_synced']['switch_2']
 
     @games_group.command(name='info', description='Check the status of the games search database')
     @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
@@ -354,8 +287,8 @@ class Games(commands.Cog, name='Games'):
         embed = discord.Embed(
             title='Game Search Database Status',
             description=(
-                'Game search data provided by [Deku Deals](https://www.dekudeals.com/games?utm_campaign=rnintendoswitch'
-                '&utm_medium=social&utm_source=discord&utm_content=mechabowser-game-status).'
+                'Game data provided by '
+                f'[Deku Deals](https://www.dekudeals.com/games?{DEKU_UTM}&utm_content=mechabowser-game-status)'
             ),
         )
 
@@ -363,24 +296,20 @@ class Games(commands.Cog, name='Games'):
         embed.add_field(name='Games Stored', value=game_count, inline=True)
 
         if self.last_sync['running']:
-            last_sync = f"*In-progress...*"
-        elif self.last_sync['at']:
-            last_sync = f"<t:{int(self.last_sync['at'].timestamp())}:R>"
+            last_sync = f"*Fetch in-progress...*"
         else:
-            newest_update_game = self.db.find_one(sort=[("_last_synced.switch_1", -1)])
-            last_sync = f"<t:{int(newest_update_game['_last_synced']['switch_1'].timestamp())}:R>"
+            last_sync = f"<t:{int(self.get_db_last_update().timestamp())}:R>"
 
-        embed.add_field(name=f'Last Sync', value=last_sync, inline=True)
+        embed.add_field(name=f'Last Fetch', value=last_sync, inline=True)
 
         return await interaction.followup.send(embed=embed)
 
     # called by core.py
     async def games_sync(self, interaction: discord.Interaction):
-        '''Force a database sync'''
-        await interaction.response.send_message('Running sync...')
+        await interaction.response.send_message('Running fetch...')
 
         count = await self.sync_db()
-        message = f'{config.greenTick} Finished syncing {count} games'
+        message = f'{config.greenTick} Finished fetching {count} games'
         return await interaction.edit_original_response(content=message)
 
 

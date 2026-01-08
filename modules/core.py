@@ -811,7 +811,7 @@ class MainEvents(commands.Cog):
             f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
         )
 
-    @update_group.command(name='gamedb', description='Sync the games database with GiantBomb')
+    @update_group.command(name='gamedb', description='Fetch games database updates from DekuDeals')
     @app_commands.default_permissions(view_audit_log=True)
     async def _update_game_db(self, interaction: discord.Interaction):
         gamesCog = self.bot.get_cog('Games')
