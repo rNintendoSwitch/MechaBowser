@@ -197,7 +197,7 @@ class Games(commands.Cog, name='Games'):
                 timestamp=self.get_db_last_update(),
             )
             embed.set_footer(
-                text=f'Data provided by DekuDeals ⯁ Last fetched',
+                text=f'Data provided by DekuDeals',
                 icon_url='https://www.dekudeals.com/favicon-32x32.png',
             )
 
@@ -242,7 +242,8 @@ class Games(commands.Cog, name='Games'):
                     curr = price['price'] / 100 if price['price'] else None
 
                     if curr and msrp and curr < msrp:
-                        lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f}")
+                        discount = (1 - curr/msrp)*100
+                        lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f} *(-{discount:.0f}%)*")
                     elif curr:
                         lines.append(f"{platform}: ${curr:.2f}")
                     else:
