@@ -1,9 +1,9 @@
 import calendar
 import collections
+import copy
 import io
 import logging
 import re
-import copy
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Literal, Optional, Tuple, Union
 
@@ -67,13 +67,7 @@ class Games(commands.Cog, name='Games'):
 
         # Generate the pipeline
         self.pipeline = [
-            {
-                '$project': {
-                    'deku_id': 1,
-                    'name': 1,
-                    'release_date': 1
-                }
-            },  # Filter to only stuff we want
+            {'$project': {'deku_id': 1, 'name': 1, 'release_date': 1}},  # Filter to only stuff we want
         ]
         self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
 
@@ -103,16 +97,16 @@ class Games(commands.Cog, name='Games'):
 
                     if game['release_date']:
                         game['release_date'] = parser.parse(game['release_date'])
-                    
+
                     # Filter out fields unique to releases and upsert
                     filtered_update_dict = {k: v for k, v in game.items() if k not in release_fields}
 
                     # Readd the release fields in a platform subset
                     for field in release_fields:
-                            if field not in filtered_update_dict:
-                                filtered_update_dict[field] = dict()
-                            
-                            filtered_update_dict[field][platform] = game[field] if field in game else None
+                        if field not in filtered_update_dict:
+                            filtered_update_dict[field] = dict()
+
+                        filtered_update_dict[field][platform] = game[field] if field in game else None
 
                     self.db.update_one({'deku_id': game['deku_id']}, {'$set': filtered_update_dict}, upsert=True)
                     count += 1
@@ -129,17 +123,12 @@ class Games(commands.Cog, name='Games'):
 
                 unset_dict[field][platform] = ''
 
-            self.db.update_many(
-                {'_last_synced': {platform: {'$lt': sync_time}}},
-                {'$unset': unset_dict})
+            self.db.update_many({'_last_synced': {platform: {'$lt': sync_time}}}, {'$unset': unset_dict})
 
         # If items were not updated, delete them
-        self.db.delete_many({
-            "$or": [
-                { "_last_synced.switch_1": {'$lt': sync_time} },
-                { "_last_synced.switch_2": {'$lt': sync_time} }
-            ]
-        })
+        self.db.delete_many(
+            {"$or": [{"_last_synced.switch_1": {'$lt': sync_time}}, {"_last_synced.switch_2": {'$lt': sync_time}}]}
+        )
 
         logging.info(f'[Games] Finished syncing {count} games')
 
