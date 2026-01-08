@@ -820,34 +820,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return embed, main_img  # Both need to be passed into a message for image embedding to function
 
-    @commands.group(name='profile', invoke_without_command=True)
-    async def _old_profile_redirect(self, ctx):
-        for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
-            # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
-                break
-
-        commandStr = f'</profile view:{command.extras["id"]}>'
-        await ctx.message.reply(
-            f':repeat: Hi there! I no longer use text commands. Instead, please repeat your command using {commandStr} as a slash command instead',
-            delete_after=10,
-        )
-        await ctx.message.delete()
-
-    @_old_profile_redirect.command(name='edit')
-    async def _old_profile_redirect_edit(self, ctx):
-        for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
-            # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
-                break
-
-        commandStr = f'</profile edit:{command.extras["id"]}>'
-        await ctx.message.reply(
-            f':repeat: Hi there! I no longer use text commands. Instead, please repeat your command using {commandStr} as a slash command instead',
-            delete_after=10,
-        )
-        await ctx.message.delete()
-
     async def _profile_friendcode_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:
