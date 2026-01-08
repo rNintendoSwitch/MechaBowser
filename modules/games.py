@@ -172,7 +172,7 @@ class Games(commands.Cog, name='Games'):
                 resp.raise_for_status()
                 data = await resp.read()
                 return io.BytesIO(data)
-            
+
     def get_name(self, deku_id: str):
         document = self.db.find_one({'deku_id': deku_id}, projection={'name': 1})
         return document['name'] if document else None
