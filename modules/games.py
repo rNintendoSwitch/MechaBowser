@@ -143,7 +143,9 @@ class Games(commands.Cog, name='Games'):
             rem_punc = re.compile('[^0-9a-zA-Z ]+')
 
             # Remove punctuation and casing for name and query
-            scores = [method(rem_punc.sub('', game['name'].lower()), rem_punc.sub('', query.lower())) for method in methods]
+            scores = [
+                method(rem_punc.sub('', game['name'].lower()), rem_punc.sub('', query.lower())) for method in methods
+            ]
             score = sum(scores) / len(methods)
 
             if not match['score'] or (score > match['score']):
@@ -170,7 +172,7 @@ class Games(commands.Cog, name='Games'):
                 resp.raise_for_status()
                 data = await resp.read()
                 return io.BytesIO(data)
-            
+
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class GamesCommand(app_commands.Group):
         pass
