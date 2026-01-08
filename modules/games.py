@@ -433,7 +433,7 @@ class Games(commands.Cog, name='Games'):
         embed.add_field(name=f'Last Sync', value=f'<t:{last_sync}:R>', inline=False)
 
         return await interaction.followup.send(embed=embed)
-    
+
     # called by core.py
     async def games_sync(self, interaction: discord.Interaction):
         '''Force a database sync'''
@@ -442,7 +442,6 @@ class Games(commands.Cog, name='Games'):
         count = await self.sync_db()
         message = f'{config.greenTick} Finished syncing {count} games'
         return await interaction.edit_original_response(content=message)
-
 
 
 async def setup(bot):
