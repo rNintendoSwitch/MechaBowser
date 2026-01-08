@@ -246,8 +246,10 @@ class Games(commands.Cog, name='Games'):
                         lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f} *(-{discount:.0f}%)*")
                     elif curr:
                         lines.append(f"{platform}: ${curr:.2f}")
-                    else:
+                    elif msrp:
                         lines.append(f"{platform}: ${msrp:.2f}")
+                    else:
+                        lines.append(f"{platform}: Free")
 
                 if lines:
                     s = "" if len(prices) == 1 else "s"
