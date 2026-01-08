@@ -810,7 +810,7 @@ class MainEvents(commands.Cog):
         return await interaction.channel.send(
             f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
         )
-    
+
     @update_group.command(name='gamedb', description='Sync the games database with GiantBomb')
     @app_commands.describe(full='Determines if it should be a full sync, or a partial')
     @app_commands.default_permissions(view_audit_log=True)

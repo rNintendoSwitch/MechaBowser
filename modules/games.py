@@ -60,8 +60,8 @@ class Games(commands.Cog, name='Games'):
         self.db = mclient.bowser.games
 
         self.last_sync = {
-        'part': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
-        'full': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
+            'part': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
+            'full': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
         }
 
         # TODO uncomment
@@ -457,7 +457,7 @@ class Games(commands.Cog, name='Games'):
         embed.add_field(name=f'Last Sync', value=f'<t:{last_sync}:R>', inline=False)
 
         return await interaction.followup.send(embed=embed)
-    
+
     # called by core.py
     async def games_sync(self, interaction: discord.Interaction, full: bool):
         '''Force a database sync'''
@@ -466,7 +466,6 @@ class Games(commands.Cog, name='Games'):
         c, detail = await self.sync_db(full)
         message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
         return await interaction.edit_original_response(content=message)
-
 
 
 async def setup(bot):
