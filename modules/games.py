@@ -242,13 +242,15 @@ class Games(commands.Cog, name='Games'):
                 
                 lines = []
                 for platform, price in prices.items():
-                    msrp = price['msrp']/100
-                    curr = price['price']/100
+                    msrp = price['msrp']/100 if price['msrp'] else None
+                    curr = price['price']/100 if price['price'] else None
                     
-                    if curr < msrp:
+                    if curr and msrp and curr < msrp:
                         lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f}")
-                    else:
+                    elif curr:
                         lines.append(f"{platform}: ${curr:.2f}")
+                    else:
+                        lines.append(f"{platform}: ${msrp:.2f}")
 
                 if lines:
                     s = "" if len(prices) == 1 else "s"
