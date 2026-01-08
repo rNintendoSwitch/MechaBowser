@@ -194,14 +194,14 @@ class Games(commands.Cog, name='Games'):
             embed = discord.Embed(
                 title=game['name'],
                 url=f"{game['deku_link']}?{DEKU_UTM}&utm_content=mechabowser-game-search",
-                timestamp=self.get_db_last_update()
+                timestamp=self.get_db_last_update(),
             )
             embed.set_footer(text=f'Data last fetched')
 
             embed.set_author(
                 name='Data provided by DekuDeals',
                 url=f'https://www.dekudeals.com/games?{DEKU_UTM}&utm_content=mechabowser-game-search',
-                icon_url='https://www.dekudeals.com/favicon-32x32.png'
+                icon_url='https://www.dekudeals.com/favicon-32x32.png',
             )
 
             if game['image']:
@@ -219,12 +219,11 @@ class Games(commands.Cog, name='Games'):
                 dates["Switch 2"] = game["release_date"]["switch_2"].date()
             elif 'switch_2' in game['_last_synced']:
                 dates["Switch 2"] = "*Unknown*"
-                
+
             lines = []
             for platform, date in dates.items():
                 lines.append(f"{platform}: {date}")
 
-            
             s = "" if len(dates) == 1 else "s"
             embed.add_field(name=f'Release Date{s}', value="\n".join(lines), inline=False)
 
@@ -233,13 +232,13 @@ class Games(commands.Cog, name='Games'):
                 prices = {}
 
                 if "switch_1" in game["eshop_price"] and game["eshop_price"]["switch_1"]:
-                    if "us"  in game["eshop_price"]["switch_1"] and game["eshop_price"]["switch_1"]["us"]:
+                    if "us" in game["eshop_price"]["switch_1"] and game["eshop_price"]["switch_1"]["us"]:
                         prices["Switch"] = game["eshop_price"]["switch_1"]["us"]
 
                 if "switch_2" in game["eshop_price"] and game["eshop_price"]["switch_2"]:
-                    if "us"  in game["eshop_price"]["switch_2"] and game["eshop_price"]["switch_2"]["us"]:
+                    if "us" in game["eshop_price"]["switch_2"] and game["eshop_price"]["switch_2"]["us"]:
                         prices["Switch 2"] = game["eshop_price"]["switch_2"]["us"]
-                
+
                 lines = []
                 for platform, price in prices.items():
                     msrp = price['msrp']/100 if price['msrp'] else None
@@ -269,11 +268,11 @@ class Games(commands.Cog, name='Games'):
 
         else:
             return await interaction.followup.send(f'{config.redTick} No results found.')
-        
+
     def get_db_last_update(self):
         if self.last_sync['at']:
             return self.last_sync['at']
-        
+
         else:
             newest_sw1_update_game = self.db.find_one(sort=[("_last_synced.switch_1", -1)])
             newest_sw2_update_game = self.db.find_one(sort=[("_last_synced.switch_2", -1)])
