@@ -156,10 +156,10 @@ class Games(commands.Cog, name='Games'):
 
         return match
 
-    async def get_image(self, deku_id: str, as_url: bool = False) -> Union[str, None]:
+    async def get_image(self, deku_id: str, as_url: bool = False):
         game = self.db.find_one({'deku_id': deku_id}, projection={'image': 1})
 
-        if not game or 'image' not in game or type not in game['image']:
+        if not game or 'image' not in game:
             return None
 
         url = game['image']
@@ -172,6 +172,10 @@ class Games(commands.Cog, name='Games'):
                 resp.raise_for_status()
                 data = await resp.read()
                 return io.BytesIO(data)
+            
+    def get_name(self, deku_id: str):
+        document = self.db.find_one({'deku_id': deku_id}, projection={'name': 1})
+        return document['name'] if document else None
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class GamesCommand(app_commands.Group):

@@ -15,12 +15,9 @@ import codepoints
 import config  # type: ignore
 import discord
 import emoji_data
-import gridfs
 import numpy as np
 import pymongo
 import pytz
-import requests
-import token_bucket
 import yaml
 from discord import app_commands
 from discord.ext import commands
@@ -39,10 +36,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.inprogressEdits = {}
 
         self.Games = self.bot.get_cog('Games')
-
-        # !profile ratelimits
-        self.bucket_storage = token_bucket.MemoryStorage()
-        self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
 
         # Add context menus to command tree
         self.profileContextMenu = app_commands.ContextMenu(
@@ -125,8 +118,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
         self.easter_egg_games = {
-            self.bot.user.id: ["3030-80463"],  # Super Mario 3D All-Stars
-            config.parakarry: ["3030-89844"],  # Paper Mario: The Thousand-Year Door
+            self.bot.user.id: ["602caef0-b928-4dcb-8785-3da2a7fb747d"], # Super Mario 3D All-Stars
+            config.parakarry: [
+                "c47d6eda-ae22-4036-afca-bb7df4e81738", # Paper Mario: The Thousand-Year Door
+                "dd2dbc1d-938c-495a-a630-75ac96024695" #  Nintendo 64 – Nintendo Classics
+            ], 
         }
 
         self.easter_egg_text = [  # Message text for bot easter egg, keep under 12 chars
@@ -349,12 +345,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    async def _cache_game_img(self, guid: str, theme) -> Image:
+    async def _cache_game_img(self, deku_id: str, theme) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
-        if guid in self.gameImgCache:
-            if time.time() > self.gameImgCache[guid][EXPIRY]:  # Expired in cache
+        if deku_id in self.gameImgCache:
+            if time.time() > self.gameImgCache[deku_id][EXPIRY]:  # Expired in cache
                 do_recache = True
         else:  # Not in cache
             do_recache = True
@@ -364,7 +360,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 return theme['missingImage']
 
             try:
-                gameImg = await self.Games.get_image(guid, 'icon_url')
+                gameImg = await self.Games.get_image(deku_id)
 
                 if gameImg:
                     gameIcon = Image.open(gameImg).convert('RGBA').resize((120, 120))
@@ -375,12 +371,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 logging.error('Error caching game icon', exc_info=e)
                 gameIcon = None
 
-            self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
+            self.gameImgCache[deku_id] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
 
-        if self.gameImgCache[guid][IMAGE] is None:
+        if self.gameImgCache[deku_id][IMAGE] is None:
             return theme['missingImage']
 
-        return self.gameImgCache[guid][IMAGE]
+        return self.gameImgCache[deku_id][IMAGE]
 
     def _generate_background_preview(self, backgrounds) -> discord.File:
         # square_length: Gets smallest square dimensions that will fit length of backgrounds, ie len 17 -> 25
@@ -605,16 +601,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
             setGames = setGames[:5]  # Limit to 5 results, just in case
 
-            for game_guid in setGames:
+            for game_deku_id in setGames:
                 if not self.Games:
                     continue
 
-                gameName = self.Games.get_preferred_name(game_guid)
+                gameName = self.Games.get_name(game_deku_id)
 
                 if not gameName:
                     continue
 
-                gameIcon = await self._cache_game_img(game_guid, theme)
+                gameIcon = await self._cache_game_img(game_deku_id, theme)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 1285
@@ -786,12 +782,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         main_img = await self._generate_profile_card_from_member(member)
         embed.set_image(url='attachment://profile.png')
 
+        commandID = 0
         for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
             # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
+            if command.name == 'profile' and command.extras:
+                commandID = command.extras['id']
                 break
 
-        commandID = command.extras['id']
         if new_user:
             # We need to minorly modify description for info for first time user flow
             embed_description = (
@@ -986,39 +983,39 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         db = mclient.bowser.games
 
-        # If user selected an auto-complete result, we will be provided the guid automatically which saves effort
+        # If user selected an auto-complete result, we will be provided the deku_id automatically which saves effort
         flagConfirmation = False
         gameList = []
-        guid1 = db.find_one({'guid': game1})
-        guid2 = None if not game2 else db.find_one({'guid': game2})
-        guid3 = None if not game3 else db.find_one({'guid': game3})
-        guid4 = None if not game4 else db.find_one({'guid': game4})
-        guid5 = None if not game5 else db.find_one({'guid': game5})
+        deku_id1 = db.find_one({'deku_id': game1})
+        deku_id2 = None if not game2 else db.find_one({'deku_id': game2})
+        deku_id3 = None if not game3 else db.find_one({'deku_id': game3})
+        deku_id4 = None if not game4 else db.find_one({'deku_id': game4})
+        deku_id5 = None if not game5 else db.find_one({'deku_id': game5})
 
         games = [game1, game2, game3, game4, game5]
-        guids = [guid1, guid2, guid3, guid4, guid5]
+        deku_ids = [deku_id1, deku_id2, deku_id3, deku_id4, deku_id5]
 
-        def resolve_guid(game_name: str):
+        def resolve_deku_id(game_name: str):
             return self.Games.search(game_name)
 
         async def return_failure(interaction: discord.Interaction, game_name: str):
             return await interaction.followup.send(
-                f'{config.redTick} I was unable to match the game named "{game_name}" with any game released on the Nintendo Switch. Please try again, or contact a moderator if you believe this is in error'
+                f'{config.redTick} I was unable to match the game named "{game_name}". Please try again, or contact DM Parakarry if you believe this is in error'
             )
 
         flagConfirmation = False
-        for idx, guid in enumerate(guids):
+        for idx, deku_id in enumerate(deku_ids):
             if not games[idx]:
                 continue
 
-            if not guid:
+            if not deku_id:
                 flagConfirmation = True
-                guid = resolve_guid(games[idx])
+                deku_id = resolve_deku_id(games[idx])
 
-            if not guid:
+            if not deku_id:
                 return await return_failure(interaction, games[idx])
 
-            gameList.append(guid['guid'])
+            gameList.append(deku_id['deku_id'])
 
         msg = None
         if flagConfirmation:
@@ -1027,7 +1024,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 title='Are these games correct?', description='*Use the buttons below to confirm*', color=0xF5FF00
             )
             for idx, game in enumerate(gameList):
-                embed.add_field(name=f'Game {idx + 1}', value=db.find_one({'guid': game})['name'])
+                embed.add_field(name=f'Game {idx + 1}', value=db.find_one({'deku_id': game})['name'])
 
             view = tools.NormalConfirmation(timeout=90.0)
             view.message = await interaction.followup.send(
@@ -1048,7 +1045,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             elif not view.value:
                 # User selected No
                 return await view.message.edit(
-                    content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please contact a moderator',
+                    content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please DM Parakarry',
                     embed=None,
                 )
 
@@ -1292,11 +1289,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'usertime': "Not specified",
             'trophies': [None] * 18,
             'games': [
-                '3030-88442',
-                '3030-87348',
-                '3030-89546',
-                '3030-84825',
-                '3030-89623',
+                '01b3e429-9a02-4c45-a221-1b5cf101f433', # MEGA SIMULATOR BUNDLE - Forest Ranger Life Simulator...
+                '7dcab3d8-c1c1-4462-8807-3427c0a61a37', # G-Mode Archives+ Todo Ryunosuke Tantei Nikki Vol.6 ...
+                '344ca3de-1209-46c7-91da-96966951033b', # Puzzles & Colors Games for Kids Toddler Coloring Book Draw ...
+                '26eefce2-d2ea-4dee-a85b-c3680da69a1a', # THE Table Game Deluxe Pack -Mahjong, Go, Shogi, ...
+                '5b8bb732-f2fa-4964-a8f4-d102772506c5', # Prinny Presents NIS Classics Volume 2: Makai Kingdom: ...
             ],  # Games with really long titles
         }
 
