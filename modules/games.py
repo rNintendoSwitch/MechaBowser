@@ -34,7 +34,7 @@ class DekuDeals:
     async def fetch_games(self, platform: str):
         offset = 0
 
-        for _ in range(1, 2):  # TODO: change this to 1000 later or something
+        for _ in range(1, 5):  # TODO: change this to 1000 later or something
             async with aiohttp.ClientSession() as session:
                 headers = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
                 params = {'api_key': self.api_key, 'offset': offset}
@@ -44,10 +44,6 @@ class DekuDeals:
 
                 async with session.get(self.ENDPOINT, params=params, headers=headers) as resp:
                     resp_json = await resp.json()
-
-                    # debug
-                    # TODO: remove
-                    logging.info(f'[Games] sync: p={platform} o={offset} l={len(resp_json['games'])}')
 
                     for item in resp_json['games']:
                         yield item
@@ -64,13 +60,11 @@ class Games(commands.Cog, name='Games'):
         self.DekuDeals = DekuDeals(config.dekudeals)
         self.db = mclient.bowser.games
 
-        self.last_sync = {'at': None, 'count': 0, 'running': False}
+        self.last_sync = {'at': None, 'running': False}
 
-        # TODO uncomment
         # Ensure indices exist
         self.db.create_index([("deku_id", pymongo.ASCENDING)], unique=True)
 
-        # TODO: update pipeline?
         # Generate the pipeline
         self.pipeline = [
             {
@@ -149,30 +143,24 @@ class Games(commands.Cog, name='Games'):
 
         logging.info(f'[Games] Finished syncing {count} games')
 
-        self.last_sync = {'at': sync_time, 'count': count, 'running': False}
+        self.last_sync = {'at': sync_time, 'running': False}
         self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
 
         return count
 
     def search(self, query: str) -> Optional[dict]:
-        match = {'guid': None, 'score': None, 'name': None}
+        match = {'deku_id': None, 'score': None, 'name': None}
         for game in self.aggregatePipeline:
-            names = collections.Counter([game['name']])
-            if game['aliases']:
-                names.update(game['aliases'])
-            if game['_releases']:
-                names.update([release['name'] for release in game['_releases']])
 
-            for name in names:
-                methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
-                rem_punc = re.compile('[^0-9a-zA-Z ]+')
+            methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
+            rem_punc = re.compile('[^0-9a-zA-Z ]+')
 
-                # Remove punctuation and casing for name and query
-                scores = [method(rem_punc.sub('', name.lower()), rem_punc.sub('', query.lower())) for method in methods]
-                score = sum(scores) / len(methods)
+            # Remove punctuation and casing for name and query
+            scores = [method(rem_punc.sub('', game['name'].lower()), rem_punc.sub('', query.lower())) for method in methods]
+            score = sum(scores) / len(methods)
 
-                if not match['score'] or (score > match['score']):
-                    match = {'guid': game['guid'], 'score': score, 'name': name}
+            if not match['score'] or (score > match['score']):
+                match = {'deku_id': game['deku_id'], 'score': score, 'name': game['name']}
 
         if match['score'] < SEARCH_RATIO_THRESHOLD:
             return None
@@ -260,27 +248,6 @@ class Games(commands.Cog, name='Games'):
                 resp.raise_for_status()
                 data = await resp.read()
                 return io.BytesIO(data)
-
-    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
-    class GamesCommand(app_commands.Group):
-        pass
-
-    games_group = GamesCommand(name='game', description='Find out information about games for the Nintendo Switch!')
-
-    async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
-        if current:
-            game = self.search(current)
-
-        else:
-            # Current textbox is empty
-            return []
-
-        if game:
-            return [app_commands.Choice(name=game['name'], value=game['guid'])]
-
-        else:
-            return []
-
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class GamesCommand(app_commands.Group):
         pass
@@ -293,24 +260,11 @@ class Games(commands.Cog, name='Games'):
     async def _games_search(self, interaction: discord.Interaction, query: str):
         '''Search for Nintendo Switch games'''
         await interaction.response.defer()
-        user_guid = self.db.find_one({'guid': query.strip()})
-        game = None
-
-        if user_guid:
-            game = user_guid  # User clicked an autocomplete, giving us the exact guid
-            result = {'guid': user_guid['guid'], 'score': 100.0, 'name': user_guid['name']}
-
-        else:
-            result = self.search(query)
-
-        if not user_guid and result and result['guid']:
-            game = self.db.find_one({'_type': 'game', 'guid': result['guid']})
+        game = self.search(query)
 
         if game:
-            name = self.get_preferred_name(result['guid'])
-
             embed = discord.Embed(
-                title=name,
+                title=game['name'],
                 description=game["deck"],
                 url=f"https://web.archive.org/web/{game['site_detail_url']}",
                 timestamp=game['date_last_updated'],
@@ -325,11 +279,7 @@ class Games(commands.Cog, name='Games'):
             if image:
                 embed.set_thumbnail(url=image)
 
-            # Build footer; if an match was an alias/release name, add it to footer
-            has_alias = (result['name'] != name) and (result['name'] != game['name'])
-            alias_str = (' ("' + result['name'] + '")') if has_alias else ''
-
-            embed.set_footer(text=f'{result["score"] }% confident{alias_str} ⯁ Entry last updated')
+            embed.set_footer(text=f'{result["score"] }% confident ⯁ Entry last updated')
 
             # TODO: publishers/developers
 
@@ -415,22 +365,23 @@ class Games(commands.Cog, name='Games'):
         embed = discord.Embed(
             title='Game Search Database Status',
             description=(
-                'Our game search database is powered by the [GiantBomb API](https://www.giantbomb.com/api), filtered to'
-                ' Nintendo Switch releases.'
+                'Game search data provided by [Deku Deals](https://www.dekudeals.com/games?utm_campaign=rnintendoswitch'
+                '&utm_medium=social&utm_source=discord&utm_content=mechabowser-game-status).'
             ),
         )
 
-        game_count = self.db.count_documents({'_type': 'game'})
-        release_count = self.db.count_documents({'_type': 'release'})
+        game_count = self.db.count_documents({})
         embed.add_field(name='Games Stored', value=game_count, inline=True)
-        embed.add_field(name='Releases Stored', value=release_count, inline=True)
 
-        # TODO: Replace with new DekuDeals logic
-        # https://github.com/rNintendoSwitch/MechaBowser/blob/47ea5ba33bd2345356d7c0bd49c6b0ad7599f01c/modules/games.py#L558
-        newest_update_game = self.db.find_one(sort=[("date_last_updated", -1)])
-        last_sync = int(newest_update_game['date_last_updated'].timestamp())
+        if self.last_sync['running']:
+            last_sync = f"*In-progress...*"
+        elif self.last_sync['at']:
+            last_sync = f"<t:{int(self.last_sync['at'].timestamp())}:R>"
+        else:
+            newest_update_game = self.db.find_one(sort=[("_last_synced.switch_1", -1)])
+            last_sync = f"<t:{int(newest_update_game['_last_synced']['switch_1'].timestamp())}:R>"
 
-        embed.add_field(name=f'Last Sync', value=f'<t:{last_sync}:R>', inline=False)
+        embed.add_field(name=f'Last Sync', value=last_sync, inline=True)
 
         return await interaction.followup.send(embed=embed)
 
