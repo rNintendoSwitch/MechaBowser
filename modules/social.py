@@ -1,8 +1,8 @@
 import asyncio
 import glob
 import io
-import logging
 import json
+import logging
 import math
 import os
 import random
@@ -139,7 +139,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'Not specified',
             '???',
             'Reply hazy',
-            'Most likely'
+            'Most likely',
         ]
 
         self.INDEX, self.EMOTES = (0, 1)
@@ -1533,7 +1533,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await msg.edit(
                 content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(users) - failCount}/{len(users)} member(s).'
             )
-        
+
     @commands.group(name='migratefavgames', invoke_without_command=True)
     async def _migratefavgames(self, ctx):
         if ctx.author.id not in [
@@ -1547,8 +1547,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             game_lookup = json.load(f)
 
         db = mclient.bowser.users
-        
-        query = { "favgames": { '$exists': True, '$not': { '$size': 0 } } }
+
+        query = {"favgames": {'$exists': True, '$not': {'$size': 0}}}
         count = db.count_documents(query)
         users = db.find(query)
 
@@ -1571,10 +1571,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 # giantbomb id unknown
                 if game not in game_lookup:
-                    new_games[i] = game # keep the giantbomb id
+                    new_games[i] = game  # keep the giantbomb id
                     new_id_cache[game] = game
                     continue
-                
+
                 names = game_lookup[game]
 
                 score = 0
@@ -1587,7 +1587,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         deku_id = search['deku_id']
 
                 if not deku_id:
-                    new_games[i] = game # keep the giantbomb id
+                    new_games[i] = game  # keep the giantbomb id
                     new_id_cache[game] = game
                     continue
 
@@ -1598,8 +1598,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             db.update_one({'_id': user['_id']}, {'$set': {'favgames': new_games}}, upsert=True)
 
             # update the progress message
-            interval = (count//100)+1
-            if(((j+1) % interval) == 0):
+            interval = (count // 100) + 1
+            if ((j + 1) % interval) == 0:
                 await message.edit(content=f'Migrating... {j+1}/{count}')
 
         await message.edit(content=f'Migrating... {count}/{count}')
