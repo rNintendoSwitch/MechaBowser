@@ -259,11 +259,11 @@ class Games(commands.Cog, name='Games'):
             # Devs and Pubs
             if game['developers']:
                 s = "" if len(game['developers']) == 1 else "s"
-                embed.add_field(name=f'Developer{s}', value=" ,".join(game['developers']), inline=True)
+                embed.add_field(name=f'Developer{s}', value=", ".join(game['developers']), inline=True)
 
             if game['publishers']:
                 s = "" if len(game['publishers']) == 1 else "s"
-                embed.add_field(name=f'Publisher{s}', value=" ,".join(game['publishers']), inline=True)
+                embed.add_field(name=f'Publisher{s}', value=", ".join(game['publishers']), inline=True)
 
             return await interaction.followup.send(embed=embed)
 
