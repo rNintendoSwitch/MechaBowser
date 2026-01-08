@@ -349,7 +349,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    async def _cache_game_img(self, gamesDb, guid: str, theme) -> Image:
+    async def _cache_game_img(self, guid: str, theme) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
@@ -602,8 +602,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         setGames = profile['games']
         gameCount = 0
         if setGames:
-            gamesDb = mclient.bowser.games
-
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
             setGames = setGames[:5]  # Limit to 5 results, just in case
 
@@ -616,7 +614,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 if not gameName:
                     continue
 
-                gameIcon = await self._cache_game_img(gamesDb, game_guid, theme)
+                gameIcon = await self._cache_game_img(game_guid, theme)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 1285
