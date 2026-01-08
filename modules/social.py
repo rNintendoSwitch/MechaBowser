@@ -2,6 +2,7 @@ import asyncio
 import glob
 import io
 import logging
+import json
 import math
 import os
 import random
@@ -121,7 +122,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             self.bot.user.id: ["602caef0-b928-4dcb-8785-3da2a7fb747d"],  # Super Mario 3D All-Stars
             config.parakarry: [
                 "c47d6eda-ae22-4036-afca-bb7df4e81738",  # Paper Mario: The Thousand-Year Door
-                "dd2dbc1d-938c-495a-a630-75ac96024695",  #  Nintendo 64 – Nintendo Classics
+                "dd2dbc1d-938c-495a-a630-75ac96024695",  # Nintendo 64 – Nintendo Classics
             ],
         }
 
@@ -138,7 +139,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'Not specified',
             '???',
             'Reply hazy',
-            'Most likely',
+            'Most likely'
         ]
 
         self.INDEX, self.EMOTES = (0, 1)
@@ -944,7 +945,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         name='timezone',
         description='Pick your timezone to show on your profile and for when others are looking for group',
     )
-    @app_commands.describe(timezone='This is based on your region. I.e. "America/New_York')
+    @app_commands.describe(timezone='This is based on your region. e.g. "America/New_York')
     @app_commands.autocomplete(timezone=_profile_timezone_autocomplete)
     async def _profile_timezone(self, interaction: discord.Interaction, timezone: str):
         await interaction.response.defer(ephemeral=True)
@@ -986,16 +987,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         # If user selected an auto-complete result, we will be provided the deku_id automatically which saves effort
         flagConfirmation = False
         gameList = []
-        deku_id1 = db.find_one({'deku_id': game1})
-        deku_id2 = None if not game2 else db.find_one({'deku_id': game2})
-        deku_id3 = None if not game3 else db.find_one({'deku_id': game3})
-        deku_id4 = None if not game4 else db.find_one({'deku_id': game4})
-        deku_id5 = None if not game5 else db.find_one({'deku_id': game5})
+        doc1 = db.find_one({'deku_id': game1})
+        doc2 = None if not game2 else db.find_one({'deku_id': game2})
+        doc3 = None if not game3 else db.find_one({'deku_id': game3})
+        doc4 = None if not game4 else db.find_one({'deku_id': game4})
+        doc5 = None if not game5 else db.find_one({'deku_id': game5})
 
         games = [game1, game2, game3, game4, game5]
-        deku_ids = [deku_id1, deku_id2, deku_id3, deku_id4, deku_id5]
+        documents = [doc1, doc2, doc3, doc4, doc5]
 
-        def resolve_deku_id(game_name: str):
+        def resolve_document(game_name: str):
             return self.Games.search(game_name)
 
         async def return_failure(interaction: discord.Interaction, game_name: str):
@@ -1004,18 +1005,18 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         flagConfirmation = False
-        for idx, deku_id in enumerate(deku_ids):
+        for idx, document in enumerate(documents):
             if not games[idx]:
                 continue
 
-            if not deku_id:
+            if not document:
                 flagConfirmation = True
-                deku_id = resolve_deku_id(games[idx])
+                document = resolve_document(games[idx])
 
-            if not deku_id:
+            if not document:
                 return await return_failure(interaction, games[idx])
 
-            gameList.append(deku_id['deku_id'])
+            gameList.append(document['deku_id'])
 
         msg = None
         if flagConfirmation:
@@ -1532,6 +1533,77 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return await msg.edit(
                 content=f'{config.greenTick} {item.title()} `{name}` revoked from {len(users) - failCount}/{len(users)} member(s).'
             )
+        
+    @commands.group(name='migratefavgames', invoke_without_command=True)
+    async def _migratefavgames(self, ctx):
+        if ctx.author.id not in [
+            125233822760566784,  # MattBSG
+            123879073972748290,  # Lyrus
+        ]:
+            return await ctx.reply('no permission')
+        new_id_cache = dict()
+
+        with open('giantbomb_names.json') as f:
+            game_lookup = json.load(f)
+
+        db = mclient.bowser.users
+        
+        query = { "favgames": { '$exists': True, '$not': { '$size': 0 } } }
+        count = db.count_documents(query)
+        users = db.find(query)
+
+        message = await ctx.reply(f'Migrating... 0/{count}')
+
+        for j, user in enumerate(users):
+            new_games = user['favgames']
+
+            for i, game in enumerate(user['favgames']):
+                # Not a GiantBomb id
+                if not game.startswith("3030-"):
+                    new_id_cache[game] = game
+
+                # Already cached
+                if game in new_id_cache:
+                    new_games[i] = new_id_cache[game]
+                    continue
+
+                # Get name from GiantBomb archive and search
+
+                # giantbomb id unknown
+                if game not in game_lookup:
+                    new_games[i] = game # keep the giantbomb id
+                    new_id_cache[game] = game
+                    continue
+                
+                names = game_lookup[game]
+
+                score = 0
+                deku_id = None
+                for name in names:
+                    search = self.Games.search(name)
+
+                    if search['score'] > score:
+                        score = search['score']
+                        deku_id = search['deku_id']
+
+                if not deku_id:
+                    new_games[i] = game # keep the giantbomb id
+                    new_id_cache[game] = game
+                    continue
+
+                new_games[i] = deku_id
+                new_id_cache[game] = deku_id
+
+            # update user record
+            db.update_one({'_id': user['_id']}, {'$set': {'favgames': new_games}}, upsert=True)
+
+            # update the progress message
+            interval = (count//100)+1
+            if(((j+1) % interval) == 0):
+                await message.edit(content=f'Migrating... {j+1}/{count}')
+
+        await message.edit(content=f'Migrating... {count}/{count}')
+        await message.reply('Done!')
 
     @commands.Cog.listener()
     async def on_message(self, message):
