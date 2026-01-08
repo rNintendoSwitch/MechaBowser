@@ -5,8 +5,8 @@ token = 'token'
 # Sentry DSN
 DSN = ''
 
-# Giantbomb Api Credentials
-giantbomb = 'key'
+# Api Credentials
+dekudeals = 'key'
 
 # Mongo Credentials
 mongoURI = 'MongoDB URI'

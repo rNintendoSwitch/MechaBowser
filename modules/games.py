@@ -4,7 +4,7 @@ import io
 import logging
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Generator, Literal, Optional, Tuple, Union
+from typing import AsyncGenerator, Literal, Optional, Tuple, Union
 
 import aiohttp
 import config  # type: ignore
@@ -21,20 +21,52 @@ import tools  # type: ignore
 
 mclient = pymongo.MongoClient(config.mongoURI)
 
-GIANTBOMB_NSW_ID = 157
 AUTO_SYNC = False
 SEARCH_RATIO_THRESHOLD = 50
+
+
+class DekuDeals:
+    def __init__(self, api_key):
+        self.ENDPOINT = 'https://www.dekudeals.com/api/rNS/games'
+        self.api_key = api_key
+
+    async def fetch_games(self, platform: str):
+        offset = 0
+
+        for _ in range(1, 3):  # change this to 1000 later or something
+            async with aiohttp.ClientSession() as session:
+                headers = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
+                params = {'api_key': self.api_key, 'offset': offset}
+
+                if platform:
+                    params['platform'] = platform
+
+                async with session.get(self.ENDPOINT, params=params, headers=headers) as resp:
+                    resp_json = await resp.json()
+
+                    for item in resp_json['games']:
+                        yield item
+
+                    offset += len(resp_json['games'])
+
+                    if len(resp_json['games']) < 100:
+                        break  # no more results expected
 
 
 class Games(commands.Cog, name='Games'):
     def __init__(self, bot):
         self.bot = bot
+        self.DekuDeals = DekuDeals(config.dekudeals)
         self.db = mclient.bowser.games
 
+        self.last_sync = {
+        'part': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
+        'full': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
+        }
+
+        # TODO uncomment
         # Ensure indices exist
-        self.db.create_index([("date_last_updated", pymongo.DESCENDING)])
-        self.db.create_index([("guid", pymongo.ASCENDING)], unique=True)
-        self.db.create_index([("game.id", pymongo.ASCENDING)])
+        # self.db.create_index([("deku_id", pymongo.ASCENDING)], unique=True)
 
         # Generate the pipeline
         self.pipeline = [
@@ -61,6 +93,90 @@ class Games(commands.Cog, name='Games'):
             },  # Filter to only stuff we want
         ]
         self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
+
+        if AUTO_SYNC:
+            self.sync_db.start()
+
+    async def cog_unload(self):
+        if AUTO_SYNC:
+            self.sync_db.cancel()
+
+    @tasks.loop(hours=1)
+    async def sync_db(self, force_full: bool = False) -> Tuple[int, str]:
+        # If last full sync was more then a day ago (or on restart/forced), preform a new full sync
+        day_ago = datetime.now(tz=timezone.utc) - timedelta(days=1)
+        full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
+
+        if not full:
+            try:
+                latest_doc = self.db.find().sort("date_last_updated", pymongo.DESCENDING).limit(1).next()
+                after = latest_doc['date_last_updated']
+            except StopIteration:
+                full = True  # Do full sync if we're having issues getting latest updated
+
+        detail_str = '(full)' if full else f'(partial after {after})'
+        logging.info(f'[Games] Syncing games database {detail_str}...')
+        self.last_sync['full' if full else 'part']['running'] = True
+
+        if full:
+            # Flag items so we can detect if they are not updated.
+            self.db.update_many({}, {'$set': {'_full_sync_updated': False}})
+
+        count = {}
+        for type, path in [('game', 'games'), ('release', 'releases')]:
+            count[path] = 0
+            try:
+                async for game in self.GiantBomb.fetch_items(path, None if full else after):
+                    if full:
+                        game['_full_sync_updated'] = True
+
+                    self.update_item_in_db(type, game)
+                    count[path] += 1
+
+            except aiohttp.ClientResponseError as e:
+                if e.status in [429, 420]:  # Giantbomb uses 420 as ratelimiting
+                    logging.error('[Games] Ratelimited with GiantBomb, attempting retry at next loop')
+                    return
+
+            except Exception as e:
+                logging.error(f'[Games] Exception while syncing games: {e}')
+                raise
+
+        if full:
+            self.db.delete_many({'_full_sync_updated': False})  # If items were not updated, delete them
+
+        logging.info(f'[Games] Finished syncing {count["games"]} games and {count["releases"]} releases {detail_str}')
+        self.last_sync['full' if full else 'part'] = {
+            'at': datetime.now(tz=timezone.utc),
+            'count': count,
+            'running': False,
+        }
+        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
+
+        return count, detail_str
+
+    def update_item_in_db(self, type: Literal['game', 'release'], game: dict):
+        if type not in ['game', 'release']:
+            raise ValueError(f'invalid type: {type}')
+
+        date_keys = {
+            'game': ['date_added', 'date_last_updated', 'original_release_date'],
+            'release': ['date_added', 'date_last_updated', 'release_date'],
+        }
+
+        for key in date_keys[type]:  # Parse dates
+            if game[key]:
+                game[key] = parser.parse(game[key])
+
+        if type == 'game' and game['aliases']:
+            game['aliases'] = game['aliases'].splitlines()
+
+        if type == 'release':
+            game['_gameid'] = game['game']['id']
+
+        game['_type'] = type
+
+        return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
 
     def search(self, query: str) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
@@ -175,6 +291,26 @@ class Games(commands.Cog, name='Games'):
 
     games_group = GamesCommand(name='game', description='Find out information about games for the Nintendo Switch!')
 
+    async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
+        if current:
+            game = self.search(current)
+
+        else:
+            # Current textbox is empty
+            return []
+
+        if game:
+            return [app_commands.Choice(name=game['name'], value=game['guid'])]
+
+        else:
+            return []
+
+    @app_commands.guilds(discord.Object(id=config.nintendoswitch))
+    class GamesCommand(app_commands.Group):
+        pass
+
+    games_group = GamesCommand(name='game', description='Find out information about games for the Nintendo Switch!')
+
     @games_group.command(name='search')
     @app_commands.describe(query='The term you want to search for a game')
     @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
@@ -218,6 +354,8 @@ class Games(commands.Cog, name='Games'):
             alias_str = (' ("' + result['name'] + '")') if has_alias else ''
 
             embed.set_footer(text=f'{result["score"] }% confident{alias_str} ⯁ Entry last updated')
+
+            # TODO: publishers/developers
 
             # Build release date line
             if self.parse_expected_release_date(game):
@@ -311,12 +449,24 @@ class Games(commands.Cog, name='Games'):
         embed.add_field(name='Games Stored', value=game_count, inline=True)
         embed.add_field(name='Releases Stored', value=release_count, inline=True)
 
+        # TODO: Replace with new DekuDeals logic
+        # https://github.com/rNintendoSwitch/MechaBowser/blob/47ea5ba33bd2345356d7c0bd49c6b0ad7599f01c/modules/games.py#L558
         newest_update_game = self.db.find_one(sort=[("date_last_updated", -1)])
         last_sync = int(newest_update_game['date_last_updated'].timestamp())
 
         embed.add_field(name=f'Last Sync', value=f'<t:{last_sync}:R>', inline=False)
 
         return await interaction.followup.send(embed=embed)
+    
+    # called by core.py
+    async def games_sync(self, interaction: discord.Interaction, full: bool):
+        '''Force a database sync'''
+        await interaction.response.send_message('Running sync...')
+
+        c, detail = await self.sync_db(full)
+        message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
+        return await interaction.edit_original_response(content=message)
+
 
 
 async def setup(bot):
