@@ -241,9 +241,9 @@ class Games(commands.Cog, name='Games'):
 
                 lines = []
                 for platform, price in prices.items():
-                    msrp = price['msrp']/100 if price['msrp'] else None
-                    curr = price['price']/100 if price['price'] else None
-                    
+                    msrp = price['msrp'] / 100 if price['msrp'] else None
+                    curr = price['price'] / 100 if price['price'] else None
+
                     if curr and msrp and curr < msrp:
                         lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f}")
                     elif curr:
