@@ -3,6 +3,7 @@ import collections
 import io
 import logging
 import re
+import copy
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Literal, Optional, Tuple, Union
 
@@ -33,7 +34,7 @@ class DekuDeals:
     async def fetch_games(self, platform: str):
         offset = 0
 
-        for _ in range(1, 3):  # change this to 1000 later or something
+        for _ in range(1, 2):  # TODO: change this to 1000 later or something
             async with aiohttp.ClientSession() as session:
                 headers = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
                 params = {'api_key': self.api_key, 'offset': offset}
@@ -43,6 +44,10 @@ class DekuDeals:
 
                 async with session.get(self.ENDPOINT, params=params, headers=headers) as resp:
                     resp_json = await resp.json()
+
+                    # debug
+                    # TODO: remove
+                    logging.info(f'[Games] sync: p={platform} o={offset} l={len(resp_json['games'])}')
 
                     for item in resp_json['games']:
                         yield item
@@ -59,36 +64,20 @@ class Games(commands.Cog, name='Games'):
         self.DekuDeals = DekuDeals(config.dekudeals)
         self.db = mclient.bowser.games
 
-        self.last_sync = {
-        'part': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
-        'full': {'at': None, 'count': {'games': 0, 'releases': 0}, 'running': False},
-        }
+        self.last_sync = {'at': None, 'count': 0, 'running': False}
 
         # TODO uncomment
         # Ensure indices exist
-        # self.db.create_index([("deku_id", pymongo.ASCENDING)], unique=True)
+        self.db.create_index([("deku_id", pymongo.ASCENDING)], unique=True)
 
+        # TODO: update pipeline?
         # Generate the pipeline
         self.pipeline = [
-            {'$match': {'_type': 'game'}},  # Select games
-            {
-                '$graphLookup': {
-                    'from': 'games',
-                    'startWith': '$id',
-                    'connectFromField': 'id',
-                    'connectToField': 'game.id',
-                    'as': '_releases',
-                    'restrictSearchWithMatch': {'_type': 'release'},
-                }
-            },  # Search for releases from 'id' to release 'game.id' field, and add as '_releases'
             {
                 '$project': {
-                    'guid': 1,
+                    'deku_id': 1,
                     'name': 1,
-                    'aliases': 1,
-                    'original_release_date': 1,
-                    '_releases.name': 1,
-                    '_releases.release_date': 1,
+                    'release_date': 1
                 }
             },  # Filter to only stuff we want
         ]
@@ -102,81 +91,68 @@ class Games(commands.Cog, name='Games'):
             self.sync_db.cancel()
 
     @tasks.loop(hours=1)
-    async def sync_db(self, force_full: bool = False) -> Tuple[int, str]:
-        # If last full sync was more then a day ago (or on restart/forced), preform a new full sync
-        day_ago = datetime.now(tz=timezone.utc) - timedelta(days=1)
-        full = force_full or ((self.last_sync['full']['at'] < day_ago) if self.last_sync['full']['at'] else True)
+    async def sync_db(self) -> Tuple[int, str]:
+        logging.info(f'[Games] Syncing games database...')
+        self.last_sync['running'] = True
 
-        if not full:
+        # Fields that are per release and will need some manipulation
+        release_fields = ['_last_synced', 'eshop_price', 'release_date']
+
+        # Generate a timestamp to use for marking last sync time
+        sync_time = datetime.now(tz=timezone.utc)
+
+        count = 0
+        for platform in ['switch_1', 'switch_2']:
             try:
-                latest_doc = self.db.find().sort("date_last_updated", pymongo.DESCENDING).limit(1).next()
-                after = latest_doc['date_last_updated']
-            except StopIteration:
-                full = True  # Do full sync if we're having issues getting latest updated
+                async for game in self.DekuDeals.fetch_games(platform):
+                    game['_last_synced'] = sync_time
 
-        detail_str = '(full)' if full else f'(partial after {after})'
-        logging.info(f'[Games] Syncing games database {detail_str}...')
-        self.last_sync['full' if full else 'part']['running'] = True
+                    if game['release_date']:
+                        game['release_date'] = parser.parse(game['release_date'])
+                    
+                    # Filter out fields unique to releases and upsert
+                    filtered_update_dict = {k: v for k, v in game.items() if k not in release_fields}
 
-        if full:
-            # Flag items so we can detect if they are not updated.
-            self.db.update_many({}, {'$set': {'_full_sync_updated': False}})
+                    # Readd the release fields in a platform subset
+                    for field in release_fields:
+                            if field not in filtered_update_dict:
+                                filtered_update_dict[field] = dict()
+                            
+                            filtered_update_dict[field][platform] = game[field] if field in game else None
 
-        count = {}
-        for type, path in [('game', 'games'), ('release', 'releases')]:
-            count[path] = 0
-            try:
-                async for game in self.GiantBomb.fetch_items(path, None if full else after):
-                    if full:
-                        game['_full_sync_updated'] = True
-
-                    self.update_item_in_db(type, game)
-                    count[path] += 1
-
-            except aiohttp.ClientResponseError as e:
-                if e.status in [429, 420]:  # Giantbomb uses 420 as ratelimiting
-                    logging.error('[Games] Ratelimited with GiantBomb, attempting retry at next loop')
-                    return
+                    self.db.update_one({'deku_id': game['deku_id']}, {'$set': filtered_update_dict}, upsert=True)
+                    count += 1
 
             except Exception as e:
                 logging.error(f'[Games] Exception while syncing games: {e}')
                 raise
 
-        if full:
-            self.db.delete_many({'_full_sync_updated': False})  # If items were not updated, delete them
+            # Remove data from release fields for any that didn't get updated for this release
+            unset_dict = dict()
+            for field in release_fields:
+                if field not in unset_dict:
+                    unset_dict[field] = dict()
 
-        logging.info(f'[Games] Finished syncing {count["games"]} games and {count["releases"]} releases {detail_str}')
-        self.last_sync['full' if full else 'part'] = {
-            'at': datetime.now(tz=timezone.utc),
-            'count': count,
-            'running': False,
-        }
+                unset_dict[field][platform] = ''
+
+            self.db.update_many(
+                {'_last_synced': {platform: {'$lt': sync_time}}},
+                {'$unset': unset_dict})
+
+        # If items were not updated, delete them
+        self.db.delete_many({
+            "$or": [
+                { "_last_synced.switch_1": {'$lt': sync_time} },
+                { "_last_synced.switch_2": {'$lt': sync_time} }
+            ]
+        })
+
+        logging.info(f'[Games] Finished syncing {count} games')
+
+        self.last_sync = {'at': sync_time, 'count': count, 'running': False}
         self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
 
-        return count, detail_str
-
-    def update_item_in_db(self, type: Literal['game', 'release'], game: dict):
-        if type not in ['game', 'release']:
-            raise ValueError(f'invalid type: {type}')
-
-        date_keys = {
-            'game': ['date_added', 'date_last_updated', 'original_release_date'],
-            'release': ['date_added', 'date_last_updated', 'release_date'],
-        }
-
-        for key in date_keys[type]:  # Parse dates
-            if game[key]:
-                game[key] = parser.parse(game[key])
-
-        if type == 'game' and game['aliases']:
-            game['aliases'] = game['aliases'].splitlines()
-
-        if type == 'release':
-            game['_gameid'] = game['game']['id']
-
-        game['_type'] = type
-
-        return self.db.replace_one({'guid': game['guid']}, game, upsert=True)
+        return count
 
     def search(self, query: str) -> Optional[dict]:
         match = {'guid': None, 'score': None, 'name': None}
@@ -459,12 +435,12 @@ class Games(commands.Cog, name='Games'):
         return await interaction.followup.send(embed=embed)
     
     # called by core.py
-    async def games_sync(self, interaction: discord.Interaction, full: bool):
+    async def games_sync(self, interaction: discord.Interaction):
         '''Force a database sync'''
         await interaction.response.send_message('Running sync...')
 
-        c, detail = await self.sync_db(full)
-        message = f'{config.greenTick} Finished syncing {c["games"]} games and {c["releases"]} releases {detail}'
+        count = await self.sync_db()
+        message = f'{config.greenTick} Finished syncing {count} games'
         return await interaction.edit_original_response(content=message)
 
 
