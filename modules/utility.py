@@ -14,7 +14,7 @@ import discord
 import pymongo
 from discord import Webhook, WebhookType, app_commands
 from discord.ext import commands, tasks
-from fuzzywuzzy import process
+from rapidfuzz import process
 
 import tools
 
