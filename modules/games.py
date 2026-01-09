@@ -66,11 +66,9 @@ class Games(commands.Cog, name='Games'):
         # Ensure indices exist
         self.db.create_index([("deku_id", pymongo.ASCENDING)], unique=True)
 
-        # Generate the pipeline
-        self.pipeline = [
-            {'$project': {'deku_id': 1, 'name': 1, 'release_date': 1}},  # Filter to only stuff we want
-        ]
-        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
+        self.gameNamesCache = None
+        self.topGames = None
+        self.recalculate_cache()
 
         if AUTO_SYNC:
             self.sync_db.start()
@@ -131,27 +129,27 @@ class Games(commands.Cog, name='Games'):
         logging.info(f'[Games] Finished syncing {count} games')
 
         self.last_sync = {'at': sync_time, 'running': False}
-        self.aggregatePipeline = list(self.db.aggregate(self.pipeline))
-
+        self.recalculate_cache()
         return count
 
-    def search(self, query: str) -> Optional[dict]:
-        match = {'deku_id': None, 'score': 0, 'name': None}
-        for game in self.aggregatePipeline:
-            # If the game we are comparing is really short (<=3 chars), do not allow a match if our search is longer.
-            # This prevents things like 'a' being the best match for 'realMyst' and not 'realMyst: Masterpiece Edition'
-            if len(game['name']) <= 5 and len(query) > 5:
-                continue
+    def recalculate_cache(self):
+        self.gameNamesCache = list(self.db.aggregate([{'$project': {'deku_id': 1, 'name': 1}}]))
 
-            score = rapidfuzz.fuzz.WRatio(query.lower(), game['name'], processor=rapidfuzz.utils.default_process)
+        # Cache the 10 most popular games
+        users = mclient.bowser.users.find({"favgames": {'$exists': True, '$not': {'$size': 0}}})
+        games = {}
+        for user in users:
+            for game_id in user['favgames']:
+                if game_id not in games:
+                    games[game_id] = 1
 
-            if not match['score'] or (score > match['score']):
-                match = {'deku_id': game['deku_id'], 'score': score, 'name': game['name']}
+                else:
+                    games[game_id] += 1
 
-        if match['score'] < SEARCH_RATIO_THRESHOLD:
-            return None
+        top_10 = dict(sorted(games.items(), key=lambda kv: kv[1], reverse=True)[0:10])
+        games = self.db.find({"deku_id": {"$in": list(top_10.keys())}}, projection={'deku_id': 1, 'name': 1})
 
-        return match
+        self.topGames = list(games)
 
     async def get_image(self, deku_id: str, as_url: bool = False):
         game = self.db.find_one({'deku_id': deku_id}, projection={'image': 1})
@@ -174,16 +172,39 @@ class Games(commands.Cog, name='Games'):
         document = self.db.find_one({'deku_id': deku_id}, projection={'name': 1})
         return document['name'] if document else None
 
+    def search(self, query: str, multiResult=False) -> Optional[dict]:
+        gameList = self.gameNamesCache
+
+        # If the game we are comparing is really short (<=3 chars), do not allow a match if our search is longer.
+        # This prevents things like 'a' being the best match for 'realMyst' and not 'realMyst: Masterpiece Edition'
+        if len(query) > 5:
+            gameList = [g for g in gameList if len(g['name']) > 5]
+
+        results = rapidfuzz.process.extract(
+            query,
+            [g['name'] for g in gameList],
+            scorer=rapidfuzz.fuzz.WRatio,
+            limit=10 if multiResult else 1,
+            processor=rapidfuzz.utils.default_process,
+            score_cutoff=SEARCH_RATIO_THRESHOLD,
+        )
+
+        if not results:
+            return None
+
+        ret = [{'deku_id': gameList[i]['deku_id'], 'score': score, 'name': name} for name, score, i in results]
+        return ret if multiResult else ret[0]
+
     async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
         if current:
-            game = self.search(current)
+            games = self.search(current, True)
 
         else:
             # Current textbox is empty
-            return []
+            return [app_commands.Choice(name=game['name'], value=game['deku_id']) for game in self.topGames]
 
-        if game:
-            return [app_commands.Choice(name=game['name'], value=game['deku_id'])]
+        if games:
+            return [app_commands.Choice(name=game['name'], value=game['deku_id']) for game in games]
         else:
             return []
 
