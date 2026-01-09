@@ -175,7 +175,7 @@ class Games(commands.Cog, name='Games'):
     def search(self, query: str, multiResult=False) -> Optional[dict]:
         gameList = self.gameNamesCache
 
-        # If the game we are comparing is really short (<=3 chars), do not allow a match if our search is longer.
+        # If our query isn't short (>5 chars), then filter out short game titles.
         # This prevents things like 'a' being the best match for 'realMyst' and not 'realMyst: Masterpiece Edition'
         if len(query) > 5:
             gameList = [g for g in gameList if len(g['name']) > 5]
