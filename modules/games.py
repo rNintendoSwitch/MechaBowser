@@ -15,7 +15,7 @@ from discord.ext import commands, tasks
 
 mclient = pymongo.MongoClient(config.mongoURI)
 
-AUTO_SYNC = False
+AUTO_SYNC = True
 SEARCH_RATIO_THRESHOLD = 50
 DEKU_UTM = "utm_campaign=rnintendoswitch&utm_medium=social&utm_source=discord"
 
