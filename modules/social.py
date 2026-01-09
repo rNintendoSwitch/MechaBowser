@@ -22,8 +22,8 @@ import pytz
 import yaml
 from discord import app_commands
 from discord.ext import commands
-from rapidfuzz import process
 from PIL import Image, ImageDraw, ImageFont
+from rapidfuzz import process
 
 import tools  # type: ignore
 
@@ -975,11 +975,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         game5='Optionally pick a 5th game to show on your profile as well. Search by name',
     )
     @app_commands.autocomplete(
-       game1=_profile_games_autocomplete,
-       game2=_profile_games_autocomplete,
-       game3=_profile_games_autocomplete,
-       game4=_profile_games_autocomplete,
-       game5=_profile_games_autocomplete,
+        game1=_profile_games_autocomplete,
+        game2=_profile_games_autocomplete,
+        game3=_profile_games_autocomplete,
+        game4=_profile_games_autocomplete,
+        game5=_profile_games_autocomplete,
     )
     async def _profile_games(
         self,

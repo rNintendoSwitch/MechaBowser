@@ -11,11 +11,11 @@ import aiohttp
 import config  # type: ignore
 import discord
 import pymongo
+import rapidfuzz
 import token_bucket
 from dateutil import parser
 from discord import app_commands
 from discord.ext import commands, tasks
-import rapidfuzz
 
 import tools  # type: ignore
 
@@ -186,7 +186,7 @@ class Games(commands.Cog, name='Games'):
             return [app_commands.Choice(name=game['name'], value=game['deku_id'])]
         else:
             return []
-        
+
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class GamesCommand(app_commands.Group):
         pass
