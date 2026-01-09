@@ -1604,7 +1604,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # update the progress message
             interval = (count // 100) + 1
             if ((j + 1) % interval) == 0:
-                percent_complete = (j+1) / count
+                percent_complete = (j + 1) / count
                 await message.edit(content=f'Migrating... {j+1}/{count} ({percent_complete:.0f}%)')
 
         await message.edit(content=f'Migrating... {count}/{count} (100%)')
