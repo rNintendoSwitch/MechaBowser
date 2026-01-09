@@ -22,7 +22,7 @@ import pytz
 import yaml
 from discord import app_commands
 from discord.ext import commands
-from fuzzywuzzy import process
+from rapidfuzz import process
 from PIL import Image, ImageDraw, ImageFont
 
 import tools  # type: ignore
@@ -963,6 +963,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f'{config.redTick} The timezone you provided is invalid. It should be in the format similar to `America/New_York`. If you aren\'t sure how to find it or what yours is, you can visit [this helpful website](https://www.timezoneconverter.com/cgi-bin/findzone.tzc)'
         )
 
+    async def _profile_games_autocomplete(self, interaction: discord.Interaction, current: str):
+        return await self.Games._games_search_autocomplete(interaction, current)
+
     @social_group.command(name='games', description='Pick up-to 5 of your fav Nintendo Switch games to show them off')
     @app_commands.describe(
         game1='You need to pick at least one game. Search by name',
@@ -970,6 +973,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         game3='Optionally pick a 3rd game to show on your profile as well. Search by name',
         game4='Optionally pick a 4th game to show on your profile as well. Search by name',
         game5='Optionally pick a 5th game to show on your profile as well. Search by name',
+    )
+    @app_commands.autocomplete(
+       game1=_profile_games_autocomplete,
+       game2=_profile_games_autocomplete,
+       game3=_profile_games_autocomplete,
+       game4=_profile_games_autocomplete,
+       game5=_profile_games_autocomplete,
     )
     async def _profile_games(
         self,
@@ -1584,7 +1594,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 for name in names:
                     search = self.Games.search(name)
 
-                    if search['score'] > score:
+                    if search and (search['score'] > score):
                         score = search['score']
                         deku_id = search['deku_id']
                         new_name = search['name']
@@ -1604,7 +1614,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # update the progress message
             interval = (count // 100) + 1
             if ((j + 1) % interval) == 0:
-                percent_complete = (j + 1) / count
+                percent_complete = ((j + 1) / count) * 100
                 await message.edit(content=f'Migrating... {j+1}/{count} ({percent_complete:.0f}%)')
 
         await message.edit(content=f'Migrating... {count}/{count} (100%)')

@@ -15,7 +15,7 @@ import token_bucket
 from dateutil import parser
 from discord import app_commands
 from discord.ext import commands, tasks
-from fuzzywuzzy import fuzz
+import rapidfuzz
 
 import tools  # type: ignore
 
@@ -136,17 +136,14 @@ class Games(commands.Cog, name='Games'):
         return count
 
     def search(self, query: str) -> Optional[dict]:
-        match = {'deku_id': None, 'score': None, 'name': None}
+        match = {'deku_id': None, 'score': 0, 'name': None}
         for game in self.aggregatePipeline:
+            # If the game we are comparing is really short (<=3 chars), do not allow a match if our search is longer.
+            # This prevents things like 'a' being the best match for 'realMyst' and not 'realMyst: Masterpiece Edition'
+            if len(game['name']) <= 5 and len(query) > 5:
+                continue
 
-            methods = [fuzz.ratio, fuzz.partial_ratio, fuzz.token_sort_ratio, fuzz.token_set_ratio]
-            rem_punc = re.compile('[^0-9a-zA-Z ]+')
-
-            # Remove punctuation and casing for name and query
-            scores = [
-                method(rem_punc.sub('', game['name'].lower()), rem_punc.sub('', query.lower())) for method in methods
-            ]
-            score = sum(scores) / len(methods)
+            score = rapidfuzz.fuzz.WRatio(query.lower(), game['name'], processor=rapidfuzz.utils.default_process)
 
             if not match['score'] or (score > match['score']):
                 match = {'deku_id': game['deku_id'], 'score': score, 'name': game['name']}
@@ -177,6 +174,19 @@ class Games(commands.Cog, name='Games'):
         document = self.db.find_one({'deku_id': deku_id}, projection={'name': 1})
         return document['name'] if document else None
 
+    async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
+        if current:
+            game = self.search(current)
+
+        else:
+            # Current textbox is empty
+            return []
+
+        if game:
+            return [app_commands.Choice(name=game['name'], value=game['deku_id'])]
+        else:
+            return []
+        
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     class GamesCommand(app_commands.Group):
         pass
@@ -186,13 +196,23 @@ class Games(commands.Cog, name='Games'):
     @games_group.command(name='search')
     @app_commands.describe(query='The term you want to search for a game')
     @app_commands.checks.cooldown(2, 60, key=lambda i: (i.guild_id, i.user.id))
+    @app_commands.autocomplete(query=_games_search_autocomplete)
     async def _games_search(self, interaction: discord.Interaction, query: str):
         '''Search for Nintendo Switch games'''
         await interaction.response.defer()
-        result = self.search(query)
 
-        if result and result['deku_id']:
-            game = self.db.find_one({'deku_id': result['deku_id']})
+        user_deku_id = self.db.find_one({'deku_id': query.strip()})
+        game = None
+
+        if user_deku_id:
+            game = user_deku_id  # User clicked an autocomplete, giving us the exact deku_id
+            result = {'deku_id': user_deku_id['deku_id'], 'score': 100.0, 'name': user_deku_id['name']}
+
+        else:
+            result = self.search(query)
+
+            if result and result['deku_id']:
+                game = self.db.find_one({'deku_id': result['deku_id']})
 
         if game:
             embed = discord.Embed(

@@ -3,7 +3,7 @@ discord.py==2.4.0
 pymongo[srv]<=3.12.3
 jishaku
 pylint
-fuzzywuzzy[speedup]
+rapidfuzz
 pillow<=9.5.0
 pytz
 codepoints
