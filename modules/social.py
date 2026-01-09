@@ -18,6 +18,7 @@ import discord
 import emoji_data
 import numpy as np
 import pymongo
+import token_bucket
 import pytz
 import yaml
 from discord import app_commands
@@ -37,6 +38,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         self.inprogressEdits = {}
 
         self.Games = self.bot.get_cog('Games')
+
+        # !profile ratelimits
+        self.bucket_storage = token_bucket.MemoryStorage()
+        self.profile_bucket = token_bucket.Limiter(1 / 30, 2, self.bucket_storage)  # burst limit 2, renews at 1 / 30 s
 
         # Add context menus to command tree
         self.profileContextMenu = app_commands.ContextMenu(
