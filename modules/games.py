@@ -172,7 +172,7 @@ class Games(commands.Cog, name='Games'):
         document = self.db.find_one({'deku_id': deku_id}, projection={'name': 1})
         return document['name'] if document else None
 
-    def search(self, query: str, multiResult=False) -> Optional[dict]:
+    def search(self, query: str, multiResult=False):
         gameList = self.gameNamesCache
 
         # If our query isn't short (>5 chars), then filter out short game titles.
