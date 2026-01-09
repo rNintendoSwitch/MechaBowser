@@ -163,7 +163,8 @@ class Games(commands.Cog, name='Games'):
             return url
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
+            headers = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
+            async with session.get(url, headers=headers) as resp:
                 resp.raise_for_status()
                 data = await resp.read()
                 return io.BytesIO(data)
