@@ -89,7 +89,7 @@ class Games(commands.Cog, name='Games'):
         sync_time = datetime.now(tz=timezone.utc)
 
         count = 0
-        for platform in ['switch_1', 'switch_2']:
+        for platform in ['switch', 'switch_2']:
             try:
                 async for game in self.DekuDeals.fetch_games(platform):
                     game['_last_synced'] = sync_time
@@ -123,7 +123,7 @@ class Games(commands.Cog, name='Games'):
 
         # If items were not updated, delete them
         self.db.delete_many(
-            {"$or": [{"_last_synced.switch_1": {'$lt': sync_time}}, {"_last_synced.switch_2": {'$lt': sync_time}}]}
+            {"$or": [{"_last_synced.switch": {'$lt': sync_time}}, {"_last_synced.switch_2": {'$lt': sync_time}}]}
         )
 
         logging.info(f'[Games] Finished syncing {count} games')
@@ -253,9 +253,9 @@ class Games(commands.Cog, name='Games'):
             # Release Dates
             dates = {}
 
-            if game["release_date"] and "switch_1" in game["release_date"] and game["release_date"]["switch_1"]:
-                dates["Switch"] = game["release_date"]["switch_1"].date()
-            elif 'switch_1' in game['_last_synced']:
+            if game["release_date"] and "switch" in game["release_date"] and game["release_date"]["switch"]:
+                dates["Switch"] = game["release_date"]["switch"].date()
+            elif 'switch' in game['_last_synced']:
                 dates["Switch"] = "*Unknown*"
 
             if game["release_date"] and "switch_2" in game["release_date"] and game["release_date"]["switch_2"]:
@@ -274,9 +274,9 @@ class Games(commands.Cog, name='Games'):
             if game["eshop_price"]:
                 prices = {}
 
-                if "switch_1" in game["eshop_price"] and game["eshop_price"]["switch_1"]:
-                    if "us" in game["eshop_price"]["switch_1"] and game["eshop_price"]["switch_1"]["us"]:
-                        prices["Switch"] = game["eshop_price"]["switch_1"]["us"]
+                if "switch" in game["eshop_price"] and game["eshop_price"]["switch"]:
+                    if "us" in game["eshop_price"]["switch"] and game["eshop_price"]["switch"]["us"]:
+                        prices["Switch"] = game["eshop_price"]["switch"]["us"]
 
                 if "switch_2" in game["eshop_price"] and game["eshop_price"]["switch_2"]:
                     if "us" in game["eshop_price"]["switch_2"] and game["eshop_price"]["switch_2"]["us"]:
@@ -320,11 +320,11 @@ class Games(commands.Cog, name='Games'):
             return self.last_sync['at']
 
         else:
-            newest_sw1_update_game = self.db.find_one(sort=[("_last_synced.switch_1", -1)])
+            newest_sw1_update_game = self.db.find_one(sort=[("_last_synced.switch", -1)])
             newest_sw2_update_game = self.db.find_one(sort=[("_last_synced.switch_2", -1)])
 
-            if newest_sw1_update_game['_last_synced']['switch_1'] > newest_sw2_update_game['_last_synced']['switch_2']:
-                return newest_sw1_update_game['_last_synced']['switch_1']
+            if newest_sw1_update_game['_last_synced']['switch'] > newest_sw2_update_game['_last_synced']['switch_2']:
+                return newest_sw1_update_game['_last_synced']['switch']
             else:
                 return newest_sw2_update_game['_last_synced']['switch_2']
 
