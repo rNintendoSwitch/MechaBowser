@@ -1552,7 +1552,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         count = db.count_documents(query)
         users = db.find(query)
 
-        message = await ctx.reply(f'Migrating... 0/{count}')
+        message = await ctx.reply(f'Migrating... 0/{count} (0%)')
 
         for j, user in enumerate(users):
             new_games = user['favgames']
@@ -1560,7 +1560,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             for i, game in enumerate(user['favgames']):
                 # Not a GiantBomb id
                 if not game.startswith("3030-"):
-                    new_id_cache[game] = game
+                    new_games[i] = game
+                    continue
 
                 # Already cached
                 if game in new_id_cache:
@@ -1579,18 +1580,21 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
                 score = 0
                 deku_id = None
+                new_name = None
                 for name in names:
                     search = self.Games.search(name)
 
                     if search['score'] > score:
                         score = search['score']
                         deku_id = search['deku_id']
+                        new_name = search['name']
 
                 if not deku_id:
                     new_games[i] = game  # keep the giantbomb id
                     new_id_cache[game] = game
                     continue
 
+                logging.info(f"favgames migration: {names[0]} -> {new_name}")
                 new_games[i] = deku_id
                 new_id_cache[game] = deku_id
 
@@ -1600,9 +1604,10 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             # update the progress message
             interval = (count // 100) + 1
             if ((j + 1) % interval) == 0:
-                await message.edit(content=f'Migrating... {j+1}/{count}')
+                percent_complete = (j+1) / count
+                await message.edit(content=f'Migrating... {j+1}/{count} ({percent_complete:.0f}%)')
 
-        await message.edit(content=f'Migrating... {count}/{count}')
+        await message.edit(content=f'Migrating... {count}/{count} (100%)')
         await message.reply('Done!')
 
     @commands.Cog.listener()
