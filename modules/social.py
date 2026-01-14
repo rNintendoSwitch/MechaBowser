@@ -18,8 +18,8 @@ import discord
 import emoji_data
 import numpy as np
 import pymongo
-import token_bucket
 import pytz
+import token_bucket
 import yaml
 from discord import app_commands
 from discord.ext import commands

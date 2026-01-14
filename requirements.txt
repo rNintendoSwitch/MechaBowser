@@ -1,5 +1,6 @@
 git+https://github.com/falconry/token-bucket
 discord.py==2.4.0
+brotli>=1.2
 pymongo[srv]<=3.12.3
 jishaku
 pylint
