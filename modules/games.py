@@ -277,18 +277,21 @@ class Games(commands.Cog, name='Games'):
 
                 lines = []
                 for platform, price in prices.items():
-                    msrp = price['msrp'] / 100 if price['msrp'] else None
-                    curr = price['price'] / 100 if price['price'] else None
+                    msrp = price['msrp'] / 100 if price['msrp'] is not None else None
+                    curr = price['price'] / 100 if price['price'] is not None else None
 
-                    if curr and msrp and curr < msrp:
-                        discount = (1 - curr / msrp) * 100
-                        lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f} *(-{discount:.0f}%)*")
+                    if curr is not None and msrp and curr < msrp:
+                        if curr != 0:
+                            discount = (1 - curr / msrp) * 100
+                            lines.append(f"{platform}: ~~${msrp:.2f}~~ ${curr:.2f} *(-{discount:.0f}%)*")
+                        else:
+                            lines.append(f"{platform}: ~~${msrp:.2f}~~ Free *(-100%)*")
+                    elif curr == 0:
+                        lines.append(f"{platform}: Free")
                     elif curr:
                         lines.append(f"{platform}: ${curr:.2f}")
                     elif msrp:
                         lines.append(f"{platform}: ${msrp:.2f}")
-                    else:
-                        lines.append(f"{platform}: Free")
 
                 if lines:
                     s = "" if len(prices) == 1 else "s"
