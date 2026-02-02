@@ -10,7 +10,6 @@ import pymongo
 from discord import AsyncWebhookAdapter, Embed, File, NotFound, Webhook
 from discord.ext import commands
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 

@@ -14,7 +14,6 @@ from discord.ext import commands, tasks
 
 import tools
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 

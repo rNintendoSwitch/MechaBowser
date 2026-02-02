@@ -13,7 +13,6 @@ from discord.ext import commands, tasks
 
 import tools  # type: ignore
 
-
 startTime = int(time.time())
 mclient = pymongo.MongoClient(config.mongoURI)
 

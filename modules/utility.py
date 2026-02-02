@@ -18,7 +18,6 @@ from rapidfuzz import process
 
 import tools
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 serverLogs = None

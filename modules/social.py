@@ -28,7 +28,6 @@ from rapidfuzz import process
 
 import tools  # type: ignore
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 
