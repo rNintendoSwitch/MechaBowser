@@ -2,6 +2,7 @@
 bot/
 .vscode/
 *.json
+!giantbomb_names.json
 config.py
 
 # Byte-compiled / optimized / DLL files

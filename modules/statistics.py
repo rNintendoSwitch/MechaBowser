@@ -13,7 +13,6 @@ from discord.ext import commands
 
 import tools
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 
@@ -72,7 +71,8 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
             )
 
         if not start:
-            messages = mclient.bowser.messages.find({'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}})
+            query = {'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))}}
+            messages = mclient.bowser.messages.find(query)
 
         else:
             if endDate <= searchDate:
@@ -80,11 +80,10 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
                     content=f'{config.redTick} Invalid dates provided. The end date cannot be before the starting date. `/stats server [starting date] [ending date]`'
                 )
 
-            messages = mclient.bowser.messages.find(
-                {'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}}
-            )
+            query = {'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()}}
+            messages = mclient.bowser.messages.find(query)
 
-        msgCount = messages.count()
+        msgCount = mclient.bowser.messages.count_documents(query)
         channelCounts = {}
         userCounts = {}
         for message in messages:
@@ -101,20 +100,20 @@ class StatCommands(commands.Cog, name='Statistic Commands'):
                 userCounts[message['author']] += 1
 
         if not start:
-            puns = mclient.bowser.puns.find(
+            puns = mclient.bowser.puns.count_documents(
                 {
                     'timestamp': {'$gte': (int(time.time()) - (60 * 60 * 24 * 30))},
                     'type': {'$nin': ['unmute', 'unblacklist', 'note']},
                 }
-            ).count()
+            )
 
         else:
-            puns = mclient.bowser.puns.find(
+            puns = mclient.bowser.puns.count_documents(
                 {
                     'timestamp': {'$gte': searchDate.timestamp(), '$lte': endDate.timestamp()},
                     'type': {'$nin': ['unmute', 'unblacklist', 'note']},
                 }
-            ).count()
+            )
 
         topChannels = sorted(channelCounts.items(), key=lambda x: x[1], reverse=True)[
             0:5

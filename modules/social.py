@@ -1,6 +1,7 @@
 import asyncio
 import glob
 import io
+import json
 import logging
 import math
 import os
@@ -15,20 +16,17 @@ import codepoints
 import config  # type: ignore
 import discord
 import emoji_data
-import gridfs
 import numpy as np
 import pymongo
 import pytz
-import requests
 import token_bucket
 import yaml
 from discord import app_commands
 from discord.ext import commands
-from fuzzywuzzy import process
 from PIL import Image, ImageDraw, ImageFont
+from rapidfuzz import process
 
 import tools  # type: ignore
-
 
 mclient = pymongo.MongoClient(config.mongoURI)
 
@@ -87,7 +85,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'resources/profiles/layout/{theme}/pfp-background.png'
             ).convert('RGBA')
             self.themes[theme]['missingImage'] = (
-                Image.open(f'resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((45, 45))
+                Image.open(f'resources/profiles/layout/{theme}/missing-game.png').convert("RGBA").resize((120, 120))
             )
             self.themes[theme]['profileStatic'] = self._init_profile_static(theme)  # Do this last
 
@@ -125,8 +123,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
         self.easter_egg_games = {
-            self.bot.user.id: ["3030-80463"],  # Super Mario 3D All-Stars
-            config.parakarry: ["3030-89844"],  # Paper Mario: The Thousand-Year Door
+            self.bot.user.id: ["602caef0-b928-4dcb-8785-3da2a7fb747d"],  # Super Mario 3D All-Stars
+            config.parakarry: [
+                "c47d6eda-ae22-4036-afca-bb7df4e81738",  # Paper Mario: The Thousand-Year Door
+                "dd2dbc1d-938c-495a-a630-75ac96024695",  # Nintendo 64 – Nintendo Classics
+            ],
         }
 
         self.easter_egg_text = [  # Message text for bot easter egg, keep under 12 chars
@@ -349,12 +350,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         return self.flagImgCache[name]
 
-    async def _cache_game_img(self, gamesDb, guid: str, theme) -> Image:
+    async def _cache_game_img(self, deku_id: str, theme) -> Image:
         EXPIRY, IMAGE = 0, 1
         do_recache = False
 
-        if guid in self.gameImgCache:
-            if time.time() > self.gameImgCache[guid][EXPIRY]:  # Expired in cache
+        if deku_id in self.gameImgCache:
+            if time.time() > self.gameImgCache[deku_id][EXPIRY]:  # Expired in cache
                 do_recache = True
         else:  # Not in cache
             do_recache = True
@@ -364,7 +365,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 return theme['missingImage']
 
             try:
-                gameImg = await self.Games.get_image(guid, 'icon_url')
+                gameImg = await self.Games.get_image(deku_id)
 
                 if gameImg:
                     gameIcon = Image.open(gameImg).convert('RGBA').resize((120, 120))
@@ -375,12 +376,12 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 logging.error('Error caching game icon', exc_info=e)
                 gameIcon = None
 
-            self.gameImgCache[guid] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
+            self.gameImgCache[deku_id] = (time.time() + 60 * 60 * 48, gameIcon)  # Expire in 48 hours
 
-        if self.gameImgCache[guid][IMAGE] is None:
+        if self.gameImgCache[deku_id][IMAGE] is None:
             return theme['missingImage']
 
-        return self.gameImgCache[guid][IMAGE]
+        return self.gameImgCache[deku_id][IMAGE]
 
     def _generate_background_preview(self, backgrounds) -> discord.File:
         # square_length: Gets smallest square dimensions that will fit length of backgrounds, ie len 17 -> 25
@@ -441,7 +442,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
             setGames = setGames[0:5]  # Limit to 5 results, just in case
 
-            message_count = f'{mclient.bowser.messages.find({"author": member.id}).count():,}'
+            message_count = f'{mclient.bowser.messages.count_documents({"author": member.id}):,}'
 
         ## Get join date ##
         joins = dbUser['joins']
@@ -602,21 +603,19 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         setGames = profile['games']
         gameCount = 0
         if setGames:
-            gamesDb = mclient.bowser.games
-
             setGames = list(dict.fromkeys(setGames))  # Remove duplicates from list, just in case
             setGames = setGames[:5]  # Limit to 5 results, just in case
 
-            for game_guid in setGames:
+            for game_deku_id in setGames:
                 if not self.Games:
                     continue
 
-                gameName = self.Games.get_preferred_name(game_guid)
+                gameName = self.Games.get_name(game_deku_id)
 
                 if not gameName:
                     continue
 
-                gameIcon = await self._cache_game_img(gamesDb, game_guid, theme)
+                gameIcon = await self._cache_game_img(game_deku_id, theme)
                 card.paste(gameIcon, gameIconLocations[gameCount], gameIcon)
 
                 nameW = 1285
@@ -629,7 +628,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 lines = []
                 current_line = []
                 current_w = 0
-                
+
                 # Use nameW as the starting X coordinate for all lines
                 start_x = nameW
                 max_w = nameWMax - start_x
@@ -657,7 +656,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                             else:
                                 partial_word += char
                                 partial_w += char_w
-                        
+
                         if partial_word:
                             current_line = [partial_word]
                             current_w = partial_w + space_w
@@ -687,7 +686,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         if current_line_w + ellipsis_w <= max_w:
                             break
                         lines[-1] = lines[-1][:-1]  # Remove last char
-                    
+
                     lines[-1] += ellipsis
 
                 # Safety: Limit to 3 lines
@@ -698,7 +697,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 # Draw the wrapped lines
                 # Use gameTextLocations[gameCount] as the starting Y
                 y_pos = gameTextLocations[gameCount]
-                
+
                 for line in lines:
                     # Draw text at the stored start_x
                     draw.text((start_x, y_pos), line, tuple(theme["primary"]), font=game_name_font)
@@ -775,11 +774,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return None
 
     async def generate_user_flow_embed(self, member: discord.Member, new_user: bool = False):
-        '''
+        """
         Generates a discord.Embed with information profile card editing flow and all subcommands.
 
         returns discord.Embed, discord.File
-        '''
+        """
 
         embed = discord.Embed(title='Setup Your Profile Card!', color=0x8BC062)
         embed.set_author(name=member.name, icon_url=member.display_avatar.url)
@@ -788,12 +787,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         main_img = await self._generate_profile_card_from_member(member)
         embed.set_image(url='attachment://profile.png')
 
+        commandID = 0
         for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
             # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
+            if command.name == 'profile' and command.extras:
+                commandID = command.extras['id']
                 break
 
-        commandID = command.extras['id']
         if new_user:
             # We need to minorly modify description for info for first time user flow
             embed_description = (
@@ -811,7 +811,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             f'\n\n- **Add Your Friend Code**: </profile friendcode:{commandID}> Add your friend code to allow friend requests!'
             f'\n- **Pick a Timezone**: </profile timezone:{commandID}> Let others know what time it is for you and your timezone. You can find yours by clicking [here](https://www.timezoneconverter.com/cgi-bin/findzone.tzc).'
             f'\n- **Rep a Flag**: </profile flag:{commandID}> Show your country 🇺🇳, be a pirate 🏴‍☠️, or rep pride 🏳️‍🌈 with flag emoji on your card!'
-            f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 3 of your Switch game faves.'
+            f'\n- **Show Off Your Fav Games**: </profile games:{commandID}> Show off up-to 5 of your Switch game faves.'
             f'\n- **Choose a Different Background**: </profile background:{commandID}> Start with a light or dark theme. '
             'Earn more in events (like Trivia) to make your card pop!'
             '\n**Get Some Trophies**\nEarn a trophy when you participate in server events and Trivia!\n'
@@ -821,34 +821,6 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed.description = embed_description
 
         return embed, main_img  # Both need to be passed into a message for image embedding to function
-
-    @commands.group(name='profile', invoke_without_command=True)
-    async def _old_profile_redirect(self, ctx):
-        for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
-            # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
-                break
-
-        commandStr = f'</profile view:{command.extras["id"]}>'
-        await ctx.message.reply(
-            f':repeat: Hi there! I no longer use text commands. Instead, please repeat your command using {commandStr} as a slash command instead',
-            delete_after=10,
-        )
-        await ctx.message.delete()
-
-    @_old_profile_redirect.command(name='edit')
-    async def _old_profile_redirect_edit(self, ctx):
-        for command in self.bot.tree.get_commands(guild=discord.Object(id=config.nintendoswitch)):
-            # Iterate over commands in the tree so we can get the profile command ID
-            if command.name == 'profile':
-                break
-
-        commandStr = f'</profile edit:{command.extras["id"]}>'
-        await ctx.message.reply(
-            f':repeat: Hi there! I no longer use text commands. Instead, please repeat your command using {commandStr} as a slash command instead',
-            delete_after=10,
-        )
-        await ctx.message.delete()
 
     async def _profile_friendcode_autocomplete(
         self, interaction: discord.Interaction, current: str
@@ -977,7 +949,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         name='timezone',
         description='Pick your timezone to show on your profile and for when others are looking for group',
     )
-    @app_commands.describe(timezone='This is based on your region. I.e. "America/New_York')
+    @app_commands.describe(timezone='This is based on your region. e.g. "America/New_York')
     @app_commands.autocomplete(timezone=_profile_timezone_autocomplete)
     async def _profile_timezone(self, interaction: discord.Interaction, timezone: str):
         await interaction.response.defer(ephemeral=True)
@@ -1006,13 +978,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         game4='Optionally pick a 4th game to show on your profile as well. Search by name',
         game5='Optionally pick a 5th game to show on your profile as well. Search by name',
     )
-    # @app_commands.autocomplete(
-    #   game1=_profile_games_autocomplete,
-    #    game2=_profile_games_autocomplete,
-    #    game3=_profile_games_autocomplete,
-    #    game4=_profile_games_autocomplete,
-    #    game5=_profile_games_autocomplete,
-    # )
+    @app_commands.autocomplete(
+        game1=_profile_games_autocomplete,
+        game2=_profile_games_autocomplete,
+        game3=_profile_games_autocomplete,
+        game4=_profile_games_autocomplete,
+        game5=_profile_games_autocomplete,
+    )
     async def _profile_games(
         self,
         interaction: discord.Interaction,
@@ -1026,39 +998,39 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         db = mclient.bowser.games
 
-        # If user selected an auto-complete result, we will be provided the guid automatically which saves effort
+        # If user selected an auto-complete result, we will be provided the deku_id automatically which saves effort
         flagConfirmation = False
         gameList = []
-        guid1 = db.find_one({'guid': game1})
-        guid2 = None if not game2 else db.find_one({'guid': game2})
-        guid3 = None if not game3 else db.find_one({'guid': game3})
-        guid4 = None if not game4 else db.find_one({'guid': game4})
-        guid5 = None if not game5 else db.find_one({'guid': game5})
+        doc1 = db.find_one({'deku_id': game1})
+        doc2 = None if not game2 else db.find_one({'deku_id': game2})
+        doc3 = None if not game3 else db.find_one({'deku_id': game3})
+        doc4 = None if not game4 else db.find_one({'deku_id': game4})
+        doc5 = None if not game5 else db.find_one({'deku_id': game5})
 
         games = [game1, game2, game3, game4, game5]
-        guids = [guid1, guid2, guid3, guid4, guid5]
+        documents = [doc1, doc2, doc3, doc4, doc5]
 
-        def resolve_guid(game_name: str):
+        def resolve_document(game_name: str):
             return self.Games.search(game_name)
 
         async def return_failure(interaction: discord.Interaction, game_name: str):
             return await interaction.followup.send(
-                f'{config.redTick} I was unable to match the game named "{game_name}" with any game released on the Nintendo Switch. Please try again, or contact a moderator if you believe this is in error'
+                f'{config.redTick} I was unable to match the game named "{game_name}". Please try again, or contact DM Parakarry if you believe this is in error'
             )
 
         flagConfirmation = False
-        for idx, guid in enumerate(guids):
+        for idx, document in enumerate(documents):
             if not games[idx]:
                 continue
 
-            if not guid:
+            if not document:
                 flagConfirmation = True
-                guid = resolve_guid(games[idx])
+                document = resolve_document(games[idx])
 
-            if not guid:
+            if not document:
                 return await return_failure(interaction, games[idx])
 
-            gameList.append(guid['guid'])
+            gameList.append(document['deku_id'])
 
         msg = None
         if flagConfirmation:
@@ -1067,7 +1039,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 title='Are these games correct?', description='*Use the buttons below to confirm*', color=0xF5FF00
             )
             for idx, game in enumerate(gameList):
-                embed.add_field(name=f'Game {idx + 1}', value=db.find_one({'guid': game})['name'])
+                embed.add_field(name=f'Game {idx + 1}', value=db.find_one({'deku_id': game})['name'])
 
             view = tools.NormalConfirmation(timeout=90.0)
             view.message = await interaction.followup.send(
@@ -1088,7 +1060,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             elif not view.value:
                 # User selected No
                 return await view.message.edit(
-                    content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please contact a moderator',
+                    content=f'{config.redTick} It looks like the games I matched for you were incorrect, sorry about that. Please rerun the command to try again. A tip to a great match is to click on an autocomplete option for each game and to type the title as completely as possible -- this will ensure that the correct game is selected. If you continue to experience difficulty in adding a game, please DM Parakarry',
                     embed=None,
                 )
 
@@ -1332,11 +1304,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             'usertime': "Not specified",
             'trophies': [None] * 18,
             'games': [
-                '3030-88442',
-                '3030-87348',
-                '3030-89546',
-                '3030-84825',
-                '3030-89623',
+                '01b3e429-9a02-4c45-a221-1b5cf101f433',  # MEGA SIMULATOR BUNDLE - Forest Ranger Life Simulator...
+                '7dcab3d8-c1c1-4462-8807-3427c0a61a37',  # G-Mode Archives+ Todo Ryunosuke Tantei Nikki Vol.6 ...
+                '344ca3de-1209-46c7-91da-96966951033b',  # Puzzles & Colors Games for Kids Toddler Coloring Book Draw ...
+                '26eefce2-d2ea-4dee-a85b-c3680da69a1a',  # THE Table Game Deluxe Pack -Mahjong, Go, Shogi, ...
+                '5b8bb732-f2fa-4964-a8f4-d102772506c5',  # Prinny Presents NIS Classics Volume 2: Makai Kingdom: ...
             ],  # Games with really long titles
         }
 

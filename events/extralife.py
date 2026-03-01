@@ -23,23 +23,24 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://extra-life.org/api/participants/531641/donations'
+        self.DONATIONS_URL = 'https://extra-life.org/api/participants/549812/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
+        self.REQUEST_HEADERS = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 1192235490309570560
-        self.DONOR_ROLE = 1192235806551716044
+        self.CHAT_ROLE = 1365349551929823242
+        self.DONOR_ROLE = 1365349619306987610
 
         # Trophy and Background consts
-        self.TROPHY = 'extra-life-2024'
+        self.TROPHY = 'extra-life-2025'
         self.BACKGROUND = 'extra-life'
 
         # Donation incentive ID consts
         self.INCENTIVES = {
             # 'uuiduuid-uuid-uuid-uuiduuiduuiduuid': 'Friendly Name',
-            '2F30C4A5-A947-7BFD-0300CAA167485690': 'Series 1 & 2 sticker sheets (Physical)',
-            '2F44162E-F391-10C4-DBE0155A125CBE9D': 'Enamel pin & Sticker sheets (Physical)',
+            '479328F2-089C-A2E0-EBD491D69CFF478C': 'Series 1 & 2 sticker sheets (Physical)',
+            '47989E42-CB98-0684-6BF8656B760A413E': 'Enamel pin & Sticker sheets (Physical)',
         }
 
         ################################################################################################################################
@@ -47,10 +48,6 @@ class ExtraLife(commands.Cog):
         self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
         self.guild = self.bot.get_guild(self.GUILD)
-        self.extra_life_admin = self.guild.get_channel(self.EXTRA_LIFE_ADMIN)
-        self.extra_life = self.guild.get_channel(self.EXTRA_LIFE)
-        self.general = self.guild.get_channel(self.GENERAL)
-        self.donations = self.guild.get_channel(self.DONATIONS)
         self.chatRole = self.guild.get_role(self.CHAT_ROLE)
         self.donorRole = self.guild.get_role(self.DONOR_ROLE)
         self.lastDonationID = None
@@ -72,6 +69,11 @@ class ExtraLife(commands.Cog):
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
     async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+        self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
+        self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
+        self.general = await self.bot.fetch_channel(self.GENERAL)
+        self.donations = await self.bot.fetch_channel(self.DONATIONS)
+
         if id is None:
             return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
 
@@ -145,7 +147,11 @@ class ExtraLife(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def donation_check(self):
-        donations_request = requests.get(self.DONATIONS_URL, timeout=8.0)
+        # Exit event if there is no last donation programmed
+        if self.lastDonationID is None:
+            return
+
+        donations_request = requests.get(self.DONATIONS_URL, timeout=8.0, headers=self.REQUEST_HEADERS)
 
         try:
             donations_request.raise_for_status()

@@ -14,10 +14,9 @@ import discord
 import pymongo
 from discord import Webhook, WebhookType, app_commands
 from discord.ext import commands, tasks
-from fuzzywuzzy import process
+from rapidfuzz import process
 
 import tools
-
 
 mclient = pymongo.MongoClient(config.mongoURI)
 
@@ -385,9 +384,10 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                 'There is little information to display as they have not been recorded joining the server before'
             )
 
-            infractions = mclient.bowser.puns.find({'user': user.id}).count()
+            # Case where a user could have an infraction even if they've never been recorded joining, i.e. ban
+            infractions = mclient.bowser.puns.count_documents({'user': user.id})
             if infractions:
-                desc += f'\n\nUser has {infractions} infraction entr{"y" if infractions == 1 else "ies"}, use `/history {user.id}` to view'
+                desc += f'\n\nUser has **{infractions}** infraction entr{"y" if infractions == 1 else "ies"}, use `/history {user.id}` to view.'
 
             embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
             embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.display_avatar.url)
@@ -397,8 +397,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             return await interaction.followup.send(embed=embed)
 
         # Member object, loads of info to work with
-        messages = mclient.bowser.messages.find({'author': user.id})
-        msgCount = 0 if not messages else messages.count()
+        query = {'author': user.id}
+        messages = mclient.bowser.messages.find(query)
+        msgCount = mclient.bowser.messages.count_documents(query)
 
         desc = (
             f'Fetched user {user.mention}.'
@@ -445,7 +446,14 @@ class ChatControl(commands.Cog, name='Utility Commands'):
 
                 roleList = tempList
 
-            roles = ', '.join(roleList)
+            # concat roles into comma delimitered string
+            roles = str(roleList[0])
+            for i, role in enumerate(roleList[1:]):
+                if len(f"{roles}, {role}") > 1000:  # too big?
+                    roles += f", and {len(roleList) - i} more..."
+                    break
+
+                roles += f", {role}"
 
         embed.add_field(name='Roles', value=roles, inline=False)
 
@@ -455,11 +463,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         embed.add_field(name='Last message', value=lastMsg, inline=True)
         embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>', inline=True)
 
-        noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
+        query = {'user': user.id, 'type': 'note'}
         fieldValue = 'View history to get full details on all notes\n\n'
-        if noteDocs.count():
-            noteCnt = noteDocs.count()
+        noteCnt = mclient.bowser.puns.count_documents(query)
+        if noteCnt:
             noteList = []
+            noteDocs = mclient.bowser.puns.find(query)
+
             for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
                 stamp = f'[<t:{int(x["timestamp"])}:d>]'
                 noteContent = f'{stamp}: {x["reason"]}'
@@ -476,9 +486,11 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             embed.add_field(name='User notes', value=fieldValue + '\n'.join(noteList), inline=False)
 
         punishments = ''
-        punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
+        query = {'user': user.id, 'type': {'$ne': 'note'}}
+        punsCol = mclient.bowser.puns.find(query)
+        punsCnt = mclient.bowser.puns.count_documents(query)
         puns = 0
-        if not punsCol.count():
+        if not punsCnt:
             punishments = '__*No punishments on record*__'
 
         else:
@@ -516,7 +528,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
                     punishments += f'> {config.addTick} {stamp} **{punType}**\n'
 
             punishments = (
-                f'Showing {puns}/{punsCol.count()} punishment entries. '
+                f'Showing {puns}/{punsCnt} punishment entries. '
                 f'For a full history including responsible moderator, active status, and more use `/history {user.id}`'
                 f'\n\n{punishments}'
             )
@@ -584,7 +596,8 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             self_check = False
 
         db = mclient.bowser.puns
-        puns = db.find({'user': user.id, 'type': {'$ne': 'note'}}) if self_check else db.find({'user': user.id})
+        query = {'user': user.id, 'type': {'$ne': 'note'}} if self_check else {'user': user.id}
+        puns = db.find(query)
 
         deictic_language = {
             'no_punishments': ('User has no punishments on record.', 'You have no available punishments on record.'),
@@ -620,12 +633,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             'note': 'User note',
         }
 
-        if puns.count() == 0:
+        punsCnt = db.count_documents(query)
+        if punsCnt == 0:
             desc = deictic_language["no_punishments"][self_check]
-        elif puns.count() == 1:
+        elif punsCnt == 1:
             desc = deictic_language['single_inf'][self_check]
         else:
-            desc = deictic_language['multiple_infs'][self_check].format(puns.count())
+            desc = deictic_language['multiple_infs'][self_check].format(punsCnt)
 
         fields = []
         activeStrikes = 0

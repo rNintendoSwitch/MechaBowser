@@ -6,12 +6,10 @@ import discord
 import pymongo
 from discord.ext import commands
 
-
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 import tools
-
 
 try:
     import config
@@ -54,34 +52,6 @@ class BotCache(commands.Cog):
             for rc, lc in zip(remote, local):  # We are pulling command IDs from server-side, then storing the mentions
                 lc.extras['id'] = rc.id
 
-            # logging.info('[Cache] Performing initial user database synchronization')
-            # self.READY = True
-            # return
-            # db = mclient.bowser.users
-            # NS = self.bot.get_guild(config.nintendoswitch)
-
-            # guildCount = len(NS.members)
-            # userCount = 0
-            # for member in NS.members:
-            #    await asyncio.sleep(0.5)
-            #    userCount += 1
-            #    logging.debug(f'[Cache] Syncronizing user {userCount}/{guildCount}')
-            #    doc = db.find_one({'_id': member.id})
-            #    if not doc:
-            #        await tools.store_user(member)
-            #        continue
-
-            #    roleList = []
-            #    for role in member.roles:
-            #        if role.id != NS.id:
-            #            roleList.append(role.id)
-
-            #    if roleList == doc['roles']:
-            #        continue
-
-            #    db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
-
-            # logging.info('[Cache] Inital user database syncronization complete')
             self.READY = True
 
 
@@ -115,7 +85,7 @@ class MechaBowser(commands.Bot):
         super().__init__(
             activity=discord.Activity(type=discord.ActivityType.watching, name='over the server'),
             case_insensitive=True,
-            command_prefix=config.command_prefixes,
+            command_prefix=commands.when_mentioned,
             chunk_guilds_at_startup=True,
             intents=discord.Intents(
                 guilds=True,
@@ -194,5 +164,5 @@ async def on_app_command_error(interaction: discord.Interaction, exception):
 
 
 if __name__ == '__main__':
-    logging.info('\033[94mMechaBowser by mattbsg & lyrus ©2019-2024\033[0m')
+    logging.info('\033[94mMechaBowser by mattbsg & lyrus ©2019-2026\033[0m')
     asyncio.run(bot.start(config.token))

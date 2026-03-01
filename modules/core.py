@@ -13,7 +13,6 @@ from discord.ext import commands, tasks
 
 import tools  # type: ignore
 
-
 startTime = int(time.time())
 mclient = pymongo.MongoClient(config.mongoURI)
 
@@ -53,7 +52,7 @@ class MainEvents(commands.Cog):
         guild = guild_db.find_one({'_id': config.nintendoswitch})
 
         if not guild:
-            guild_db.insert(
+            guild_db.insert_one(
                 {
                     "_id": config.nintendoswitch,
                     "inviteWhitelist": [config.nintendoswitch],
@@ -220,9 +219,10 @@ class MainEvents(commands.Cog):
                 'mute': 'Mute',
                 'blacklist': 'Channel Blacklist ({})',
             }
-            puns = punDB.find({'user': member.id, 'active': True})
             restoredPuns = []
-            if puns.count():
+            query = {'user': member.id, 'active': True}
+            if punDB.count_documents(query):
+                puns = punDB.find(query)
                 for x in puns:
                     if x['type'] == 'blacklist':
                         restoredPuns.append(punTypes[x['type']].format(x['context']))
@@ -347,13 +347,14 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         db = mclient.bowser.puns
-        puns = db.find({'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}})
 
         mclient.bowser.users.update_one(
             {'_id': member.id},
             {'$push': {'leaves': int(datetime.now(tz=timezone.utc).timestamp())}},
         )
-        if puns.count():
+        query = {'user': member.id, 'active': True, 'type': {'$in': ['strike', 'mute', 'blacklist']}}
+        if db.count_documents(query):
+            puns = db.find(query)
             embed = discord.Embed(
                 description=f'{member} ({member.id}) left the server\n\n:warning: __**User had active punishments**__ :warning:',
                 color=0xD62E44,
@@ -753,6 +754,31 @@ class MainEvents(commands.Cog):
         await self.bot.user.edit(username=name)
         return await interaction.followup.send('Done.')
 
+    @update_group.command(name='members', description='Syncronize members and their roles in the DB')
+    async def _update_members(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        logging.info('[Core] Starting db member sync')
+        db = mclient.bowser.users
+        guild = self.bot.get_guild(config.nintendoswitch)
+
+        for member in guild.members:
+            doc = db.find_one({'_id': member.id})
+            if not doc:
+                await tools.store_user(member)
+                continue
+
+            roleList = []
+            for role in member.roles:
+                if role.id != guild.id:  # Ignore @everyone
+                    roleList.append(role.id)
+
+            if roleList == doc['roles']:
+                continue
+
+            db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
+        logging.info('[Core] User database syncronization complete')
+        return await interaction.followup.send('Done.')
+
     @update_group.command(
         name='cache', description='Update the database message cache for the entire server. API and resource intensive'
     )
@@ -784,12 +810,11 @@ class MainEvents(commands.Cog):
             f'<@{interaction.user.id}> Syncronization completed. Took {timeToComplete}'
         )
 
-    @update_group.command(name='gamedb', description='Sync the games database with GiantBomb')
-    @app_commands.describe(full='Determines if it should be a full sync, or a partial')
+    @update_group.command(name='gamedb', description='Fetch games database updates from DekuDeals')
     @app_commands.default_permissions(view_audit_log=True)
-    async def _update_game_db(self, interaction: discord.Interaction, full: bool):
+    async def _update_game_db(self, interaction: discord.Interaction):
         gamesCog = self.bot.get_cog('Games')
-        await gamesCog.games_sync(interaction, full)
+        await gamesCog.games_sync(interaction)
 
     @app_commands.command(name='shutdown', description='Shutdown the bot and all modules')
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))

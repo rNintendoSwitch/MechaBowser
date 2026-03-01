@@ -14,7 +14,6 @@ from discord.ext import commands, tasks
 
 import tools
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 
@@ -54,16 +53,20 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     continue  # We don't want to create many tasks when we only remove one
                 user = userDB.find_one({'_id': pun['user']})
                 trackedStrikes.append(pun['user'])
-                if user['strike_check'] > time.time():  # In the future
-                    tryTime = (
-                        twelveHr
-                        if user['strike_check'] - time.time() > twelveHr
-                        else user['strike_check'] - time.time()
-                    )
-                    self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
+                tryTime = 0  # Default to immediately
+                try:
+                    if user['strike_check'] > time.time():  # In the future
+                        tryTime = (
+                            twelveHr
+                            if user['strike_check'] - time.time() > twelveHr
+                            else user['strike_check'] - time.time()
+                        )
 
-                else:  # In the past
-                    self.schedule_task(0, pun['_id'], config.nintendoswitch)
+                except KeyError:  # Edge case for missing strike_check field
+                    userDB.update_one({'_id': pun['user']}, {'$set': {'strike_check': time.time()}})
+
+                finally:
+                    self.schedule_task(tryTime, pun['_id'], config.nintendoswitch)
 
             elif pun['type'] == 'mute':
                 tryTime = twelveHr if pun['expiry'] - time.time() > twelveHr else pun['expiry'] - time.time()
@@ -310,6 +313,10 @@ class Moderation(commands.Cog, name='Moderation Commands'):
     @app_commands.describe(uuid='The infraction UUID, found in the footer of the mod log message embeds')
     async def _inf_revoke(self, interaction: discord.Interaction, uuid: str):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
+
+        if interaction.user.id not in [125233822760566784, 123879073972748290]:  # MattBSG, Lyrus
+            return await interaction.followup.send(f'{config.redTick} You do not have permission to run this command')
+
         db = mclient.bowser.puns
         doc = db.find_one_and_delete({'_id': uuid})
         if not doc:  # Delete did nothing if doc is None
