@@ -6,12 +6,10 @@ import discord
 import pymongo
 from discord.ext import commands
 
-
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 import tools
-
 
 try:
     import config

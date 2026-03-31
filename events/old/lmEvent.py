@@ -31,7 +31,6 @@ from discord.ext import commands, tasks
 import tools
 from events.resources.lm3 import qte
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 

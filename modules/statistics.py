@@ -13,7 +13,6 @@ from discord.ext import commands
 
 import tools
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 
 

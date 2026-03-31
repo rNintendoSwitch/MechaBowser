@@ -10,7 +10,6 @@ import pymongo
 from discord import AsyncWebhookAdapter, Embed, File, NotFound, Webhook
 from discord.ext import commands
 
-
 mclient = pymongo.MongoClient(config.mongoURI)
 activeEmoji = """
 <:spacer:754356052387954748><:spacer:754356052387954748><a:Mario_Brick_Top:753445692587900960>
