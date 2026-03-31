@@ -8,7 +8,7 @@ rapidfuzz
 pillow<=9.5.0
 pytz
 codepoints
-emoji_data==0.1.6.1
+emoji_data
 sentry-sdk
 discord-sentry-reporting
 aiohttp
