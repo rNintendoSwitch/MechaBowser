@@ -162,6 +162,10 @@ machine-makerfest:
     theme: light
     trophy-bg-opacity: 50
 
+trivia-tomodachi:
+    theme: light
+    trophy-bg-opacity: 30
+
 trivia-pokopia:
     theme: light
     trophy-bg-opacity: 20
