@@ -552,7 +552,7 @@ class MainEvents(commands.Cog):
                 user = (f'{dbMessage['author']}', dbMessage['author'] , None)
 
             else:
-                nameHist = [d or d in dbUser['nameHist'] if d.get('type') == 'name']
+                nameHist = [d for d in dbUser['nameHist'] if d.get('type') == 'name']
                 lastName = sorted(nameHist, key=lambda x: x['timestamp'])[0]['str']
                 user = (f'{lastName} {dbMessage["author"]}', dbMessage["author"], None)
 
