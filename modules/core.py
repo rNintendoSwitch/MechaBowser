@@ -549,7 +549,7 @@ class MainEvents(commands.Cog):
             dbUser = db.find_one({'_id': dbMessage['author']})
             if not dbUser or not dbUser['nameHist']:
                 # The user either isn't in the database (unlikely) or we have no prior names recorded
-                user = (f'{dbMessage['author']}', dbMessage['author'] , None)
+                user = (f'{dbMessage['author']}', dbMessage['author'], None)
 
             else:
                 nameHist = [d for d in dbUser['nameHist'] if d.get('type') == 'name']
@@ -583,7 +583,6 @@ class MainEvents(commands.Cog):
 
         if user[2] == None:
             embed.set_footer(text='Using cached name data and may be out of date or inaccurate')
-
 
         await self.serverLogs.send(f':wastebasket: Message deleted in <#{payload.channel_id}>', embed=embed)
 
