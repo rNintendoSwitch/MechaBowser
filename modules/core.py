@@ -66,7 +66,7 @@ class MainEvents(commands.Cog):
     async def cog_unload(self):
         self.run_process_logs.cancel()
 
-    #        self.sanitize_eud.cancel()  # pylint: disable=no-member
+    # self.sanitize_eud.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=24)
     async def sanitize_eud(self):
