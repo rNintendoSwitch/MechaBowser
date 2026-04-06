@@ -134,7 +134,8 @@ class MainEvents(commands.Cog):
             return
 
         else:
-            for log in pendingMessages: self.serverLogQueue.remove(log)
+            for log in pendingMessages:
+                self.serverLogQueue.remove(log)
             self.serverLogLastSend = time.time()
 
     @app_commands.command(
