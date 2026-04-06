@@ -130,11 +130,11 @@ class MainEvents(commands.Cog):
 
         except Exception as e:
             logging.error(f'[Core] Error while processing server logs: {e}. Will retry')
+            self.serverLogQueue.extend(pendingMessages)
             await asyncio.sleep(5.0)
             return
 
         else:
-            self.serverLogQueue.extend(pendingMessages)
             self.serverLogLastSend = time.time()
 
     @app_commands.command(
