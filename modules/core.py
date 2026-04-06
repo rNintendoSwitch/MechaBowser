@@ -20,6 +20,7 @@ mclient = pymongo.MongoClient(config.mongoURI)
 class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.serverLogQueue = []
 
     async def cog_load(self):
         logging.info('[Core] Waiting for guild caches to chunk...')
@@ -61,7 +62,8 @@ class MainEvents(commands.Cog):
                 }
             )
 
-    #    def cog_unload(self):
+    async def cog_unload(self):
+        self.run_process_logs.cancel()
     #        self.sanitize_eud.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=24)
@@ -77,6 +79,45 @@ class MainEvents(commands.Cog):
         )
 
         logging.info('[Core] Finished sanitzation of old EUD')
+
+    @tasks.loop(seconds=2.0)
+    async def run_process_logs(self):
+        await self.process_logs()
+
+    @run_process_logs.after_loop
+    async def on_process_logs_cancel(self):
+        while self.serverLogQueue:
+            await self.process_logs()
+
+    async def process_logs(self):
+        if not self.serverLogQueue:
+            # Queue is empty
+            return
+
+        messageIndex = 0
+        characterCount = 0
+        pendingMessages = []
+        for log in self.serverLogQueue:
+            messageIndex += 1
+
+            # We must count every Embed attribute's character count to ensure we won't exceed the limit.
+            characterCount += (
+                len(log.author.name or '')
+                + len(log.description or '')
+                + sum(len(field.name) + len(field.value) for field in log.fields)
+                + len(log.footer.text or '')
+                + len(log.title or '')
+            )
+            if characterCount < 6000 and messageIndex <=10:
+                pendingMessages.append(log)
+                self.serverLogQueue.remove(log)
+                continue
+
+            else:
+                # We are either over the character limit, >10 embeds, or both
+                break
+
+        await self.serverLogs.send(embeds=pendingMessages)
 
     @app_commands.command(
         name='ping', description='Checks that the bot is responding normally and shows various latency values'
@@ -514,6 +555,9 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload):
         db = mclient.bowser.messages
+        dbMessage = db.find_one_and_update(
+                {'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}}
+        )
         if payload.cached_message:
             if (
                 payload.cached_message.type not in [discord.MessageType.default, discord.MessageType.reply]
@@ -528,8 +572,6 @@ class MainEvents(commands.Cog):
             if not payload.cached_message.content and not payload.cached_message.attachments:
                 return  # Blank or null content (could be embed)
 
-            db.update_one({'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}})
-
             cachedUser = payload.cached_message.author
             user = {
                 'author_field': f'{str(cachedUser)} ({cachedUser.id})',
@@ -541,9 +583,6 @@ class MainEvents(commands.Cog):
 
         else:
             # Message is not in ram cache, pull from DB or ignore if missing
-            dbMessage = db.find_one_and_update(
-                {'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}}
-            )
             if not dbMessage:
                 logging.warning(
                     f'[Core] Missing message metadata for deletion of {payload.channel_id}/{payload.message_id}'
@@ -569,10 +608,13 @@ class MainEvents(commands.Cog):
                 '-No saved copy of message content is available-' if not dbMessage['content'] else dbMessage['content']
             )
 
+        channel = self.bot.get_channel(payload.channel_id)
+        channel_name = payload.channel_id if not channel else channel.name
         embed = discord.Embed(
+            title=f'🗑️ Message deleted in ⁠#{channel_name}',
             description=f'[Jump to message]({jump_url})\n{content}',
             color=0xF8E71C,
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.fromtimestamp(dbMessage['timestamp'], tz=timezone.utc),
         )
         embed.set_author(name=user['author_field'], icon_url=user['author_icon'])
         embed.add_field(name='Mention', value=f'<@{user['author_id']}>')
@@ -592,7 +634,8 @@ class MainEvents(commands.Cog):
         if user['author_icon'] == None:
             embed.set_footer(text='Using cached name data, which may be out of date or inaccurate')
 
-        await self.serverLogs.send(f':wastebasket: Message deleted in <#{payload.channel_id}>', embed=embed)
+        # Queue the message delete, helps with spam from Discord
+        self.serverLogQueue.append(embed)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
