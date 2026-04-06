@@ -64,6 +64,7 @@ class MainEvents(commands.Cog):
 
     async def cog_unload(self):
         self.run_process_logs.cancel()
+
     #        self.sanitize_eud.cancel()  # pylint: disable=no-member
 
     @tasks.loop(hours=24)
@@ -108,7 +109,7 @@ class MainEvents(commands.Cog):
                 + len(log.footer.text or '')
                 + len(log.title or '')
             )
-            if characterCount < 6000 and messageIndex <=10:
+            if characterCount < 6000 and messageIndex <= 10:
                 pendingMessages.append(log)
                 self.serverLogQueue.remove(log)
                 continue
@@ -556,7 +557,7 @@ class MainEvents(commands.Cog):
     async def on_raw_message_delete(self, payload):
         db = mclient.bowser.messages
         dbMessage = db.find_one_and_update(
-                {'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}}
+            {'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}}
         )
         if payload.cached_message:
             if (
