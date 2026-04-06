@@ -531,7 +531,11 @@ class MainEvents(commands.Cog):
             db.update_one({'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}})
 
             cachedUser = payload.cached_message.author
-            user = {'author_field': f'{str(cachedUser)} ({cachedUser})', 'author_id': cachedUser.id, 'author_icon': cachedUser.display_avatar.url}
+            user = {
+                'author_field': f'{str(cachedUser)} ({cachedUser})',
+                'author_id': cachedUser.id,
+                'author_icon': cachedUser.display_avatar.url,
+            }
             jump_url = payload.cached_message.jump_url
             content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
 
@@ -554,8 +558,11 @@ class MainEvents(commands.Cog):
             else:
                 nameHist = [d for d in dbUser['nameHist'] if d.get('type') == 'name']
                 previousName = sorted(nameHist, key=lambda x: x['timestamp'])[0]['str']
-                user = {'author_field': f'{previousName} ({dbMessage["author"]})', 'author_id': dbMessage["author"], 'author_icon': None}
-
+                user = {
+                    'author_field': f'{previousName} ({dbMessage["author"]})',
+                    'author_id': dbMessage["author"],
+                    'author_icon': None,
+                }
 
             jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
             content = (
