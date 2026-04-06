@@ -532,7 +532,7 @@ class MainEvents(commands.Cog):
 
             cachedUser = payload.cached_message.author
             user = {
-                'author_field': f'{str(cachedUser)} ({cachedUser})',
+                'author_field': f'{str(cachedUser)} ({cachedUser.id})',
                 'author_id': cachedUser.id,
                 'author_icon': cachedUser.display_avatar.url,
             }
