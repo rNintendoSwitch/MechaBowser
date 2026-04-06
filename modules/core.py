@@ -531,7 +531,7 @@ class MainEvents(commands.Cog):
             db.update_one({'_id': payload.message_id, 'channel': payload.channel_id}, {'$set': {'deleted': True}})
 
             cachedUser = payload.cached_message.author
-            user = (f'{str(cachedUser)} ({cachedUser})', cachedUser.id, cachedUser.display_avatar.url)
+            user = {'author_field': f'{str(cachedUser)} ({cachedUser})', 'author_id': cachedUser.id, 'author_icon': cachedUser.display_avatar.url}
             jump_url = payload.cached_message.jump_url
             content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
 
@@ -549,12 +549,13 @@ class MainEvents(commands.Cog):
             dbUser = db.find_one({'_id': dbMessage['author']})
             if not dbUser or not dbUser['nameHist']:
                 # The user either isn't in the database (unlikely) or we have no prior names recorded
-                user = (f'{dbMessage['author']}', dbMessage['author'] , None)
+                user = {'author_field': f'{dbMessage['author']}', 'author_id': dbMessage['author'], 'author_icon': None}
 
             else:
                 nameHist = [d for d in dbUser['nameHist'] if d.get('type') == 'name']
-                lastName = sorted(nameHist, key=lambda x: x['timestamp'])[0]['str']
-                user = (f'{lastName} {dbMessage["author"]}', dbMessage["author"], None)
+                previousName = sorted(nameHist, key=lambda x: x['timestamp'])[0]['str']
+                user = {'author_field': f'{previousName} ({dbMessage["author"]})', 'author_id': dbMessage["author"], 'author_icon': None}
+
 
             jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
             content = (
@@ -566,8 +567,8 @@ class MainEvents(commands.Cog):
             color=0xF8E71C,
             timestamp=datetime.now(tz=timezone.utc),
         )
-        embed.set_author(name=user[0], icon_url=user[2])
-        embed.add_field(name='Mention', value=f'<@{user[1]}>')
+        embed.set_author(name=user['author_field'], icon_url=user['author_icon'])
+        embed.add_field(name='Mention', value=f'<@{user['author_id']}>')
         if payload.cached_message and len(payload.cached_message.attachments) == 1:
             embed.set_image(url=payload.cached_message.attachments[0].proxy_url)
 
@@ -581,9 +582,8 @@ class MainEvents(commands.Cog):
             embed.description = content
             embed.add_field(name='Jump', value=f'[Jump to message]({jump_url})')
 
-        if user[2] == None:
-            embed.set_footer(text='Using cached name data and may be out of date or inaccurate')
-
+        if user['author_icon'] == None:
+            embed.set_footer(text='Using cached name data, which may be out of date or inaccurate')
 
         await self.serverLogs.send(f':wastebasket: Message deleted in <#{payload.channel_id}>', embed=embed)
 
