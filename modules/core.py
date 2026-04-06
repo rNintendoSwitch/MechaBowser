@@ -41,6 +41,7 @@ class MainEvents(commands.Cog):
             pass
 
         # self.sanitize_eud.start()  # pylint: disable=no-member
+        self.run_process_logs.start()
 
         self.serverLogs = self.bot.get_channel(config.logChannel)
         self.modLogs = self.bot.get_channel(config.modChannel)
@@ -86,8 +87,9 @@ class MainEvents(commands.Cog):
 
     @run_process_logs.after_loop
     async def on_process_logs_cancel(self):
-        while self.serverLogQueue:
-            await self.process_logs()
+        if self.run_process_logs.is_being_cancelled() and len(self.serverLogQueue) != 0:
+            while self.serverLogQueue:
+                await self.process_logs()
 
     async def process_logs(self):
         if not self.serverLogQueue:
