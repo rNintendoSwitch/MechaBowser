@@ -129,7 +129,7 @@ class MainEvents(commands.Cog):
             await self.serverLogs.send(embeds=pendingMessages)
 
         except Exception as e:
-            logging.error(f'[Core] Error while processing server logs: {e}. Will retry in 5 seconds')
+            logging.error(f'[Core] Error while processing server logs: {e}. Will retry')
             await asyncio.sleep(5.0)
             return
 
