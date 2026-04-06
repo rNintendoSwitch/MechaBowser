@@ -21,6 +21,7 @@ class MainEvents(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.serverLogQueue = []
+        self.serverLogLastSend = time.time()
 
     async def cog_load(self):
         logging.info('[Core] Waiting for guild caches to chunk...')
@@ -90,9 +91,13 @@ class MainEvents(commands.Cog):
     async def on_process_logs_cancel(self):
         if self.run_process_logs.is_being_cancelled() and len(self.serverLogQueue) != 0:
             while self.serverLogQueue:
-                await self.process_logs()
+                await self.process_logs(force_run=True)
 
-    async def process_logs(self):
+    async def process_logs(self, force_run=False):
+        if not force_run and len(self.serverLogQueue) < 10 and time.time() - self.serverLogLastSend < 10:
+            # Execution is not forced and it has been less than 10 seconds since last ran with <10 in queue, delay
+            return
+
         if not self.serverLogQueue:
             # Queue is empty
             return
@@ -120,7 +125,17 @@ class MainEvents(commands.Cog):
                 # We are either over the character limit, >10 embeds, or both
                 break
 
-        await self.serverLogs.send(embeds=pendingMessages)
+        try:
+            await self.serverLogs.send(embeds=pendingMessages)
+
+        except Exception as e:
+            logging.error(f'[Core] Error while processing server logs: {e}. Will retry in 5 seconds')
+            await asyncio.sleep(5.0)
+            return
+
+        else:
+            for log in pendingMessages: self.serverLogQueue.remove(log)
+            self.serverLogLastSend = time.time()
 
     @app_commands.command(
         name='ping', description='Checks that the bot is responding normally and shows various latency values'
