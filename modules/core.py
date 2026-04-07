@@ -598,6 +598,7 @@ class MainEvents(commands.Cog):
             }
             jump_url = payload.cached_message.jump_url
             content = payload.cached_message.content if payload.cached_message.content else '-No message content-'
+            msgTimestamp = payload.cached_message.created_at
 
         else:
             # Message is not in ram cache, pull from DB or ignore if missing
@@ -622,6 +623,7 @@ class MainEvents(commands.Cog):
                 }
 
             jump_url = f'https://discord.com/channels/{dbMessage["guild"]}/{dbMessage["channel"]}/{dbMessage["_id"]}'
+            msgTimestamp = datetime.fromtimestamp(dbMessage['timestamp'], tz=timezone.utc)
             content = (
                 '-No saved copy of message content is available-' if not dbMessage['content'] else dbMessage['content']
             )
@@ -632,7 +634,7 @@ class MainEvents(commands.Cog):
             title=f'🗑️ Message deleted in ⁠#{channel_name}',
             description=f'[Jump to message]({jump_url})\n{content}',
             color=0xF8E71C,
-            timestamp=datetime.fromtimestamp(dbMessage['timestamp'], tz=timezone.utc),
+            timestamp=msgTimestamp,
         )
         embed.set_author(name=user['author_field'], icon_url=user['author_icon'])
         embed.add_field(name='Mention', value=f'<@{user['author_id']}>')
