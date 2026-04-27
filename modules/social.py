@@ -68,6 +68,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             }
         )
 
+        emoji_data.load_emoji_data()
+
         with open("resources/profiles/themes.yml", 'r') as stream:
             self.themes = yaml.safe_load(stream)
 
@@ -759,7 +761,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             return emoji_data.QualifiedType.FULLY_QUALIFIED
 
         # Locate EmojiSequence for given emoji
-        for uni, seq in emoji_data.EmojiSequence:
+        for uni, seq in emoji_data.EmojiSequence.items():
             if uni == emoji:
                 # Normal unicode flags
                 is_emoji_flag = emoji_data.is_emoji_flag_sequence(emoji)
