@@ -34,9 +34,9 @@ class MainEvents(commands.Cog):
             await self.bot.load_extension('modules.games')
             await self.bot.load_extension('modules.social')
             # Disable automod submodule
-            #try:  # Private submodule extensions
+            # try:  # Private submodule extensions
             #    await self.bot.load_extension('private.automod')
-            #except commands.errors.ExtensionNotFound:
+            # except commands.errors.ExtensionNotFound:
             #    logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
