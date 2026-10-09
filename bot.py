@@ -83,7 +83,7 @@ class MechaBowser(commands.Bot):
             activity=discord.Activity(type=discord.ActivityType.watching, name='over the server'),
             case_insensitive=True,
             command_prefix=commands.when_mentioned,
-            #chunk_guilds_at_startup=True,
+            # chunk_guilds_at_startup=True,
             intents=intents,
             max_messages=300000,
         )
