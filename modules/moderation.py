@@ -484,8 +484,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                 'ban',
                 docID,
                 reason,
-                username=username,
-                userid=ban_id,
+                username=str(u),
+                userid=u.id,
                 moderator=interaction.user,
                 public=True,
             )
@@ -1113,7 +1113,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     public_notify = True
 
             else:
-                member = await self.bot.fetch_user(doc['user'])
+                try:
+                    member = await punGuild.fetch_member(doc['user'])
+
+                except discord.NotFound:
+                    member = await self.bot.fetch_user(doc['user'])
 
             newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {'active': False}})
             docID = await tools.issue_pun(
