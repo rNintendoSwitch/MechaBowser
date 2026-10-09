@@ -21,13 +21,10 @@ except ImportError:
 mclient = pymongo.MongoClient(config.mongoURI)
 intents = discord.Intents(
     guilds=True,
-    members=True,
     bans=True,
     emojis=True,
     voice_states=True,
-    presences=True,
     messages=True,
-    message_content=True,
     reactions=True,
 )
 
@@ -87,17 +84,7 @@ class MechaBowser(commands.Bot):
             case_insensitive=True,
             command_prefix=commands.when_mentioned,
             chunk_guilds_at_startup=True,
-            intents=discord.Intents(
-                guilds=True,
-                members=True,
-                bans=True,
-                emojis=True,
-                voice_states=True,
-                presences=True,
-                messages=True,
-                message_content=True,
-                reactions=True,
-            ),
+            intents=intents,
             max_messages=300000,
         )
 
