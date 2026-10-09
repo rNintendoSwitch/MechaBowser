@@ -377,6 +377,13 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if interaction.guild.get_member(user.id):
             user = interaction.guild.get_member(user.id)
 
+        else:
+            try:
+                user = await interaction.guild.fetch_member(user.id)
+
+            except discord.NotFound:
+                pass
+
         if not dbUser:
             inServer = False
             desc = (
