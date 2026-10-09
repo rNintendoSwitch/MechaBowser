@@ -565,7 +565,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             userid = int(re.search(r'\| (\d+)', interaction.message.embeds[0].author.name).group(1))
             user = interaction.client.get_user(userid)
             if not user:
-                user = interaction.client.fetch_user(userid)
+                user = await interaction.client.fetch_user(userid)
 
             self.INTERACTION = interaction
             await self.ChatCog._pull_history(interaction, user)
