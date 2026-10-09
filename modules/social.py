@@ -113,7 +113,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         self.special_trophies = {
             'bot': lambda member, guild: member.bot,
-            'owner': lambda member, guild: member.id == guild.owner.id,
+            'owner': lambda member, guild: member.id == guild.owner_id,
             'developer': lambda member, guild: member.id in self.bot_contributors,
             'chat-mod': lambda member, guild: guild.get_role(config.chatmod) in member.roles,
             'sub-mod': lambda member, guild: guild.get_role(config.submod) in member.roles,
