@@ -1236,7 +1236,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
         u = db.find_one({'_id': interaction.user.id})
-        embed, card = await self.generate_user_flow_embed(interaction.message.author, new_user=not u['profileSetup'])
+        embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
         await interaction.followup.send(embed=embed, file=card)
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
