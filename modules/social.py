@@ -222,7 +222,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         return
 
             await interaction.response.defer()
-            card = await self._generate_profile_card_from_member(member)
+            card = await self._generate_profile_card_from_member(member, interaction.guild)
             await interaction.followup.send(file=card)
 
     def _load_fonts(self, fonts_defs):
@@ -415,7 +415,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         canvas.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='preview.png')
 
-    async def _generate_profile_card_from_member(self, member: discord.Member) -> discord.File:
+    async def _generate_profile_card_from_member(self, member: discord.Member, guild: discord.Guild) -> discord.File:
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
 
@@ -478,7 +478,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 trophies.append(x)
 
         for trophy, lambda_function in self.special_trophies.items():
-            if lambda_function(member, member.guild):
+            if lambda_function(member, guild):
                 trophies.append(trophy)
 
         if len(trophies) < 18:  # Check for additional non-prefered trophies
@@ -786,7 +786,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed.set_author(name=member.name, icon_url=member.display_avatar.url)
         embed.set_footer(text='❔You can see this info again anytime if you run the /profile edit command')
 
-        main_img = await self._generate_profile_card_from_member(member)
+        main_img = await self._generate_profile_card_from_member(member, member.guild)
         embed.set_image(url='attachment://profile.png')
 
         commandID = 0
@@ -910,7 +910,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code'
             )
 
-        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
+        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild))
 
     @social_group.command(name='flag', description='Choose an emoji flag to display on your profile')
     @app_commands.describe(flag='The flag emoji you wish to set, from the emoji picker')
@@ -936,7 +936,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': pointStr, 'profileSetup': True}})
         await interaction.followup.send(
             f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:',
-            file=await self._generate_profile_card_from_member(interaction.user),
+            file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
         )
 
     async def _profile_timezone_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -962,7 +962,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
                 return await interaction.followup.send(
                     f'{config.greenTick} Your timezone has been successfully updated on your profile card! Here\'s how it looks:',
-                    file=await self._generate_profile_card_from_member(interaction.user),
+                    file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
                 )
 
         await interaction.followup.send(
@@ -1076,7 +1076,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await msg.delete()
 
         await interaction.followup.send(
-            message_reply, file=await self._generate_profile_card_from_member(interaction.user), ephemeral=True
+            message_reply, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild), ephemeral=True
         )
 
     class BackgroundSelectMenu(discord.ui.View):
@@ -1124,7 +1124,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     await self.message.delete()
                     await interaction.response.send_message(
                         f'{config.greenTick} Your background has been successfully updated on your profile card! Here\'s how it looks:',
-                        file=await self.Parent._generate_profile_card_from_member(interaction.user),
+                        file=await self.Parent._generate_profile_card_from_member(interaction.user, interaction.guild),
                         embed=None,
                         ephemeral=True,
                     )
@@ -1221,7 +1221,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             msg += '. '
 
         msg += 'Here\'s how it looks:'
-        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
+        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild))
 
     @social_group.command(
         name='edit', description='Run this command for help with editing your profile and what the other commands do'
