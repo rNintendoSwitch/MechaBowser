@@ -910,7 +910,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code'
             )
 
-        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild))
+        await interaction.followup.send(
+            msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild)
+        )
 
     @social_group.command(name='flag', description='Choose an emoji flag to display on your profile')
     @app_commands.describe(flag='The flag emoji you wish to set, from the emoji picker')
@@ -1076,7 +1078,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await msg.delete()
 
         await interaction.followup.send(
-            message_reply, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild), ephemeral=True
+            message_reply,
+            file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
+            ephemeral=True,
         )
 
     class BackgroundSelectMenu(discord.ui.View):
@@ -1221,7 +1225,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             msg += '. '
 
         msg += 'Here\'s how it looks:'
-        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild))
+        await interaction.followup.send(
+            msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild)
+        )
 
     @social_group.command(
         name='edit', description='Run this command for help with editing your profile and what the other commands do'
