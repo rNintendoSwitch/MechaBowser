@@ -1349,7 +1349,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 m = interaction.guild.get_member(user)
                 if not m:
                     try:
-                        m = await self.bot.fetch_user(user)
+                        try:
+                            m = await interaction.guild.fetch_member(user)
+
+                        except:
+                            m = await self.bot.fetch_user(user)
 
                     except:
                         failed.append(f'{user}')
@@ -1399,7 +1403,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 m = interaction.guild.get_member(user)
                 if not m:
                     try:
-                        m = await self.bot.fetch_user(user)
+                        try:
+                            m = await interaction.guild.fetch_member(user)
+
+                        except:
+                            m = await self.bot.fetch_user(user)
 
                     except:
                         failed.append(f'{user}')
