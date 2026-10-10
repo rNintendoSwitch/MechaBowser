@@ -24,8 +24,8 @@ class MainEvents(commands.Cog):
         self.serverLogLastSend = time.time()
 
     async def cog_load(self):
-        #logging.info('[Core] Waiting for guild caches to chunk...')
-        #await asyncio.sleep(15)
+        # logging.info('[Core] Waiting for guild caches to chunk...')
+        # await asyncio.sleep(15)
         try:
             await self.bot.load_extension('tools')
             await self.bot.load_extension('modules.moderation')
