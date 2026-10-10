@@ -911,7 +911,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         await interaction.followup.send(
-            msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild)
+            msg, file=await self._generate_profile_card_from_member(interaction.message.author, interaction.guild)
         )
 
     @social_group.command(name='flag', description='Choose an emoji flag to display on your profile')
@@ -938,7 +938,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': pointStr, 'profileSetup': True}})
         await interaction.followup.send(
             f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:',
-            file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
+            file=await self._generate_profile_card_from_member(interaction.message.author, interaction.guild),
         )
 
     async def _profile_timezone_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -964,7 +964,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
                 return await interaction.followup.send(
                     f'{config.greenTick} Your timezone has been successfully updated on your profile card! Here\'s how it looks:',
-                    file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
+                    file=await self._generate_profile_card_from_member(interaction.message.author, interaction.guild),
                 )
 
         await interaction.followup.send(
@@ -1079,7 +1079,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         await interaction.followup.send(
             message_reply,
-            file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
+            file=await self._generate_profile_card_from_member(interaction.message.author, interaction.guild),
             ephemeral=True,
         )
 
@@ -1128,7 +1128,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     await self.message.delete()
                     await interaction.response.send_message(
                         f'{config.greenTick} Your background has been successfully updated on your profile card! Here\'s how it looks:',
-                        file=await self.Parent._generate_profile_card_from_member(interaction.user, interaction.guild),
+                        file=await self.Parent._generate_profile_card_from_member(interaction.message.author, interaction.guild),
                         embed=None,
                         ephemeral=True,
                     )
@@ -1226,7 +1226,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         msg += 'Here\'s how it looks:'
         await interaction.followup.send(
-            msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild)
+            msg, file=await self._generate_profile_card_from_member(interaction.message.author, interaction.guild)
         )
 
     @social_group.command(
@@ -1236,7 +1236,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
         u = db.find_one({'_id': interaction.user.id})
-        embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
+        embed, card = await self.generate_user_flow_embed(interaction.message.author, new_user=not u['profileSetup'])
         await interaction.followup.send(embed=embed, file=card)
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
