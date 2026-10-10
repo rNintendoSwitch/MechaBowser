@@ -1462,7 +1462,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             try:
                 member = interaction.guild.get_member(int(m))
                 if not member:
-                    member = await self.bot.fetch_user(int(m))
+                    try:
+                        member = await interaction.guild.fetch_member(int(m))
+
+                    except discord.NotFound:
+                        member = await self.bot.fetch_user(int(m))
 
                 users.append(member)
 
@@ -1527,7 +1531,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             try:
                 member = interaction.guild.get_member(int(m))
                 if not member:
-                    member = await self.bot.fetch_user(int(m))
+                    try:
+                        member = await interaction.guild.fetch_member(int(m))
+
+                    except discord.NotFound:
+                        member = await self.bot.fetch_user(int(m))
 
                 users.append(member)
 
