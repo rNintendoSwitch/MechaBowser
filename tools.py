@@ -387,7 +387,7 @@ def mod_cmd_invoke_delete(channel):
     return not (channel.id in config.showModCTX or channel.category_id in config.showModCTX)
 
 
-async def commit_profile_change(bot, user: discord.User, element: str, item: str, revoke=False, silent=False):
+async def commit_profile_change(bot, user: discord.User, guild: discord.Guild, element: str, item: str, revoke=False, silent=False):
     '''Given a user, update the owned status of a particular element (trophy, background, etc.), "item"'''
     # Calling functions should be verifying availability of item
     db = mclient.bowser.users
@@ -411,7 +411,7 @@ async def commit_profile_change(bot, user: discord.User, element: str, item: str
 
         else:
             dmMsg += "Here's what your profile looks like with it:"
-            generated_background = await socialCog._generate_profile_card_from_member(user)
+            generated_background = await socialCog._generate_profile_card_from_member(user, guild)
 
         try:
             if not silent:

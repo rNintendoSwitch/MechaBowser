@@ -77,7 +77,8 @@ class TGAPool(commands.Cog):
 
                     if user['earnedBackground'] and self.BACKGROUND not in dbUser['backgrounds']:
                         member = await self.bot.fetch_user(int(user['id']))
-                        await commit_profile_change(self.bot, member, 'background', self.BACKGROUND)
+                        guild = self.bot.get_guild(self.GUILD)
+                        await commit_profile_change(self.bot, member, guild, 'background', self.BACKGROUND)
                         await self.event_channel.send(
                             f':information_source: Assigned TGA background to <@{user["id"]}>',
                             allowed_mentions=discord.AllowedMentions.none(),

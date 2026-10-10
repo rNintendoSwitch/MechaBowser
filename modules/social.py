@@ -713,7 +713,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
-    async def modify_trivia_level(self, member: discord.Member, regress=False):
+    async def modify_trivia_level(self, member: discord.Member, guild: discord.Guild, regress=False):
         db = mclient.bowser.users
         dbUser = db.find_one({'_id': member.id})
         currentLevel = 0
@@ -730,16 +730,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if currentLevel > 0 and newLevel != 0:
             await tools.commit_profile_change(
-                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True, silent=True
+                self.bot, member, guild, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True, silent=True
             )
 
         elif newLevel == 0:
             await tools.commit_profile_change(
-                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True
+                self.bot, member, guild, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True
             )
 
         if newLevel > 0:
-            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyData[newLevel][self.INDEX])
+            await tools.commit_profile_change(self.bot, member, guild, 'trophy', self.triviaTrophyData[newLevel][self.INDEX])
 
         return newLevel
 
@@ -1355,7 +1355,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         failed.append(f'{user}')
                         continue
 
-                newLevel = await self.modify_trivia_level(m)
+                newLevel = await self.modify_trivia_level(m, interaction.guild)
                 stats[newLevel] += 1
 
             except IndexError:
@@ -1405,7 +1405,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         failed.append(f'{user}')
                         continue
 
-                newLevel = await self.modify_trivia_level(m, regress=True)
+                newLevel = await self.modify_trivia_level(m, interaction.guild, regress=True)
                 stats[newLevel] += 1
 
             except IndexError:
@@ -1479,7 +1479,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         failCount = 0
         for m in users:
             try:
-                await tools.commit_profile_change(self.bot, m, item, name)
+                await tools.commit_profile_change(self.bot, m, interaction.guild, item, name)
 
             except (ValueError, AttributeError):
                 failCount += 1
@@ -1537,7 +1537,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         failCount = 0
         for m in users:
             try:
-                await tools.commit_profile_change(self.bot, m, item, name, revoke=True)
+                await tools.commit_profile_change(self.bot, m, interaction.guild, item, name, revoke=True)
 
             except (ValueError, AttributeError):
                 failCount += 1
