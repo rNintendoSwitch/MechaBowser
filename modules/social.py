@@ -1073,7 +1073,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # We are good to commit changes
         userDB = mclient.bowser.users
-        userDB.update_one({'_id': interaction.user.id}, {'$set': {'favgames': gameList}})
+        userDB.update_one({'_id': interaction.user.id}, {'$set': {'favgames': gameList, 'profileSetup': True}})
         message_reply = f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:'
 
         if msg:
