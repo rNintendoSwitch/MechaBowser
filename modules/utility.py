@@ -374,7 +374,9 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         inServer = True
         dbUser = await tools.fetch_dbuser(user, return_existance_only=True)
-        guildMember = interaction.guild.get_member(user.id) # Since we can look up any user, replace with Member if available
+        guildMember = interaction.guild.get_member(
+            user.id
+        )  # Since we can look up any user, replace with Member if available
         if guildMember and dbUser:
             # Overwrite discord.User with discord.Member obj
             user = guildMember
@@ -394,7 +396,6 @@ class ChatControl(commands.Cog, name='Utility Commands'):
             except discord.NotFound:
                 # We've failed to extract a discord.Member entirely; rely only on if a value exists in the collection or not
                 pass
-
 
         if not dbUser:
             inServer = False

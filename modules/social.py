@@ -729,7 +729,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if currentLevel > 0 and newLevel != 0:
             await tools.commit_profile_change(
-                self.bot, member, guild, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True, silent=True
+                self.bot,
+                member,
+                guild,
+                'trophy',
+                self.triviaTrophyData[currentLevel][self.INDEX],
+                revoke=True,
+                silent=True,
             )
 
         elif newLevel == 0:
@@ -738,7 +744,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             )
 
         if newLevel > 0:
-            await tools.commit_profile_change(self.bot, member, guild, 'trophy', self.triviaTrophyData[newLevel][self.INDEX])
+            await tools.commit_profile_change(
+                self.bot, member, guild, 'trophy', self.triviaTrophyData[newLevel][self.INDEX]
+            )
 
         return newLevel
 

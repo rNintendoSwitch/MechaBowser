@@ -230,12 +230,12 @@ class ExtraLife(commands.Cog):
     async def _assign_properties(self, member: discord.Member):
         await member.add_roles(self.donorRole)
         await tools.commit_profile_change(self.bot, member, self.guild_obj, 'trophy', self.TROPHY)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj,'background', self.BACKGROUND)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'background', self.BACKGROUND)
 
     async def _remove_properties(self, member: discord.Member):
         await member.remove_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj,'trophy', self.TROPHY, revoke=True)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj,'background', self.BACKGROUND, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'trophy', self.TROPHY, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'background', self.BACKGROUND, revoke=True)
 
     async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
