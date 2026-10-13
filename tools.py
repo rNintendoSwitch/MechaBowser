@@ -396,7 +396,7 @@ def mod_cmd_invoke_delete(channel):
     return not (channel.id in config.showModCTX or channel.category_id in config.showModCTX)
 
 
-async def commit_profile_change(bot, user: discord.User, guild: discord.Guild, element: str, item: str, revoke=False, silent=False):
+async def commit_profile_change(bot, user: typing.Union[discord.User, discord.Member], guild: discord.Guild, element: str, item: str, revoke=False, silent=False):
     '''Given a user, update the owned status of a particular element (trophy, background, etc.), "item"'''
     # Calling functions should be verifying availability of item
     db = mclient.bowser.users
