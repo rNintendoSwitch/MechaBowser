@@ -213,31 +213,38 @@ async def message_archive(archive: typing.Union[discord.Message, list], edit=Non
 
     return archiveID
 
-
-async def store_user(member, messages=0):
+async def fetch_dbuser(user: typing.Union[discord.User, discord.Member, int], return_existance_only: bool = False) -> dict:
+    # Check if entry exist in db, else create fresh
     db = mclient.bowser.users
-    # Double check exists
-    if db.find_one({'_id': member.id}):
-        logging.error('Attempted to store user that already exists!')
-        return
+    if isinstance(user, discord.User) or isinstance(user, discord.Member):
+        existing_user = db.find_one({'_id': user.id})
 
+    else:
+        existing_user = db.find_one({'_id': int(user)})
+
+    if existing_user or return_existance_only:
+        # Return cursor, or if it is non-existent and requested, only the empty cursor without creating a new doc
+        return existing_user
+
+    # Process with document creation, not found in collection
     roleList = []
-    for role in member.roles:
-        if role.id == member.guild.id:
-            continue
+    if isinstance(user, discord.Member) and user.roles:
+        for role in user.roles:
+            if role.id == user.guild.id:
+                continue
 
-        roleList.append(role.id)
+            roleList.append(role.id)
 
     userData = {
-        '_id': member.id,
+        '_id': user if isinstance(user, int) else user.id,
         'roles': roleList,
         'joins': [int(datetime.now(tz=timezone.utc).timestamp())],
         'leaves': [],
         'nameHist': [
             {
-                'str': member.name,
+                'str': '' if isinstance(user, int) else user.name,
                 'type': 'name',
-                'discriminator': member.discriminator,
+                'discriminator': 0000,
                 'timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
             }
         ],
@@ -246,6 +253,7 @@ async def store_user(member, messages=0):
         'friendcode': None,
         'timezone': None,
         'modmail': True,
+        'strike_check': 0,
         'trophies': [],
         'trophyPreference': [],
         'favgames': [],
@@ -255,6 +263,7 @@ async def store_user(member, messages=0):
         'backgrounds': ['default-light', 'default-dark'],
     }
     db.insert_one(userData)
+    return userData
 
 
 async def issue_pun(
@@ -391,7 +400,7 @@ async def commit_profile_change(bot, user: discord.User, guild: discord.Guild, e
     '''Given a user, update the owned status of a particular element (trophy, background, etc.), "item"'''
     # Calling functions should be verifying availability of item
     db = mclient.bowser.users
-    dbUser = db.find_one({'_id': user.id})
+    dbUser = await fetch_dbuser(user)
     key = {'background': 'backgrounds', 'trophy': 'trophies'}[element]
 
     if item in dbUser[key] and not revoke:
@@ -403,7 +412,7 @@ async def commit_profile_change(bot, user: discord.User, guild: discord.Guild, e
     socialCog = bot.get_cog('Social Commands')
 
     if not revoke:
-        db.update({'_id': user.id}, {'$push': {key: item}})
+        db.update_one({'_id': user.id}, {'$push': {key: item}})
         dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)}!\nYou have received a new item for your profile on the r/NintendoSwitch Discord server!\n\nThe **{item.replace("-", " ")}** {element} is now yours, enjoy! '
         if element == 'background':
             dmMsg += f'If you wish to use this background, use the `/profile background` command in our Discord server. Here\'s what your profile could look like:'
@@ -421,10 +430,10 @@ async def commit_profile_change(bot, user: discord.User, guild: discord.Guild, e
             pass
 
     else:
-        db.update({'_id': user.id}, {'$pull': {key: item}})
+        db.update_one({'_id': user.id}, {'$pull': {key: item}})
         # Reset background to default if the one being revoked is currently equiped
         if dbUser['background'] == item and element == 'background':
-            db.update({'_id': user.id}, {'$set': {'background': 'default-light'}})
+            db.update_one({'_id': user.id}, {'$set': {'background': 'default-light'}})
 
         dmMsg = f'Hey there {discord.utils.escape_markdown(user.name)},\nA profile item has been revoked from you on the r/NintendoSwitch Discord server.\n\nThe **{item.replace("-", " ")}** {element} was revoked from you. '
         if element == 'background':
