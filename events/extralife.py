@@ -92,9 +92,13 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
+
+                await tools.fetch_dbuser(obj)
                 await self._assign_properties(obj)
 
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, discord.NotFound)):
                 errors.append(member)
 
         if len(errors) == len(member_list):
@@ -105,7 +109,7 @@ class ExtraLife(commands.Cog):
         else:
             content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
@@ -119,9 +123,13 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
+
+                await tools.fetch_dbuser(obj)
                 await self._remove_properties(obj)
 
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
@@ -132,7 +140,7 @@ class ExtraLife(commands.Cog):
         else:
             content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()

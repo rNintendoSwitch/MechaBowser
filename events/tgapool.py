@@ -8,7 +8,7 @@ import pymongo
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from tools import commit_profile_change
+from tools import commit_profile_change, fetch_dbuser
 
 mclient = pymongo.MongoClient(config.mongoURI)
 
@@ -40,7 +40,7 @@ class TGAPool(commands.Cog):
             async with session.get(self.ENDPOINT, headers=headers) as resp:
                 users = await resp.json()
                 for user in users:
-                    dbUser = self.db.find_one(int(user['id']))
+                    dbUser = await fetch_dbuser(int(user['id']), return_existance_only=True)
 
                     if not user['earnedTrophy'] or not dbUser:
                         continue
@@ -70,7 +70,7 @@ class TGAPool(commands.Cog):
             async with session.get(self.ENDPOINT, headers=headers) as resp:
                 users = await resp.json()
                 for user in users:
-                    dbUser = self.db.find_one(int(user['id']))
+                    dbUser = await fetch_dbuser(int(user['_id']), return_existance_only=True)
 
                     if not user['earnedBackground'] or not dbUser:
                         continue

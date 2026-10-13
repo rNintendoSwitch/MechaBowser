@@ -51,7 +51,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             if pun['type'] == 'strike':
                 if pun['user'] in trackedStrikes:
                     continue  # We don't want to create many tasks when we only remove one
-                user = userDB.find_one({'_id': pun['user']})
+
+                user = await tools.fetch_dbuser(int(pun['user']))
                 trackedStrikes.append(pun['user'])
                 tryTime = 0  # Default to immediately
                 try:
@@ -854,7 +855,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
-        userDoc = userDB.find_one({'_id': user.id})
+        userDoc = await tools.fetch_dbuser(user)
         if not userDoc:
             return await interaction.followup.send(
                 f'{config.redTick} Unable strike user who has never joined the server'
@@ -1049,7 +1050,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         twelveHr = 60 * 60 * 12
         if doc['type'] == 'strike':
             userDB = mclient.bowser.users
-            user = userDB.find_one({'_id': doc['user']})
+            user = await tools.fetch_dbuser(int(doc['user']))
             try:
                 if user['strike_check'] > time.time():
                     # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner

@@ -193,7 +193,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     async def _profile_view(self, interaction: discord.Interaction, member: discord.Member):
         db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
+        dbUser = await tools.fetch_dbuser(member)
 
         # If profile not setup and running on self: force ephemeral and provide NUX
         if not dbUser['profileSetup'] and member == interaction.user:
@@ -417,7 +417,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     async def _generate_profile_card_from_member(self, member: discord.Member, guild: discord.Guild) -> discord.File:
         db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
+        dbUser = await tools.fetch_dbuser(member)
 
         if 'default' in dbUser['backgrounds']:
             backgrounds = list(dbUser['backgrounds'])
@@ -430,7 +430,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if dbUser['background'] == 'default':
                 db.update_one({'_id': member.id}, {'$set': {'background': 'default-light'}})
 
-            dbUser = db.find_one({'_id': member.id})
+            dbUser = await tools.fetch_dbuser(member)
 
         ## Get avatar ##
         pfpBytes = io.BytesIO(await member.display_avatar.with_format('png').with_size(256).read())
@@ -714,8 +714,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
     async def modify_trivia_level(self, member: discord.Member, guild: discord.Guild, regress=False):
-        db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
+        dbUser = await tools.fetch_dbuser(member)
         currentLevel = 0
 
         for t in dbUser['trophies']:
@@ -865,6 +864,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_friendcode(self, interaction: discord.Interaction, code: str):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
 
         friendcode = re.search(self.friendCodeRegex['profile'], code)
         if friendcode:  # re match
@@ -919,6 +919,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_flag(self, interaction: discord.Interaction, flag: str):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
         flag = flag.strip()
 
         code_points = self.check_flag(flag)
@@ -959,6 +960,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.defer(ephemeral=True)
 
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
         for tz in pytz.all_timezones:
             if timezone.lower() == tz.lower():
                 db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
@@ -1001,6 +1003,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.defer(ephemeral=True)
 
         db = mclient.bowser.games
+        await tools.fetch_dbuser(interaction.user)
 
         # If user selected an auto-complete result, we will be provided the deku_id automatically which saves effort
         flagConfirmation = False
@@ -1160,8 +1163,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_background(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        db = mclient.bowser.users
-        user = db.find_one({'_id': interaction.user.id})
+        user = await tools.fetch_dbuser(interaction.user.id)
         bg = user['background']
 
         choices = []
@@ -1212,6 +1214,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
         msg = f'Your {element.lower()} {elementKeyPairs[element][1]} been removed from your profile successfully'
         if element == 'Favorite Games':
             db.update_one({'_id': interaction.user.id}, {'$set': {'favgames': []}})
@@ -1234,8 +1237,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     )
     async def _profile_edit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        db = mclient.bowser.users
-        u = db.find_one({'_id': interaction.user.id})
+        u = await tools.fetch_dbuser(interaction.user.id)
         embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
         await interaction.followup.send(embed=embed, file=card)
 
@@ -1490,6 +1492,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
         failCount = 0
         for m in users:
+            await tools.fetch_dbuser(m)
             try:
                 await tools.commit_profile_change(self.bot, m, interaction.guild, item, name)
 
@@ -1552,6 +1555,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
         failCount = 0
         for m in users:
+            await tools.fetch_dbuser(m)
             try:
                 await tools.commit_profile_change(self.bot, m, interaction.guild, item, name, revoke=True)
 

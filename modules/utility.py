@@ -370,25 +370,37 @@ class ChatControl(commands.Cog, name='Utility Commands'):
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
     @app_commands.checks.has_any_role(config.moderator, config.eh)
-    async def _info(self, interaction: discord.Interaction, user: discord.User):
+    async def _info(self, interaction: discord.Interaction, user: typing.Union[discord.User, discord.Member]):
         await interaction.response.defer(ephemeral=tools.mod_cmd_invoke_delete(interaction.channel))
         inServer = True
-        dbUser = mclient.bowser.users.find_one({'_id': user.id})
-        if interaction.guild.get_member(user.id):
-            user = interaction.guild.get_member(user.id)
+        dbUser = await tools.fetch_dbuser(user, return_existance_only=True)
+        guildMember = interaction.guild.get_member(user.id) # Since we can look up any user, replace with Member if available
+        if guildMember and dbUser:
+            # Overwrite discord.User with discord.Member obj
+            user = guildMember
+
+        elif guildMember and not dbUser:
+            # Missing member doc, but a Member
+            user = guildMember
+            dbUser = await tools.fetch_dbuser(user)
 
         else:
             try:
                 user = await interaction.guild.fetch_member(user.id)
+                # Fetch successful at this point, create user doc if it doesn't exist
+                if not dbUser:
+                    dbUser = await tools.fetch_dbuser(user)
 
             except discord.NotFound:
+                # We've failed to extract a discord.Member entirely; rely only on if a value exists in the collection or not
                 pass
+
 
         if not dbUser:
             inServer = False
             desc = (
-                f'Fetched information about {user.mention} from the API because they are not in this server. '
-                'There is little information to display as they have not been recorded joining the server before'
+                f'Information about {user.mention} is provided from the API because they are not in this server. '
+                'There is little information to display as they have not been recorded joining the server before.'
             )
 
             # Case where a user could have an infraction even if they've never been recorded joining, i.e. ban
@@ -1201,7 +1213,7 @@ class ChatControl(commands.Cog, name='Utility Commands'):
         if feature == 'modmail':
             context = 'modmail'
             users = mclient.bowser.users
-            dbUser = users.find_one({'_id': member.id})
+            dbUser = await tools.fetch_dbuser(member)
 
             if dbUser['modmail']:
                 users.update_one({'_id': member.id}, {'$set': {'modmail': False}})
