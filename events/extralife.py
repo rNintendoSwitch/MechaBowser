@@ -69,7 +69,7 @@ class ExtraLife(commands.Cog):
         name='ldi', description='Fetch the last donation id stored, and optionally set one manually'
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
-    async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+    async def lastdonorid(self, interaction: discord.Interaction, id: str = ''):
         self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
         self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
         self.general = await self.bot.fetch_channel(self.GENERAL)
@@ -98,7 +98,7 @@ class ExtraLife(commands.Cog):
                 await tools.fetch_dbuser(obj)
                 await self._assign_properties(obj)
 
-            except (ValueError, AttributeError, discord.NotFound)):
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
