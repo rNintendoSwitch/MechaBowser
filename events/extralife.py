@@ -17,7 +17,7 @@ class ExtraLife(commands.Cog):
     def __init__(self, bot):
         ################################################################################################################################
         self.GUILD = 238080556708003851
-        self.guild_obj = bot.get_channel self.GUILD
+        self.guild_obj = bot.get_channel
 
         # Donation Alert Consts
         self.EXTRA_LIFE_ADMIN = 772464126483890227
