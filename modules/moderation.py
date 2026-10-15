@@ -478,15 +478,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         successIDs = [s.id for s in successes]
         for user in [u for u in banList if u.id in successIDs]:
-            docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
+            docID = await tools.issue_pun(user.id, interaction.user.id, 'ban', reason=reason)
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
                 'ban',
                 docID,
                 reason,
-                username=str(u),
-                userid=u.id,
+                username=str(user),
+                userid=user.id,
                 moderator=interaction.user,
                 public=True,
             )
