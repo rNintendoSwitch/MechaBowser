@@ -356,6 +356,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             except ValueError:
                 if multiban:
                     failedBans.append(u)
+                    continue
 
                 else:
                     return await interaction.followup.send(
