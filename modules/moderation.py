@@ -381,12 +381,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             username = user.name
             userStr = f'{username} ({ban_id})'
             member = interaction.guild.get_member(ban_id)
+            if not member:
+                try:
+                    member = await interaction.guild.fetch_member(ban_id)
+                    usr_role_pos = member.top_role.position
 
-            if member:
-                usr_role_pos = member.top_role.position
+                except discord.NotFound:
+                    usr_role_pos = -1
 
             else:
-                usr_role_pos = -1
+                usr_role_pos = member.top_role.position
 
             if (usr_role_pos >= interaction.guild.me.top_role.position) or (
                 usr_role_pos >= interaction.user.top_role.position
