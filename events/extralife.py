@@ -17,6 +17,7 @@ class ExtraLife(commands.Cog):
     def __init__(self, bot):
         ################################################################################################################################
         self.GUILD = 238080556708003851
+        self.guild_obj = bot.get_channel
 
         # Donation Alert Consts
         self.EXTRA_LIFE_ADMIN = 772464126483890227
@@ -68,7 +69,7 @@ class ExtraLife(commands.Cog):
         name='ldi', description='Fetch the last donation id stored, and optionally set one manually'
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
-    async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+    async def lastdonorid(self, interaction: discord.Interaction, id: str = ''):
         self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
         self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
         self.general = await self.bot.fetch_channel(self.GENERAL)
@@ -91,9 +92,13 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
+
+                await tools.fetch_dbuser(obj)
                 await self._assign_properties(obj)
 
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
@@ -104,7 +109,7 @@ class ExtraLife(commands.Cog):
         else:
             content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
@@ -118,9 +123,13 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
+
+                await tools.fetch_dbuser(obj)
                 await self._remove_properties(obj)
 
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
@@ -131,7 +140,7 @@ class ExtraLife(commands.Cog):
         else:
             content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()
@@ -220,13 +229,13 @@ class ExtraLife(commands.Cog):
 
     async def _assign_properties(self, member: discord.Member):
         await member.add_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY)
-        await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'trophy', self.TROPHY)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'background', self.BACKGROUND)
 
     async def _remove_properties(self, member: discord.Member):
         await member.remove_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY, revoke=True)
-        await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'trophy', self.TROPHY, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'background', self.BACKGROUND, revoke=True)
 
     async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
