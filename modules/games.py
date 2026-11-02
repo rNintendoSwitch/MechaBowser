@@ -189,15 +189,19 @@ class Games(commands.Cog, name='Games'):
         return ret if multiResult else ret[0]
 
     async def _games_search_autocomplete(self, interaction: discord.Interaction, current: str):
+        def truncate_name(name: str) -> str:
+            if len(name) > 100:
+                return name[:99] + '…'
+            return name
+        
         if current:
             games = self.search(current, True)
-
         else:
             # Current textbox is empty
-            return [app_commands.Choice(name=game['name'], value=game['deku_id']) for game in self.topGames]
+            return [app_commands.Choice(name=truncate_name(game['name']), value=game['deku_id']) for game in self.topGames]
 
         if games:
-            return [app_commands.Choice(name=game['name'], value=game['deku_id']) for game in games]
+            return [app_commands.Choice(name=truncate_name(game['name']), value=game['deku_id']) for game in games]
         else:
             return []
 
