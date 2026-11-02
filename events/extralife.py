@@ -26,6 +26,7 @@ class ExtraLife(commands.Cog):
         self.DONATIONS_URL = 'https://dd.extra-life.org/api/participants/580314/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
         self.REQUEST_HEADERS = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
+        self.EMBED_COLOR = 0x0E7CA2
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
@@ -193,7 +194,7 @@ class ExtraLife(commands.Cog):
             )  # eg 2020-11-07T06:00:07.327+0000
 
             embed = discord.Embed(
-                title="Extra Life Donation Alert!", colour=discord.Color(8378422), timestamp=donation_time
+                title="Extra Life Donation Alert!", colour=discord.Color(self.EMBED_COLOR), timestamp=donation_time
             )
             embed.add_field(name="From", value=donor_name, inline=True)
 
