@@ -23,24 +23,26 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://extra-life.org/api/participants/549812/donations'
+        self.DONATIONS_URL = 'https://dd.extra-life.org/api/participants/580314/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
         self.REQUEST_HEADERS = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
 
         # Role adding consts
         self.CHAT_CHANNEL = 654018662860193830
-        self.CHAT_ROLE = 1365349551929823242
-        self.DONOR_ROLE = 1365349619306987610
+        self.CHAT_ROLE = 1566938431823683594
+        self.DONOR_ROLE = 1566938352962240634
 
         # Trophy and Background consts
-        self.TROPHY = 'extra-life-2025'
+        self.TROPHY = 'extra-life-2026'
         self.BACKGROUND = 'extra-life'
 
         # Donation incentive ID consts
         self.INCENTIVES = {
             # 'uuiduuid-uuid-uuid-uuiduuiduuiduuid': 'Friendly Name',
-            '479328F2-089C-A2E0-EBD491D69CFF478C': 'Series 1 & 2 sticker sheets (Physical)',
-            '47989E42-CB98-0684-6BF8656B760A413E': 'Enamel pin & Sticker sheets (Physical)',
+            '2DF8A1BA-0F74-7C0D-3D792ACEA10072EE': 'Series 1 & 2 sticker sheets (Physical)',
+            '2DFBEA8F-03C0-00DB-F2E1C7B981B0CF6F': 'Series 3 & 4 sticker sheets (Physical)',
+            '2E028B01-0568-C2F1-EE8431E12006EAC4': 'Snoo enamel pin (Physical)',
+            '2E095280-0B62-EC66-5C5DC8805BF9C27D': 'All 4 sticker sheets + Snoo enamel pin (Physical)',
         }
 
         ################################################################################################################################
