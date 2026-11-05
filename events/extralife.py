@@ -23,7 +23,8 @@ class ExtraLife(commands.Cog):
         self.EXTRA_LIFE = 654018662860193830
         self.GENERAL = 238081280632160257
         self.DONATIONS = 774672505540968468
-        self.DONATIONS_URL = 'https://dd.extra-life.org/api/participants/580314/donations'
+        self.PARTICIPANT_URL = 'https://dd.extra-life.org/api/participants/580314'
+        self.DONATIONS_URL = self.PARTICIPANT_URL + '/donations'
         self.FOOTER_LINKS = '[Watch live on Twitch](https://twitch.tv/rNintendoSwitch)\n[Donate to Children\'s Miracle Network Hospitals](https://rNintendoSwitch.com/donate)'
         self.REQUEST_HEADERS = {'User-Agent': 'MechaBowser (+https://github.com/rNintendoSwitch/MechaBowser)'}
         self.EMBED_COLOR = 0x0E7CA2
@@ -32,6 +33,13 @@ class ExtraLife(commands.Cog):
         self.CHAT_CHANNEL = 654018662860193830
         self.CHAT_ROLE = 1566938431823683594
         self.DONOR_ROLE = 1566938352962240634
+
+        # Stat channel consts
+        self.YEAR = 2026
+        self.YEAR_STATS_CHANNEL = 1010541101955944518  # "2026 Goal: $60 / $1,000"
+        self.LIFETIME_STATS_CHANNEL = 1010540935890882580  # "Lifetime Goal: $9,420 / $10,000"
+        self.LIFETIME_BEFORE_YEAR = 9359.97  # Lifetime total raised before this year's event
+        self.LIFETIME_GOAL = 10000
 
         # Trophy and Background consts
         self.TROPHY = 'extra-life-2026'
@@ -56,6 +64,7 @@ class ExtraLife(commands.Cog):
         self.lastDonationID = None
 
         self.donation_check.start()
+        self.stats_channels.start()
 
     @app_commands.guilds(discord.Object(id=config.nintendoswitch))
     @app_commands.default_permissions(view_audit_log=True)
@@ -231,8 +240,50 @@ class ExtraLife(commands.Cog):
         await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY, revoke=True)
         await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND, revoke=True)
 
+    @tasks.loop(minutes=5)
+    async def stats_channels(self):
+        try:
+            participant_request = requests.get(self.PARTICIPANT_URL, timeout=8.0, headers=self.REQUEST_HEADERS)
+            participant_request.raise_for_status()
+            participant = participant_request.json()
+        except Exception as e:
+            logging.error(f'[ExtraLife] Unable to fetch donation totals: {e}')
+            return
+
+        raised = participant.get('sumDonations', 0)
+        goal = participant.get('fundraisingGoal', 0)
+        lifetime = self.LIFETIME_BEFORE_YEAR + raised
+
+        await self._rename_channel(
+            self.YEAR_STATS_CHANNEL, f'{self.YEAR} Goal: {self._dollars(raised)} / {self._dollars(goal)}'
+        )
+        if lifetime >= self.LIFETIME_GOAL:
+            lifetime_name = f'Lifetime: {self._dollars(lifetime)} 🎉'
+        else:
+            lifetime_name = f'Lifetime Goal: {self._dollars(lifetime)} / {self._dollars(self.LIFETIME_GOAL)}'
+        await self._rename_channel(self.LIFETIME_STATS_CHANNEL, lifetime_name)
+
+    @staticmethod
+    def _dollars(amount: float) -> str:
+        # Whole dollars, rounded down so we never show a goal as met before it is
+        return '${:,}'.format(int(amount))
+
+    async def _rename_channel(self, channel_id: int, name: str):
+        channel = self.guild.get_channel(channel_id)
+        if channel is None:
+            logging.error(f'[ExtraLife] Stats channel {channel_id} not found')
+            return
+        if channel.name == name:
+            return  # Skip unchanged names; renames are heavily rate limited
+
+        try:
+            await channel.edit(name=name, reason='Extra Life donation totals')
+        except discord.HTTPException as e:
+            logging.error(f'[ExtraLife] Unable to rename stats channel {channel_id}: {e}')
+
     async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
+        self.stats_channels.cancel()  # pylint: disable=no-member
 
 
 async def setup(bot):
