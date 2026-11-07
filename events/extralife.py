@@ -7,6 +7,7 @@ import config
 import discord
 import pymongo
 import requests
+import typing
 from discord import app_commands
 from discord.ext import commands, tasks
 
@@ -71,17 +72,17 @@ class ExtraLife(commands.Cog):
         name='ldi', description='Fetch the last donation id stored, and optionally set one manually'
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
-    async def lastdonorid(self, interaction: discord.Interaction, id: str = ''):
+    async def lastdonorid(self, interaction: discord.Interaction, id: typing.Optional[str]):
         self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
         self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
         self.general = await self.bot.fetch_channel(self.GENERAL)
         self.donations = await self.bot.fetch_channel(self.DONATIONS)
 
-        if id is None:
-            return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
+        if not id:
+            return await interaction.response.send_message(content=f'Last donation id is currently set to `{str(self.lastDonationID)}`')
 
         self.lastDonationID = id
-        return await interaction.response.send_message(content=f'Last donation id set to `{id}`')
+        return await interaction.response.send_message(content=f'Last donation id now set to `{id}`')
 
     @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of user ids')
     @app_commands.describe(members='A space separated list of member IDs to grant extra life perks to')
