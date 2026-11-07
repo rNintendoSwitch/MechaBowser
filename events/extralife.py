@@ -110,20 +110,20 @@ class ExtraLife(commands.Cog):
                     obj = await interaction.guild.fetch_member(int(member))
 
                 await tools.fetch_dbuser(obj)
-                await self._assign_properties(obj)
+                await self._change_properties(obj, revoke=False)
 
             except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
             return await interaction.edit_original_response(
-                content=f'{config.redTick} Failed to grant Extra Life perks all provided members'
+                content=f'{config.redTick} All provided users already have extra life donation perks'
             )
 
         else:
             content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
+                content += f'.\n📋 Unable to grant some members perks-- ensure the ID(s) are correct. Otherwise, they already have perks assigned: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
@@ -141,20 +141,20 @@ class ExtraLife(commands.Cog):
                     obj = await interaction.guild.fetch_member(int(member))
 
                 await tools.fetch_dbuser(obj)
-                await self._remove_properties(obj)
+                await self._change_properties(obj, revoke=True)
 
             except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
             return await interaction.edit_original_response(
-                content=f'{config.redTick} Extra Life perks revoked from 0 members'
+                content=f'{config.redTick} No provided members have perks to remove'
             )
 
         else:
             content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
+                content += f'.\n📋 Unable to revoke some members perks-- ensure the ID(s) are correct. Otherwise, they didn\'t have perks assigned: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()
@@ -201,12 +201,12 @@ class ExtraLife(commands.Cog):
                     if member.name == match.group(0):
                         if self.donorRole not in member.roles:
                             try:
-                                await self._assign_properties(member)
+                                await self._change_properties(member, revoke=False)
 
                             except ValueError:
-                                await self.extra_life_admin.send(
-                                    f':warning: An error occured while attempting to grant donation benefits to `{donor_name}`, they already have the background or trophy'
-                                )
+                                pass
+
+                            break
 
                     donor_name = donor_name + f' ({member.mention})'
 
@@ -242,15 +242,31 @@ class ExtraLife(commands.Cog):
 
         self.lastDonationID = donations[0]['donationID']
 
-    async def _assign_properties(self, member: discord.Member):
-        await member.add_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY)
-        await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND)
+    async def _change_properties(self, member: discord.Member, revoke: bool):
+        has_valueerror_raised = False
+        if revoke:
+            await member.remove_roles(self.donorRole)
 
-    async def _remove_properties(self, member: discord.Member):
-        await member.remove_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY, revoke=True)
-        await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND, revoke=True)
+        else:
+            await member.add_roles(self.donorRole)
+
+        try:
+            await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY, revoke=True)
+
+        except ValueError:
+            has_valueerror_raised = True
+            pass
+        
+        try:
+            await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND, revoke=True)
+
+        except ValueError:
+            has_valueerror_raised = True
+            pass
+
+        if has_valueerror_raised:
+            # We always want both commits to run to ensure all changes are made, but reraise the error if either returned ValueError
+            raise ValueError('One or more perks failed to apply')
 
     @tasks.loop(minutes=5)
     async def stats_channels(self):
