@@ -184,17 +184,18 @@ class ExtraLife(commands.Cog):
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
             match = re.match(r'[\s\S]+#\d{4}|[a-z0-9._]+', donor_name.lower())
             if match:
-                # Donor name format matches a Discord username
-                member = discord.utils.find(lambda m: str(m) == match.group(0), self.guild.members)
-                if member:
-                    if self.donorRole not in member.roles:
-                        try:
-                            await self._assign_properties(member)
+                # Donor name format matches a Discord username's format
+                potential_members = await self.guild.query_members(query=match.group(0), limit=100)
+                for member in potential_members:
+                    if member.name == match.group(0):
+                        if self.donorRole not in member.roles:
+                            try:
+                                await self._assign_properties(member)
 
-                        except ValueError:
-                            await self.extra_life_admin.send(
-                                f':warning: An error occured while attempting to grant donation benefits to `{donor_name}`, they already have the background or trophy'
-                            )
+                            except ValueError:
+                                await self.extra_life_admin.send(
+                                    f':warning: An error occured while attempting to grant donation benefits to `{donor_name}`, they already have the background or trophy'
+                                )
 
                     donor_name = donor_name + f' ({member.mention})'
 
