@@ -16,8 +16,7 @@ import tools
 class ExtraLife(commands.Cog):
     def __init__(self, bot):
         ################################################################################################################################
-        self.GUILD = 238080556708003851
-        self.guild_obj = bot.get_channel
+        self.GUILD_ID = 238080556708003851
 
         # Donation Alert Consts
         self.EXTRA_LIFE_ADMIN = 772464126483890227
@@ -51,7 +50,7 @@ class ExtraLife(commands.Cog):
 
         self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
-        self.guild = self.bot.get_guild(self.GUILD)
+        self.guild = self.bot.get_guild(self.GUILD_ID)
         self.chatRole = self.guild.get_role(self.CHAT_ROLE)
         self.donorRole = self.guild.get_role(self.DONOR_ROLE)
         self.lastDonationID = None
@@ -233,13 +232,13 @@ class ExtraLife(commands.Cog):
 
     async def _assign_properties(self, member: discord.Member):
         await member.add_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'trophy', self.TROPHY)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'background', self.BACKGROUND)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND)
 
     async def _remove_properties(self, member: discord.Member):
         await member.remove_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'trophy', self.TROPHY, revoke=True)
-        await tools.commit_profile_change(self.bot, member, self.guild_obj, 'background', self.BACKGROUND, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND, revoke=True)
 
     async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
