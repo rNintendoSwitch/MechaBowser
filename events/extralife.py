@@ -256,7 +256,7 @@ class ExtraLife(commands.Cog):
         except ValueError:
             has_valueerror_raised = True
             pass
-        
+
         try:
             await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND, revoke=True)
 
