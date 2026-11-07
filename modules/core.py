@@ -24,8 +24,8 @@ class MainEvents(commands.Cog):
         self.serverLogLastSend = time.time()
 
     async def cog_load(self):
-        logging.info('[Core] Waiting for guild caches to chunk...')
-        await asyncio.sleep(15)
+        # logging.info('[Core] Waiting for guild caches to chunk...')
+        # await asyncio.sleep(15)
         try:
             await self.bot.load_extension('tools')
             await self.bot.load_extension('modules.moderation')
@@ -33,10 +33,11 @@ class MainEvents(commands.Cog):
             await self.bot.load_extension('modules.statistics')
             await self.bot.load_extension('modules.games')
             await self.bot.load_extension('modules.social')
-            try:  # Private submodule extensions
-                await self.bot.load_extension('private.automod')
-            except commands.errors.ExtensionNotFound:
-                logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
+            # Disable automod submodule
+            # try:  # Private submodule extensions
+            #    await self.bot.load_extension('private.automod')
+            # except commands.errors.ExtensionNotFound:
+            #    logging.error('[Core] Unable to load one or more private modules, are you missing the submodule?')
 
         except discord.ext.commands.errors.ExtensionAlreadyLoaded:
             pass
@@ -192,6 +193,7 @@ class MainEvents(commands.Cog):
             return
 
         # Add to database
+        await tools.fetch_dbuser(member)
         mclient.bowser.users.update_one(
             {'_id': member.id},
             {
@@ -225,13 +227,12 @@ class MainEvents(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member):
         db = mclient.bowser.users
-        doc = db.find_one({'_id': member.id})
+        doc = await tools.fetch_dbuser(member)
         roleList = []
         restored = False
 
         if not doc:
-            await tools.store_user(member)
-            doc = db.find_one({'_id': member.id})
+            doc = await tools.fetch_dbuser(member)
 
         else:
             db.update_one(
@@ -608,7 +609,7 @@ class MainEvents(commands.Cog):
                 )
                 return
 
-            dbUser = db.find_one({'_id': dbMessage['author']})
+            dbUser = await tools.fetch_dbuser(int(dbMessage['author']))
             if not dbUser or not dbUser['nameHist']:
                 # The user either isn't in the database (unlikely) or we have no prior names recorded
                 user = {'author_field': f'{dbMessage['author']}', 'author_id': dbMessage['author'], 'author_icon': None}
@@ -698,7 +699,7 @@ class MainEvents(commands.Cog):
     async def on_member_update(self, before, after):
         userCol = mclient.bowser.users
         if before.display_name != after.display_name:
-            userCol.update_one(
+            result = userCol.update_one(
                 {'_id': before.id},
                 {
                     '$push': {
@@ -711,6 +712,10 @@ class MainEvents(commands.Cog):
                     }
                 },
             )
+            if result.matched_count == 0:
+                # Missing user document
+                return await tools.fetch_dbuser(after)
+
             if not before.display_name:
                 before_name = before.name
 
@@ -742,7 +747,10 @@ class MainEvents(commands.Cog):
                     roleList.append(x.id)
                 roleStr.append(x.name)
 
-            userCol.update_one({'_id': before.id}, {'$set': {'roles': roleList}})
+            result = userCol.update_one({'_id': before.id}, {'$set': {'roles': roleList}})
+            if result.matched_count == 0:
+                # Missing user document
+                return await tools.fetch_dbuser(after)
 
             beforeCounter = collections.Counter(before.roles)
             afterCounter = collections.Counter(after.roles)
@@ -782,7 +790,7 @@ class MainEvents(commands.Cog):
             after_name = discord.utils.escape_markdown(str(after))
             userCol = mclient.bowser.users
 
-            userCol.update_one(
+            result = userCol.update_one(
                 {'_id': before.id},
                 {
                     '$push': {
@@ -795,6 +803,10 @@ class MainEvents(commands.Cog):
                     }
                 },
             )
+            if result.matched_count == 0:
+                # Missing user document
+                return await tools.fetch_dbuser(after)
+
             embed = discord.Embed(color=0x9535EC, timestamp=datetime.now(tz=timezone.utc))
             embed.set_author(name=f'{after} ({after.id})', icon_url=after.display_avatar.url)
             embed.add_field(name='Before', value=before_name, inline=False)
@@ -846,10 +858,7 @@ class MainEvents(commands.Cog):
         guild = self.bot.get_guild(config.nintendoswitch)
 
         for member in guild.members:
-            doc = db.find_one({'_id': member.id})
-            if not doc:
-                await tools.store_user(member)
-                continue
+            doc = await tools.fetch_dbuser(member)
 
             roleList = []
             for role in member.roles:
@@ -860,6 +869,7 @@ class MainEvents(commands.Cog):
                 continue
 
             db.update_one({'_id': member.id}, {'$set': {'roles': roleList}})
+
         logging.info('[Core] User database syncronization complete')
         return await interaction.followup.send('Done.')
 

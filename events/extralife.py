@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from datetime import datetime
 from typing import List
 
@@ -16,7 +17,7 @@ import tools
 class ExtraLife(commands.Cog):
     def __init__(self, bot):
         ################################################################################################################################
-        self.GUILD = 238080556708003851
+        self.GUILD_ID = 238080556708003851
 
         # Donation Alert Consts
         self.EXTRA_LIFE_ADMIN = 772464126483890227
@@ -50,7 +51,7 @@ class ExtraLife(commands.Cog):
 
         self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
-        self.guild = self.bot.get_guild(self.GUILD)
+        self.guild = self.bot.get_guild(self.GUILD_ID)
         self.chatRole = self.guild.get_role(self.CHAT_ROLE)
         self.donorRole = self.guild.get_role(self.DONOR_ROLE)
         self.lastDonationID = None
@@ -71,17 +72,19 @@ class ExtraLife(commands.Cog):
         name='ldi', description='Fetch the last donation id stored, and optionally set one manually'
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
-    async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+    async def lastdonorid(self, interaction: discord.Interaction, id: typing.Optional[str]):
         self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
         self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
         self.general = await self.bot.fetch_channel(self.GENERAL)
         self.donations = await self.bot.fetch_channel(self.DONATIONS)
 
-        if id is None:
-            return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
+        if not id:
+            return await interaction.response.send_message(
+                content=f'Last donation id is currently set to `{str(self.lastDonationID)}`'
+            )
 
         self.lastDonationID = id
-        return await interaction.response.send_message(content=f'Last donation id set to `{id}`')
+        return await interaction.response.send_message(content=f'Last donation id now set to `{id}`')
 
     @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of user ids')
     @app_commands.describe(members='A space separated list of member IDs to grant extra life perks to')
@@ -94,9 +97,13 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
+
+                await tools.fetch_dbuser(obj)
                 await self._assign_properties(obj)
 
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
@@ -107,7 +114,7 @@ class ExtraLife(commands.Cog):
         else:
             content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
@@ -121,9 +128,13 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
+
+                await tools.fetch_dbuser(obj)
                 await self._remove_properties(obj)
 
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
@@ -134,7 +145,7 @@ class ExtraLife(commands.Cog):
         else:
             content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\nSome actions failed-- member must be in the server and the ID be valid: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()
@@ -175,17 +186,18 @@ class ExtraLife(commands.Cog):
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
             match = re.match(r'[\s\S]+#\d{4}|[a-z0-9._]+', donor_name.lower())
             if match:
-                # Donor name format matches a Discord username
-                member = discord.utils.find(lambda m: str(m) == match.group(0), self.guild.members)
-                if member:
-                    if self.donorRole not in member.roles:
-                        try:
-                            await self._assign_properties(member)
+                # Donor name format matches a Discord username's format
+                potential_members = await self.guild.query_members(query=match.group(0), limit=100)
+                for member in potential_members:
+                    if member.name == match.group(0):
+                        if self.donorRole not in member.roles:
+                            try:
+                                await self._assign_properties(member)
 
-                        except ValueError:
-                            await self.extra_life_admin.send(
-                                f':warning: An error occured while attempting to grant donation benefits to `{donor_name}`, they already have the background or trophy'
-                            )
+                            except ValueError:
+                                await self.extra_life_admin.send(
+                                    f':warning: An error occured while attempting to grant donation benefits to `{donor_name}`, they already have the background or trophy'
+                                )
 
                     donor_name = donor_name + f' ({member.mention})'
 
@@ -223,13 +235,13 @@ class ExtraLife(commands.Cog):
 
     async def _assign_properties(self, member: discord.Member):
         await member.add_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY)
-        await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND)
 
     async def _remove_properties(self, member: discord.Member):
         await member.remove_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY, revoke=True)
-        await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY, revoke=True)
+        await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND, revoke=True)
 
     async def cog_unload(self):
         self.donation_check.cancel()  # pylint: disable=no-member
