@@ -200,6 +200,7 @@ class ExtraLife(commands.Cog):
                 for member in potential_members:
                     if member.name == match.group(0):
                         if self.donorRole not in member.roles:
+                            donor_name = donor_name + f' ({member.mention})'
                             try:
                                 await self._change_properties(member, revoke=False)
 
@@ -207,8 +208,6 @@ class ExtraLife(commands.Cog):
                                 pass
 
                             break
-
-                    donor_name = donor_name + f' ({member.mention})'
 
             donation_time = datetime.strptime(
                 donation['createdDateUTC'], '%Y-%m-%dT%H:%M:%S.%f%z'
