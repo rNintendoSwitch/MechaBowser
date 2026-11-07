@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from datetime import datetime
 from typing import List
 
@@ -7,7 +8,6 @@ import config
 import discord
 import pymongo
 import requests
-import typing
 from discord import app_commands
 from discord.ext import commands, tasks
 
@@ -79,7 +79,9 @@ class ExtraLife(commands.Cog):
         self.donations = await self.bot.fetch_channel(self.DONATIONS)
 
         if not id:
-            return await interaction.response.send_message(content=f'Last donation id is currently set to `{str(self.lastDonationID)}`')
+            return await interaction.response.send_message(
+                content=f'Last donation id is currently set to `{str(self.lastDonationID)}`'
+            )
 
         self.lastDonationID = id
         return await interaction.response.send_message(content=f'Last donation id now set to `{id}`')
