@@ -51,7 +51,8 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             if pun['type'] == 'strike':
                 if pun['user'] in trackedStrikes:
                     continue  # We don't want to create many tasks when we only remove one
-                user = userDB.find_one({'_id': pun['user']})
+
+                user = await tools.fetch_dbuser(int(pun['user']))
                 trackedStrikes.append(pun['user'])
                 tryTime = 0  # Default to immediately
                 try:
@@ -355,6 +356,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             except ValueError:
                 if multiban:
                     failedBans.append(u)
+                    continue
 
                 else:
                     return await interaction.followup.send(
@@ -379,12 +381,16 @@ class Moderation(commands.Cog, name='Moderation Commands'):
             username = user.name
             userStr = f'{username} ({ban_id})'
             member = interaction.guild.get_member(ban_id)
+            if not member:
+                try:
+                    member = await interaction.guild.fetch_member(ban_id)
+                    usr_role_pos = member.top_role.position
 
-            if member:
-                usr_role_pos = member.top_role.position
+                except discord.NotFound:
+                    usr_role_pos = -1
 
             else:
-                usr_role_pos = -1
+                usr_role_pos = member.top_role.position
 
             if (usr_role_pos >= interaction.guild.me.top_role.position) or (
                 usr_role_pos >= interaction.user.top_role.position
@@ -477,15 +483,15 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         successIDs = [s.id for s in successes]
         for user in [u for u in banList if u.id in successIDs]:
-            docID = await tools.issue_pun(ban_id, interaction.user.id, 'ban', reason=reason)
+            docID = await tools.issue_pun(user.id, interaction.user.id, 'ban', reason=reason)
             await tools.send_modlog(
                 self.bot,
                 self.modLogs,
                 'ban',
                 docID,
                 reason,
-                username=username,
-                userid=ban_id,
+                username=str(user),
+                userid=user.id,
                 moderator=interaction.user,
                 public=True,
             )
@@ -854,7 +860,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
 
         punDB = mclient.bowser.puns
         userDB = mclient.bowser.users
-        userDoc = userDB.find_one({'_id': user.id})
+        userDoc = await tools.fetch_dbuser(user)
         if not userDoc:
             return await interaction.followup.send(
                 f'{config.redTick} Unable strike user who has never joined the server'
@@ -1049,7 +1055,7 @@ class Moderation(commands.Cog, name='Moderation Commands'):
         twelveHr = 60 * 60 * 12
         if doc['type'] == 'strike':
             userDB = mclient.bowser.users
-            user = userDB.find_one({'_id': doc['user']})
+            user = await tools.fetch_dbuser(int(doc['user']))
             try:
                 if user['strike_check'] > time.time():
                     # To prevent drift we recall every 12 hours. Schedule for 12hr or expiry time, whichever is sooner
@@ -1113,7 +1119,11 @@ class Moderation(commands.Cog, name='Moderation Commands'):
                     public_notify = True
 
             else:
-                member = await self.bot.fetch_user(doc['user'])
+                try:
+                    member = await punGuild.fetch_member(doc['user'])
+
+                except discord.NotFound:
+                    member = await self.bot.fetch_user(doc['user'])
 
             newPun = db.find_one_and_update({'_id': doc['_id']}, {'$set': {'active': False}})
             docID = await tools.issue_pun(

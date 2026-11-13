@@ -113,7 +113,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         self.special_trophies = {
             'bot': lambda member, guild: member.bot,
-            'owner': lambda member, guild: member.id == guild.owner.id,
+            'owner': lambda member, guild: member.id == guild.owner_id,
             'developer': lambda member, guild: member.id in self.bot_contributors,
             'chat-mod': lambda member, guild: guild.get_role(config.chatmod) in member.roles,
             'sub-mod': lambda member, guild: guild.get_role(config.submod) in member.roles,
@@ -193,7 +193,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
     async def _profile_view(self, interaction: discord.Interaction, member: discord.Member):
         db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
+        dbUser = await tools.fetch_dbuser(member)
 
         # If profile not setup and running on self: force ephemeral and provide NUX
         if not dbUser['profileSetup'] and member == interaction.user:
@@ -222,7 +222,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                         return
 
             await interaction.response.defer()
-            card = await self._generate_profile_card_from_member(member)
+            card = await self._generate_profile_card_from_member(member, interaction.guild)
             await interaction.followup.send(file=card)
 
     def _load_fonts(self, fonts_defs):
@@ -415,9 +415,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         canvas.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='preview.png')
 
-    async def _generate_profile_card_from_member(self, member: discord.Member) -> discord.File:
+    async def _generate_profile_card_from_member(self, member: discord.Member, guild: discord.Guild) -> discord.File:
         db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
+        dbUser = await tools.fetch_dbuser(member)
 
         if 'default' in dbUser['backgrounds']:
             backgrounds = list(dbUser['backgrounds'])
@@ -430,7 +430,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             if dbUser['background'] == 'default':
                 db.update_one({'_id': member.id}, {'$set': {'background': 'default-light'}})
 
-            dbUser = db.find_one({'_id': member.id})
+            dbUser = await tools.fetch_dbuser(member)
 
         ## Get avatar ##
         pfpBytes = io.BytesIO(await member.display_avatar.with_format('png').with_size(256).read())
@@ -478,7 +478,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 trophies.append(x)
 
         for trophy, lambda_function in self.special_trophies.items():
-            if lambda_function(member, member.guild):
+            if lambda_function(member, guild):
                 trophies.append(trophy)
 
         if len(trophies) < 18:  # Check for additional non-prefered trophies
@@ -713,9 +713,8 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         card.save(bytesFile, format='PNG')
         return discord.File(io.BytesIO(bytesFile.getvalue()), filename='profile.png')
 
-    async def modify_trivia_level(self, member: discord.Member, regress=False):
-        db = mclient.bowser.users
-        dbUser = db.find_one({'_id': member.id})
+    async def modify_trivia_level(self, member: discord.Member, guild: discord.Guild, regress=False):
+        dbUser = await tools.fetch_dbuser(member)
         currentLevel = 0
 
         for t in dbUser['trophies']:
@@ -730,16 +729,24 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         if currentLevel > 0 and newLevel != 0:
             await tools.commit_profile_change(
-                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True, silent=True
+                self.bot,
+                member,
+                guild,
+                'trophy',
+                self.triviaTrophyData[currentLevel][self.INDEX],
+                revoke=True,
+                silent=True,
             )
 
         elif newLevel == 0:
             await tools.commit_profile_change(
-                self.bot, member, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True
+                self.bot, member, guild, 'trophy', self.triviaTrophyData[currentLevel][self.INDEX], revoke=True
             )
 
         if newLevel > 0:
-            await tools.commit_profile_change(self.bot, member, 'trophy', self.triviaTrophyData[newLevel][self.INDEX])
+            await tools.commit_profile_change(
+                self.bot, member, guild, 'trophy', self.triviaTrophyData[newLevel][self.INDEX]
+            )
 
         return newLevel
 
@@ -786,7 +793,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         embed.set_author(name=member.name, icon_url=member.display_avatar.url)
         embed.set_footer(text='❔You can see this info again anytime if you run the /profile edit command')
 
-        main_img = await self._generate_profile_card_from_member(member)
+        main_img = await self._generate_profile_card_from_member(member, member.guild)
         embed.set_image(url='attachment://profile.png')
 
         commandID = 0
@@ -865,6 +872,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_friendcode(self, interaction: discord.Interaction, code: str):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
 
         friendcode = re.search(self.friendCodeRegex['profile'], code)
         if friendcode:  # re match
@@ -910,13 +918,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 f'{config.redTick} The Nintendo Switch friend code you provided is invalid, please try again. The format of a friend code is `SW-0000-0000-0000`, with the zeros replaced with the numbers from your unique code'
             )
 
-        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
+        await interaction.followup.send(
+            msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild)
+        )
 
     @social_group.command(name='flag', description='Choose an emoji flag to display on your profile')
     @app_commands.describe(flag='The flag emoji you wish to set, from the emoji picker')
     async def _profile_flag(self, interaction: discord.Interaction, flag: str):
         await interaction.response.defer(ephemeral=True)
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
         flag = flag.strip()
 
         code_points = self.check_flag(flag)
@@ -936,7 +947,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         db.update_one({'_id': interaction.user.id}, {'$set': {'regionFlag': pointStr, 'profileSetup': True}})
         await interaction.followup.send(
             f'{config.greenTick} Your flag has been successfully updated on your profile card! Here\'s how it looks:',
-            file=await self._generate_profile_card_from_member(interaction.user),
+            file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
         )
 
     async def _profile_timezone_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -957,12 +968,13 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.defer(ephemeral=True)
 
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
         for tz in pytz.all_timezones:
             if timezone.lower() == tz.lower():
                 db.update_one({'_id': interaction.user.id}, {'$set': {'timezone': tz, 'profileSetup': True}})
                 return await interaction.followup.send(
                     f'{config.greenTick} Your timezone has been successfully updated on your profile card! Here\'s how it looks:',
-                    file=await self._generate_profile_card_from_member(interaction.user),
+                    file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
                 )
 
         await interaction.followup.send(
@@ -999,6 +1011,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         await interaction.response.defer(ephemeral=True)
 
         db = mclient.bowser.games
+        await tools.fetch_dbuser(interaction.user)
 
         # If user selected an auto-complete result, we will be provided the deku_id automatically which saves effort
         flagConfirmation = False
@@ -1068,7 +1081,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
 
         # We are good to commit changes
         userDB = mclient.bowser.users
-        userDB.update_one({'_id': interaction.user.id}, {'$set': {'favgames': gameList}})
+        userDB.update_one({'_id': interaction.user.id}, {'$set': {'favgames': gameList, 'profileSetup': True}})
         message_reply = f'{config.greenTick} Your favorite games list has been successfully updated on your profile card! Here\'s how it looks:'
 
         if msg:
@@ -1076,7 +1089,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             await msg.delete()
 
         await interaction.followup.send(
-            message_reply, file=await self._generate_profile_card_from_member(interaction.user), ephemeral=True
+            message_reply,
+            file=await self._generate_profile_card_from_member(interaction.user, interaction.guild),
+            ephemeral=True,
         )
 
     class BackgroundSelectMenu(discord.ui.View):
@@ -1124,7 +1139,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                     await self.message.delete()
                     await interaction.response.send_message(
                         f'{config.greenTick} Your background has been successfully updated on your profile card! Here\'s how it looks:',
-                        file=await self.Parent._generate_profile_card_from_member(interaction.user),
+                        file=await self.Parent._generate_profile_card_from_member(interaction.user, interaction.guild),
                         embed=None,
                         ephemeral=True,
                     )
@@ -1156,8 +1171,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
     async def _profile_background(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        db = mclient.bowser.users
-        user = db.find_one({'_id': interaction.user.id})
+        user = await tools.fetch_dbuser(interaction.user.id)
         bg = user['background']
 
         choices = []
@@ -1208,6 +1222,7 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         }
 
         db = mclient.bowser.users
+        await tools.fetch_dbuser(interaction.user)
         msg = f'Your {element.lower()} {elementKeyPairs[element][1]} been removed from your profile successfully'
         if element == 'Favorite Games':
             db.update_one({'_id': interaction.user.id}, {'$set': {'favgames': []}})
@@ -1221,15 +1236,16 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             msg += '. '
 
         msg += 'Here\'s how it looks:'
-        await interaction.followup.send(msg, file=await self._generate_profile_card_from_member(interaction.user))
+        await interaction.followup.send(
+            msg, file=await self._generate_profile_card_from_member(interaction.user, interaction.guild)
+        )
 
     @social_group.command(
         name='edit', description='Run this command for help with editing your profile and what the other commands do'
     )
     async def _profile_edit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        db = mclient.bowser.users
-        u = db.find_one({'_id': interaction.user.id})
+        u = await tools.fetch_dbuser(interaction.user.id)
         embed, card = await self.generate_user_flow_embed(interaction.user, new_user=not u['profileSetup'])
         await interaction.followup.send(embed=embed, file=card)
 
@@ -1343,13 +1359,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 m = interaction.guild.get_member(user)
                 if not m:
                     try:
-                        m = self.bot.fetch_user(user)
+                        try:
+                            m = await interaction.guild.fetch_member(user)
+
+                        except:
+                            m = await self.bot.fetch_user(user)
 
                     except:
                         failed.append(f'{user}')
                         continue
 
-                newLevel = await self.modify_trivia_level(m)
+                newLevel = await self.modify_trivia_level(m, interaction.guild)
                 stats[newLevel] += 1
 
             except IndexError:
@@ -1393,13 +1413,17 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
                 m = interaction.guild.get_member(user)
                 if not m:
                     try:
-                        m = self.bot.fetch_user(user)
+                        try:
+                            m = await interaction.guild.fetch_member(user)
+
+                        except:
+                            m = await self.bot.fetch_user(user)
 
                     except:
                         failed.append(f'{user}')
                         continue
 
-                newLevel = await self.modify_trivia_level(m, regress=True)
+                newLevel = await self.modify_trivia_level(m, interaction.guild, regress=True)
                 stats[newLevel] += 1
 
             except IndexError:
@@ -1448,7 +1472,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             try:
                 member = interaction.guild.get_member(int(m))
                 if not member:
-                    member = await self.bot.fetch_user(int(m))
+                    try:
+                        member = await interaction.guild.fetch_member(int(m))
+
+                    except discord.NotFound:
+                        member = await self.bot.fetch_user(int(m))
 
                 users.append(member)
 
@@ -1472,8 +1500,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
         failCount = 0
         for m in users:
+            await tools.fetch_dbuser(m)
             try:
-                await tools.commit_profile_change(self.bot, m, item, name)
+                await tools.commit_profile_change(self.bot, m, interaction.guild, item, name)
 
             except (ValueError, AttributeError):
                 failCount += 1
@@ -1513,7 +1542,11 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
             try:
                 member = interaction.guild.get_member(int(m))
                 if not member:
-                    member = await self.bot.fetch_user(int(m))
+                    try:
+                        member = await interaction.guild.fetch_member(int(m))
+
+                    except discord.NotFound:
+                        member = await self.bot.fetch_user(int(m))
 
                 users.append(member)
 
@@ -1530,8 +1563,9 @@ class SocialFeatures(commands.Cog, name='Social Commands'):
         )
         failCount = 0
         for m in users:
+            await tools.fetch_dbuser(m)
             try:
-                await tools.commit_profile_change(self.bot, m, item, name, revoke=True)
+                await tools.commit_profile_change(self.bot, m, interaction.guild, item, name, revoke=True)
 
             except (ValueError, AttributeError):
                 failCount += 1

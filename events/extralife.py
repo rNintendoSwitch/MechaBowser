@@ -1,5 +1,6 @@
 import logging
 import re
+import typing
 from datetime import datetime
 from typing import List
 
@@ -16,7 +17,7 @@ import tools
 class ExtraLife(commands.Cog):
     def __init__(self, bot):
         ################################################################################################################################
-        self.GUILD = 238080556708003851
+        self.GUILD_ID = 238080556708003851
 
         # Donation Alert Consts
         self.EXTRA_LIFE_ADMIN = 772464126483890227
@@ -58,7 +59,7 @@ class ExtraLife(commands.Cog):
 
         self.mclient = pymongo.MongoClient(config.mongoURI)
         self.bot = bot
-        self.guild = self.bot.get_guild(self.GUILD)
+        self.guild = self.bot.get_guild(self.GUILD_ID)
         self.chatRole = self.guild.get_role(self.CHAT_ROLE)
         self.donorRole = self.guild.get_role(self.DONOR_ROLE)
         self.lastDonationID = None
@@ -80,17 +81,19 @@ class ExtraLife(commands.Cog):
         name='ldi', description='Fetch the last donation id stored, and optionally set one manually'
     )
     @app_commands.describe(id='Optionally provide an ID to manually set the last donation ID')
-    async def lastdonorid(self, interaction: discord.Interaction, id: str = None):
+    async def lastdonorid(self, interaction: discord.Interaction, id: typing.Optional[str]):
         self.extra_life_admin = await self.bot.fetch_channel(self.EXTRA_LIFE_ADMIN)
         self.extra_life = await self.bot.fetch_channel(self.EXTRA_LIFE)
         self.general = await self.bot.fetch_channel(self.GENERAL)
         self.donations = await self.bot.fetch_channel(self.DONATIONS)
 
-        if id is None:
-            return await interaction.response.send_message(content=f'Last donation id is `{self.lastDonationID}`')
+        if not id:
+            return await interaction.response.send_message(
+                content=f'Last donation id is currently set to `{str(self.lastDonationID)}`'
+            )
 
         self.lastDonationID = id
-        return await interaction.response.send_message(content=f'Last donation id set to `{id}`')
+        return await interaction.response.send_message(content=f'Last donation id now set to `{id}`')
 
     @extralife_group.command(name='grant', description='Manually grant extra life perks to a list of user ids')
     @app_commands.describe(members='A space separated list of member IDs to grant extra life perks to')
@@ -103,20 +106,24 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
-                await self._assign_properties(obj)
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
 
-            except (ValueError, AttributeError):
+                await tools.fetch_dbuser(obj)
+                await self._change_properties(obj, revoke=False)
+
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
             return await interaction.edit_original_response(
-                content=f'{config.redTick} Failed to grant Extra Life perks all provided members'
+                content=f'{config.redTick} All provided users already have extra life donation perks'
             )
 
         else:
             content = f'{config.greenTick} Extra Life perks granted to {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\n📋 Unable to grant some members perks-- ensure the ID(s) are correct. Otherwise, they already have perks assigned: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @extralife_group.command(name='revoke', description='Manually revoke extra life perks from a list of user ids')
@@ -130,20 +137,24 @@ class ExtraLife(commands.Cog):
         for member in member_list:
             try:
                 obj = interaction.guild.get_member(int(member))
-                await self._remove_properties(obj)
+                if not obj:
+                    obj = await interaction.guild.fetch_member(int(member))
 
-            except (ValueError, AttributeError):
+                await tools.fetch_dbuser(obj)
+                await self._change_properties(obj, revoke=True)
+
+            except (ValueError, AttributeError, discord.NotFound):
                 errors.append(member)
 
         if len(errors) == len(member_list):
             return await interaction.edit_original_response(
-                content=f'{config.redTick} Extra Life perks revoked from 0 members'
+                content=f'{config.redTick} No provided members have perks to remove'
             )
 
         else:
             content = f'{config.greenTick} Extra Life perks revoked from {len(member_list) - len(errors)}/{len(member_list)} member(s)'
             if errors:
-                content += f'.\nFailed users: ```{" ".join(errors)}```'
+                content += f'.\n📋 Unable to revoke some members perks-- ensure the ID(s) are correct. Otherwise, they didn\'t have perks assigned: ```{" ".join(errors)}```'
             return await interaction.edit_original_response(content=content)
 
     @commands.Cog.listener()
@@ -184,19 +195,19 @@ class ExtraLife(commands.Cog):
             donor_name = 'Anonymous' if not 'displayName' in donation else donation['displayName']
             match = re.match(r'[\s\S]+#\d{4}|[a-z0-9._]+', donor_name.lower())
             if match:
-                # Donor name format matches a Discord username
-                member = discord.utils.find(lambda m: str(m) == match.group(0), self.guild.members)
-                if member:
-                    if self.donorRole not in member.roles:
-                        try:
-                            await self._assign_properties(member)
+                # Donor name format matches a Discord username's format
+                potential_members = await self.guild.query_members(query=match.group(0), limit=100)
+                for member in potential_members:
+                    if member.name == match.group(0):
+                        if self.donorRole not in member.roles:
+                            donor_name = donor_name + f' ({member.mention})'
+                            try:
+                                await self._change_properties(member, revoke=False)
 
-                        except ValueError:
-                            await self.extra_life_admin.send(
-                                f':warning: An error occured while attempting to grant donation benefits to `{donor_name}`, they already have the background or trophy'
-                            )
+                            except ValueError:
+                                pass
 
-                    donor_name = donor_name + f' ({member.mention})'
+                            break
 
             donation_time = datetime.strptime(
                 donation['createdDateUTC'], '%Y-%m-%dT%H:%M:%S.%f%z'
@@ -230,15 +241,72 @@ class ExtraLife(commands.Cog):
 
         self.lastDonationID = donations[0]['donationID']
 
-    async def _assign_properties(self, member: discord.Member):
-        await member.add_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY)
-        await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND)
+    async def _change_properties(self, member: discord.Member, revoke: bool):
+        has_valueerror_raised = False
+        if revoke:
+            await member.remove_roles(self.donorRole)
 
-    async def _remove_properties(self, member: discord.Member):
-        await member.remove_roles(self.donorRole)
-        await tools.commit_profile_change(self.bot, member, 'trophy', self.TROPHY, revoke=True)
-        await tools.commit_profile_change(self.bot, member, 'background', self.BACKGROUND, revoke=True)
+        else:
+            await member.add_roles(self.donorRole)
+
+        try:
+            await tools.commit_profile_change(self.bot, member, self.guild, 'trophy', self.TROPHY, revoke=True)
+
+        except ValueError:
+            has_valueerror_raised = True
+            pass
+
+        try:
+            await tools.commit_profile_change(self.bot, member, self.guild, 'background', self.BACKGROUND, revoke=True)
+
+        except ValueError:
+            has_valueerror_raised = True
+            pass
+
+        if has_valueerror_raised:
+            # We always want both commits to run to ensure all changes are made, but reraise the error if either returned ValueError
+            raise ValueError('One or more perks failed to apply')
+
+    @tasks.loop(minutes=5)
+    async def stats_channels(self):
+        try:
+            participant_request = requests.get(self.PARTICIPANT_URL, timeout=8.0, headers=self.REQUEST_HEADERS)
+            participant_request.raise_for_status()
+            participant = participant_request.json()
+        except Exception as e:
+            logging.error(f'[ExtraLife] Unable to fetch donation totals: {e}')
+            return
+
+        raised = participant.get('sumDonations', 0)
+        goal = participant.get('fundraisingGoal', 0)
+        lifetime = self.LIFETIME_BEFORE_YEAR + raised
+
+        await self._rename_channel(
+            self.YEAR_STATS_CHANNEL, f'{self.YEAR} Goal: {self._dollars(raised)} / {self._dollars(goal)}'
+        )
+        if lifetime >= self.LIFETIME_GOAL:
+            lifetime_name = f'Lifetime: {self._dollars(lifetime)} 🎉'
+        else:
+            lifetime_name = f'Lifetime Goal: {self._dollars(lifetime)} / {self._dollars(self.LIFETIME_GOAL)}'
+        await self._rename_channel(self.LIFETIME_STATS_CHANNEL, lifetime_name)
+
+    @staticmethod
+    def _dollars(amount: float) -> str:
+        # Whole dollars, rounded down so we never show a goal as met before it is
+        return '${:,}'.format(int(amount))
+
+    async def _rename_channel(self, channel_id: int, name: str):
+        channel = self.guild.get_channel(channel_id)
+        if channel is None:
+            logging.error(f'[ExtraLife] Stats channel {channel_id} not found')
+            return
+        if channel.name == name:
+            return  # Skip unchanged names; renames are heavily rate limited
+
+        try:
+            await channel.edit(name=name, reason='Extra Life donation totals')
+        except discord.HTTPException as e:
+            logging.error(f'[ExtraLife] Unable to rename stats channel {channel_id}: {e}')
 
     @tasks.loop(minutes=5)
     async def stats_channels(self):
